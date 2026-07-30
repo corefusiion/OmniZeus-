@@ -28,6 +28,7 @@ export interface EmployeeUser {
   department: string;
   role: 'gestor' | 'funcionario';
   allowedModules: string[]; // ['omni-ia', 'financeiro', 'whatsapp-bot', 'tarefas', 'documentos', 'apresentacoes', 'contaazul']
+  birthDate?: string;
   status: 'Ativo' | 'Inativo';
   createdAt: string;
 }
@@ -50,12 +51,40 @@ export const INITIAL_COMPANIES: CompanyProfile[] = [
     cnpj: '42.189.902/0001-55',
     city: 'Salvador',
     state: 'BA',
-    plan: 'Premium',
-    coinsFranchise: 15000,
+    plan: 'Business',
+    coinsFranchise: 50000,
     activeClientsCount: 142,
-    monthlyRevenueBrl: 184500.00,
+    monthlyRevenueBrl: 1990.00,
     status: 'Ativo',
     createdAt: '2026-01-15T10:00:00.000Z'
+  },
+  {
+    id: 'comp_alpha',
+    corporateName: 'Alpha BPO Financeiro Ltda',
+    tradeName: 'Alpha BPO',
+    cnpj: '18.420.910/0001-88',
+    city: 'São Paulo',
+    state: 'SP',
+    plan: 'Premium',
+    coinsFranchise: 15000,
+    activeClientsCount: 86,
+    monthlyRevenueBrl: 890.00,
+    status: 'Ativo',
+    createdAt: '2026-02-01T14:30:00.000Z'
+  },
+  {
+    id: 'comp_beta',
+    corporateName: 'Beta Tax Consultoria Tributária Ltda',
+    tradeName: 'Beta Tax',
+    cnpj: '33.918.402/0001-12',
+    city: 'Curitiba',
+    state: 'PR',
+    plan: 'Profissional',
+    coinsFranchise: 5000,
+    activeClientsCount: 42,
+    monthlyRevenueBrl: 490.00,
+    status: 'Ativo',
+    createdAt: '2026-02-10T09:15:00.000Z'
   }
 ];
 
@@ -70,6 +99,28 @@ export const INITIAL_EMPLOYEES: EmployeeUser[] = [
     allowedModules: ['omni-ia', 'financeiro', 'contaazul', 'whatsapp-bot', 'tarefas', 'documentos', 'apresentacoes'],
     status: 'Ativo',
     createdAt: '2026-01-15T10:00:00.000Z'
+  },
+  {
+    id: 'emp_alpha_1',
+    companyId: 'comp_alpha',
+    name: 'Roberto Santos',
+    email: 'roberto@alphabpo.com.br',
+    department: 'Gerência Operacional',
+    role: 'gestor',
+    allowedModules: ['omni-ia', 'financeiro', 'tarefas', 'documentos'],
+    status: 'Ativo',
+    createdAt: '2026-02-01T14:30:00.000Z'
+  },
+  {
+    id: 'emp_beta_1',
+    companyId: 'comp_beta',
+    name: 'Fernanda Lima',
+    email: 'fernanda@betatax.com.br',
+    department: 'Consultoria Tributária',
+    role: 'gestor',
+    allowedModules: ['omni-ia', 'tarefas', 'apresentacoes'],
+    status: 'Ativo',
+    createdAt: '2026-02-10T09:15:00.000Z'
   }
 ];
 
@@ -138,34 +189,71 @@ export function getCompanies(): CompanyProfile[] {
   return inMemoryCompanies;
 }
 
-export function saveCompany(companyData: Omit<CompanyProfile, 'id' | 'createdAt'>): CompanyProfile {
-  const newComp: CompanyProfile = {
-    ...companyData,
-    id: `comp_${Date.now()}`,
-    createdAt: new Date().toISOString()
-  };
+export function saveCompany(companyData: Partial<CompanyProfile> & Omit<CompanyProfile, 'createdAt'>): CompanyProfile {
+  const existingIndex = companyData.id ? inMemoryCompanies.findIndex(c => c.id === companyData.id) : -1;
 
-  inMemoryCompanies = [newComp, ...inMemoryCompanies];
+  if (existingIndex >= 0) {
+    const updated: CompanyProfile = {
+      ...inMemoryCompanies[existingIndex],
+      ...companyData
+    };
+    inMemoryCompanies[existingIndex] = updated;
 
-  insertServerTable('companies', {
-    id: newComp.id,
-    corporate_name: newComp.corporateName,
-    tradeName: newComp.tradeName,
-    cnpj: newComp.cnpj,
-    city: newComp.city,
-    state: newComp.state,
-    plan: newComp.plan,
-    coins_franchise: newComp.coinsFranchise,
-    monthly_revenue_brl: newComp.monthlyRevenueBrl,
-    activeClientsCount: newComp.activeClientsCount,
-    status: newComp.status,
-    created_at: newComp.createdAt
-  }).catch(() => {});
+    updateServerTableRecord('companies', {
+      id: updated.id,
+      corporate_name: updated.corporateName,
+      tradeName: updated.tradeName,
+      cnpj: updated.cnpj,
+      city: updated.city,
+      state: updated.state,
+      plan: updated.plan,
+      coins_franchise: updated.coinsFranchise,
+      monthly_revenue_brl: updated.monthlyRevenueBrl,
+      status: updated.status
+    }).catch(() => {});
 
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('omnizeus_companies_change'));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('omnizeus_companies_change'));
+    }
+    return updated;
+  } else {
+    const newComp: CompanyProfile = {
+      id: companyData.id || `comp_${Date.now()}`,
+      corporateName: companyData.corporateName || '',
+      tradeName: companyData.tradeName || companyData.corporateName || '',
+      cnpj: companyData.cnpj || '',
+      city: companyData.city || 'São Paulo',
+      state: companyData.state || 'SP',
+      plan: companyData.plan || 'Premium',
+      coinsFranchise: companyData.coinsFranchise || 15000,
+      activeClientsCount: companyData.activeClientsCount || 1,
+      monthlyRevenueBrl: companyData.monthlyRevenueBrl || (companyData.plan === 'Business' ? 1990 : companyData.plan === 'Premium' ? 890 : 490),
+      status: companyData.status || 'Ativo',
+      createdAt: new Date().toISOString()
+    };
+
+    inMemoryCompanies = [newComp, ...inMemoryCompanies];
+
+    insertServerTable('companies', {
+      id: newComp.id,
+      corporate_name: newComp.corporateName,
+      tradeName: newComp.tradeName,
+      cnpj: newComp.cnpj,
+      city: newComp.city,
+      state: newComp.state,
+      plan: newComp.plan,
+      coins_franchise: newComp.coinsFranchise,
+      monthly_revenue_brl: newComp.monthlyRevenueBrl,
+      activeClientsCount: newComp.activeClientsCount,
+      status: newComp.status,
+      created_at: newComp.createdAt
+    }).catch(() => {});
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('omnizeus_companies_change'));
+    }
+    return newComp;
   }
-  return newComp;
 }
 
 // Employee Operations
@@ -206,10 +294,10 @@ export function saveEmployee(empData: Omit<EmployeeUser, 'id' | 'createdAt'>): E
   return newEmp;
 }
 
-export function updateEmployeePermissions(employeeId: string, allowedModules: string[]): void {
-  inMemoryEmployees = inMemoryEmployees.map(e => e.id === employeeId ? { ...e, allowedModules } : e);
+export function updateEmployee(employeeData: Partial<EmployeeUser> & { id: string }): void {
+  inMemoryEmployees = inMemoryEmployees.map(e => e.id === employeeData.id ? { ...e, ...employeeData } : e);
   
-  const target = inMemoryEmployees.find(e => e.id === employeeId);
+  const target = inMemoryEmployees.find(e => e.id === employeeData.id);
   if (target) {
     updateServerTableRecord('employees', {
       id: target.id,
@@ -218,7 +306,8 @@ export function updateEmployeePermissions(employeeId: string, allowedModules: st
       email: target.email,
       department: target.department,
       role: target.role,
-      allowed_modules: allowedModules,
+      allowed_modules: target.allowedModules,
+      birth_date: target.birthDate,
       status: target.status
     }).catch(() => {});
   }
@@ -226,6 +315,10 @@ export function updateEmployeePermissions(employeeId: string, allowedModules: st
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('omnizeus_employees_change'));
   }
+}
+
+export function updateEmployeePermissions(employeeId: string, allowedModules: string[]): void {
+  updateEmployee({ id: employeeId, allowedModules });
 }
 
 export function deleteEmployee(employeeId: string): void {

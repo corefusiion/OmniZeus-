@@ -258,3 +258,24 @@ export async function insertAIStressTestLog(log: any) { return insertServerTable
 export async function fetchAIUsageMetrics() { return fetchServerTable('ai_usage_metrics'); }
 export async function insertAIUsageMetric(metric: any) { return insertServerTable('ai_usage_metrics', metric); }
 
+export async function fetchAuditLogs() { return fetchServerTable('audit_logs'); }
+export async function insertAuditLog(log: {
+  companyId: string;
+  userId: string;
+  userName: string;
+  action: string;
+  resource: string;
+  details?: string;
+}) {
+  return insertServerTable('audit_logs', {
+    id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+    company_id: log.companyId,
+    user_id: log.userId,
+    user_name: log.userName,
+    action: log.action,
+    resource: log.resource,
+    details: log.details || '',
+    created_at: new Date().toISOString()
+  });
+}
+

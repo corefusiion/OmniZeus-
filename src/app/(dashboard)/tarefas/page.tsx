@@ -212,32 +212,46 @@ export default function TarefasPage() {
     } catch (e) {}
   };
 
+function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'concluido' {
+  const str = String(rawStatus || '').toLowerCase().trim();
+  if (str.includes('andamento') || str === 'em_andamento') return 'em_andamento';
+  if (str.includes('conclu') || str === 'concluido') return 'concluido';
+  return 'pendente';
+}
+
   const loadTasks = async () => {
     setLoading(true);
     try {
       const records = await fetchTasks();
       if (Array.isArray(records) && records.length > 0) {
-        const mapped: TaskRecord[] = records.map((r: any) => ({
-          id: r.id || `task_${Date.now()}`,
-          title: r.title || "Sem título",
-          description: r.description || r.observacoes || "",
-          client: r.client || "Cliente Geral",
-          department: r.department || "Fiscal",
-          assignee: r.assignee || r.assignee_name || "Carlos Mendes",
-          assignee_id: r.assignee_id,
-          priority: (r.priority as any) || "media",
-          status: (r.status as any) || "pendente",
-          time_spent_sec: Number(r.time_spent_sec !== undefined ? r.time_spent_sec : (r.timeSpentSec || 0)),
-          started_at: r.started_at || null,
-          completed_at: r.completed_at || null,
-          duration_sec: r.duration_sec != null ? Number(r.duration_sec) : null,
-          execution_report: r.execution_report || r.executionReport || null,
-          updates_history: Array.isArray(r.updates_history) ? r.updates_history : [],
-          created_at: r.created_at || new Date().toISOString(),
-          company_id: r.company_id || "comp_zenitus",
-          isTimerRunning: false
-        }));
-        setTasks(mapped);
+        const uniqueMap = new Map<string, TaskRecord>();
+        records.forEach((r: any) => {
+          const norm: TaskRecord = {
+            id: r.id || `task_${Date.now()}`,
+            title: r.title || "Sem título",
+            description: r.description || r.observacoes || "",
+            client: r.client || "Cliente Geral",
+            department: r.department || "Fiscal",
+            assignee: r.assignee || r.assignee_name || "Carlos Mendes",
+            assignee_id: r.assignee_id,
+            priority: (r.priority as any) || "media",
+            status: normalizeTaskStatus(r.status),
+            time_spent_sec: Number(r.time_spent_sec !== undefined ? r.time_spent_sec : (r.timeSpentSec || 0)),
+            started_at: r.started_at || null,
+            completed_at: r.completed_at || null,
+            duration_sec: r.duration_sec != null ? Number(r.duration_sec) : null,
+            execution_report: r.execution_report || r.executionReport || null,
+            updates_history: Array.isArray(r.updates_history) ? r.updates_history : [],
+            created_at: r.created_at || new Date().toISOString(),
+            company_id: r.company_id || "comp_zenitus",
+            isTimerRunning: false
+          };
+          const key = `${norm.id}_${norm.title}`;
+          if (!uniqueMap.has(key)) {
+            uniqueMap.set(key, norm);
+          }
+        });
+        setTasks(Array.from(uniqueMap.values()));
       } else {
         for (const mockTask of INITIAL_MOCK_TASKS) {
           await insertTask(mockTask);
@@ -426,9 +440,9 @@ export default function TarefasPage() {
 
   // Calculated Metrics
   const totalTasks = tasks.length;
-  const pendingCount = tasks.filter(t => t.status === "pendente").length;
-  const inProgressCount = tasks.filter(t => t.status === "em_andamento").length;
-  const completedCount = tasks.filter(t => t.status === "concluido").length;
+  const pendingCount = tasks.filter(t => normalizeTaskStatus(t.status) === "pendente").length;
+  const inProgressCount = tasks.filter(t => normalizeTaskStatus(t.status) === "em_andamento").length;
+  const completedCount = tasks.filter(t => normalizeTaskStatus(t.status) === "concluido").length;
   const totalTimeSpentSec = tasks.reduce((sum, t) => sum + (t.time_spent_sec || 0), 0);
 
   // Filtered Tasks list
@@ -442,7 +456,7 @@ export default function TarefasPage() {
       if (!matchTitle && !matchClient && !matchAssignee) return false;
     }
     // Status Filter
-    if (statusFilter !== 'todos' && t.status !== statusFilter) {
+    if (statusFilter !== 'todos' && normalizeTaskStatus(t.status) !== statusFilter) {
       return false;
     }
     // Department Filter

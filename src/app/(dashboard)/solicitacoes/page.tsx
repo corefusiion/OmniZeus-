@@ -74,6 +74,12 @@ const DEFAULT_REQUESTS: PurchaseRequest[] = [
 ];
 
 function normalizeRequest(item: any): PurchaseRequest {
+  let rawStatus = String(item.status || "Pendente").trim();
+  let status: 'Pendente' | 'Aprovado' | 'Recusado' = 'Pendente';
+  if (rawStatus.toLowerCase() === 'aprovado') status = 'Aprovado';
+  else if (rawStatus.toLowerCase() === 'recusado' || rawStatus.toLowerCase() === 'reprovado') status = 'Recusado';
+  else status = 'Pendente';
+
   return {
     id: item.id || `req_${Date.now()}_${Math.random()}`,
     reqNumber: item.reqNumber || item.req_number || `REQ-2026-${Math.floor(Math.random()*900+100)}`,
@@ -84,7 +90,7 @@ function normalizeRequest(item: any): PurchaseRequest {
     description: item.description || "",
     valueBrl: Number(item.valueBrl ?? item.value_brl ?? 0),
     coinsAmount: item.coinsAmount ?? item.coins_amount,
-    status: item.status || "Pendente",
+    status: status,
     createdAt: item.createdAt || item.created_at || new Date().toISOString(),
     approvedBy: item.approvedBy || item.approved_by,
     approvedAt: item.approvedAt || item.approved_at,
@@ -148,7 +154,15 @@ export default function SolicitacoesPage() {
     try {
       const data = await fetchPurchaseRequests();
       if (Array.isArray(data) && data.length > 0) {
-        setRequests(data.map(normalizeRequest));
+        const uniqueMap = new Map<string, PurchaseRequest>();
+        data.forEach((item: any) => {
+          const norm = normalizeRequest(item);
+          const key = `${norm.reqNumber}_${norm.requesterName}_${norm.description}`;
+          if (!uniqueMap.has(key)) {
+            uniqueMap.set(key, norm);
+          }
+        });
+        setRequests(Array.from(uniqueMap.values()));
       } else {
         for (const req of DEFAULT_REQUESTS) {
           await insertPurchaseRequest(req);
@@ -307,7 +321,7 @@ export default function SolicitacoesPage() {
   });
 
   const filteredRequests = visibleRequests.filter(r => {
-    const matchesStatus = filterStatus === 'Todos' || r.status === filterStatus;
+    const matchesStatus = filterStatus === 'Todos' || r.status.toLowerCase().trim() === filterStatus.toLowerCase().trim();
     const matchesDepartment = filterDepartment === 'Todos' || r.department === filterDepartment;
     const matchesType = filterType === 'Todos' || r.type === filterType;
     const matchesSearch = r.reqNumber.toLowerCase().includes(search.toLowerCase()) ||

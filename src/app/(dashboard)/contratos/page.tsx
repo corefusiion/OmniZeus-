@@ -53,14 +53,14 @@ const DEFAULT_CONTRACTS: BpoContract[] = [
     monthlyFeeBrl: 7200.00,
     adjustmentIndex: "IGP-M",
     lastAdjustmentDate: "2025-09-15",
-    nextAdjustmentDate: "2026-09-15",
-    startDate: "2025-09-15",
-    endDate: "2026-09-15",
+    nextAdjustmentDate: "2026-08-15",
+    startDate: "2025-08-15",
+    endDate: "2026-08-15",
     entriesLimit: 800,
     costCenter: "Contábil",
     allocatedHoursMonth: 35,
     hourlyRateBrl: 60.00,
-    status: "Ativo"
+    status: "Vencendo"
   },
   {
     id: "ct_303",
@@ -120,15 +120,15 @@ const DEFAULT_CONTRACTS: BpoContract[] = [
     cnpj: "33.444.555/0001-88",
     monthlyFeeBrl: 3800.00,
     adjustmentIndex: "INPC",
-    lastAdjustmentDate: "2026-01-05",
-    nextAdjustmentDate: "2027-01-05",
-    startDate: "2026-01-05",
-    endDate: "2027-01-05",
+    lastAdjustmentDate: "2025-01-05",
+    nextAdjustmentDate: "2026-01-05",
+    startDate: "2025-01-05",
+    endDate: "2026-01-05",
     entriesLimit: 300,
     costCenter: "Departamento Pessoal",
     allocatedHoursMonth: 22,
     hourlyRateBrl: 52.00,
-    status: "Ativo"
+    status: "Cancelado"
   }
 ];
 
@@ -174,6 +174,9 @@ export default function ContratosPage() {
   const [allocatedHoursInput, setAllocatedHoursInput] = useState(20);
   const [hourlyRateInput, setHourlyRateInput] = useState("50,00");
   const [statusInput, setStatusInput] = useState<'Ativo' | 'Em Reajuste' | 'Vencendo' | 'Cancelado'>("Ativo");
+  const [startDateInput, setStartDateInput] = useState(new Date().toISOString().split('T')[0]);
+  const [endDateInput, setEndDateInput] = useState(new Date(Date.now() + 365*24*3600*1000).toISOString().split('T')[0]);
+  const [nextAdjustmentDateInput, setNextAdjustmentDateInput] = useState(new Date(Date.now() + 365*24*3600*1000).toISOString().split('T')[0]);
 
   // Adjustment Modal State
   const [adjustingContract, setAdjustingContract] = useState<BpoContract | null>(null);
@@ -226,6 +229,9 @@ export default function ContratosPage() {
     setAllocatedHoursInput(20);
     setHourlyRateInput("50,00");
     setStatusInput("Ativo");
+    setStartDateInput(new Date().toISOString().split('T')[0]);
+    setEndDateInput(new Date(Date.now() + 365*24*3600*1000).toISOString().split('T')[0]);
+    setNextAdjustmentDateInput(new Date(Date.now() + 365*24*3600*1000).toISOString().split('T')[0]);
     setShowModal(true);
   };
 
@@ -240,6 +246,9 @@ export default function ContratosPage() {
     setAllocatedHoursInput(c.allocatedHoursMonth);
     setHourlyRateInput(c.hourlyRateBrl.toLocaleString('pt-BR', { minimumFractionDigits: 2 }));
     setStatusInput(c.status);
+    setStartDateInput(c.startDate || new Date().toISOString().split('T')[0]);
+    setEndDateInput(c.endDate || new Date(Date.now() + 365*24*3600*1000).toISOString().split('T')[0]);
+    setNextAdjustmentDateInput(c.nextAdjustmentDate || new Date(Date.now() + 365*24*3600*1000).toISOString().split('T')[0]);
     setShowModal(true);
   };
 
@@ -261,7 +270,10 @@ export default function ContratosPage() {
         entriesLimit: entriesLimitInput,
         allocatedHoursMonth: allocatedHoursInput,
         hourlyRateBrl: rateVal,
-        status: statusInput
+        status: statusInput,
+        startDate: startDateInput,
+        endDate: endDateInput,
+        nextAdjustmentDate: nextAdjustmentDateInput
       };
 
       await updateContract(updatedContract);
@@ -279,9 +291,9 @@ export default function ContratosPage() {
         monthlyFeeBrl: feeVal,
         adjustmentIndex: indexInput,
         lastAdjustmentDate: new Date().toISOString().split('T')[0],
-        nextAdjustmentDate: new Date(Date.now() + 365*24*3600*1000).toISOString().split('T')[0],
-        startDate: new Date().toISOString().split('T')[0],
-        endDate: new Date(Date.now() + 365*24*3600*1000).toISOString().split('T')[0],
+        nextAdjustmentDate: nextAdjustmentDateInput || new Date(Date.now() + 365*24*3600*1000).toISOString().split('T')[0],
+        startDate: startDateInput || new Date().toISOString().split('T')[0],
+        endDate: endDateInput || new Date(Date.now() + 365*24*3600*1000).toISOString().split('T')[0],
         entriesLimit: entriesLimitInput,
         costCenter: costCenterInput,
         allocatedHoursMonth: allocatedHoursInput,
@@ -576,6 +588,36 @@ export default function ContratosPage() {
                   </select>
                 </div>
               </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Início Vigência:</label>
+                  <input
+                    type="date"
+                    value={startDateInput}
+                    onChange={(e) => setStartDateInput(e.target.value)}
+                    className="w-full h-9 px-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Vencimento Contrato:</label>
+                  <input
+                    type="date"
+                    value={endDateInput}
+                    onChange={(e) => setEndDateInput(e.target.value)}
+                    className="w-full h-9 px-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Próx. Reajuste:</label>
+                  <input
+                    type="date"
+                    value={nextAdjustmentDateInput}
+                    onChange={(e) => setNextAdjustmentDateInput(e.target.value)}
+                    className="w-full h-9 px-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
@@ -752,8 +794,10 @@ export default function ContratosPage() {
               <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[10px] bg-slate-50">
                 <th className="py-3 px-4">Contrato</th>
                 <th className="py-3 px-4">Cliente / CNPJ</th>
+                <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-4">Centro de Custo</th>
                 <th className="py-3 px-4 text-right">Honorário Mensal</th>
+                <th className="py-3 px-4 text-center">Vigência / Vencimento</th>
                 <th className="py-3 px-4 text-center">Índice / Próx. Reajuste</th>
                 <th className="py-3 px-4 text-right">Rentabilidade (Margem)</th>
                 <th className="py-3 px-4 text-right">Ação</th>
@@ -762,13 +806,13 @@ export default function ContratosPage() {
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-400">
+                  <td colSpan={9} className="py-8 text-center text-slate-400">
                     Carregando contratos via servidor SQLite...
                   </td>
                 </tr>
               ) : filteredContracts.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                  <td colSpan={9} className="py-12 text-center text-slate-400">
                     Nenhum contrato encontrado para os filtros selecionados.
                   </td>
                 </tr>
@@ -786,12 +830,34 @@ export default function ContratosPage() {
                         <span className="text-[10px] text-slate-500 font-mono">{c.cnpj}</span>
                       </td>
                       <td className="py-3.5 px-4">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border inline-flex items-center gap-1 ${
+                          c.status === 'Ativo' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                          c.status === 'Vencendo' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                          c.status === 'Em Reajuste' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                          'bg-slate-100 text-slate-500 border-slate-200'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            c.status === 'Ativo' ? 'bg-emerald-500' :
+                            c.status === 'Vencendo' ? 'bg-amber-500 animate-pulse' :
+                            c.status === 'Em Reajuste' ? 'bg-purple-500' :
+                            'bg-slate-400'
+                          }`} />
+                          {c.status}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
                         <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-bold border border-slate-200">
                           {c.costCenter}
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-right font-extrabold text-slate-900">
                         R$ {c.monthlyFeeBrl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-3.5 px-4 text-center">
+                        <span className={`font-bold block text-[11px] ${c.status === 'Vencendo' ? 'text-amber-700 font-extrabold' : 'text-slate-800'}`}>
+                          Até: {c.endDate || 'N/I'}
+                        </span>
+                        <span className="text-[10px] text-slate-400">De: {c.startDate || 'N/I'}</span>
                       </td>
                       <td className="py-3.5 px-4 text-center">
                         <span className="font-bold text-purple-700 block">{c.adjustmentIndex}</span>

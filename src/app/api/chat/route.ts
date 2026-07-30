@@ -34,6 +34,7 @@ function getSavedSettings(): any {
 }
 
 function recordChatMetrics(
+  companyId: string,
   model: string,
   persona: string,
   promptLength: number,
@@ -47,6 +48,7 @@ function recordChatMetrics(
 
     const stressLog = {
       id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      company_id: companyId || "comp_zenitus",
       timestamp: now,
       model: model || "google/gemini-2.5-pro",
       persona: persona || "geral",
@@ -65,6 +67,7 @@ function recordChatMetrics(
 
     const usageMetric = {
       id: `metric_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      company_id: companyId || "comp_zenitus",
       model: model || "google/gemini-2.5-pro",
       persona: persona || "geral",
       prompt_length: promptLength,
@@ -92,8 +95,9 @@ export async function POST(req: NextRequest) {
   const startTime = Date.now();
   try {
     const body = await req.json();
-    const { messages, personaPrompt, persona, clientApiKey } = body;
+    const { messages, personaPrompt, persona, clientApiKey, companyId } = body;
     let { model } = body;
+    const activeTenantId = companyId || req.headers.get("x-company-id") || "comp_zenitus";
 
     const headerKey = req.headers.get("x-openrouter-key");
     const dbSettings = getSavedSettings();
@@ -109,27 +113,67 @@ export async function POST(req: NextRequest) {
       model = dbSettings.custom_ai_model || "auto";
     }
 
+    // Calculate current time & date in Brazil (America/Sao_Paulo)
+    const nowBrazil = new Date();
+    const dateStr = nowBrazil.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    const timeStr = nowBrazil.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+    const currentHour = parseInt(nowBrazil.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }), 10);
+
+    let periodOfDay = "Manhã";
+    let correctGreeting = "Bom dia";
+    if (currentHour >= 12 && currentHour < 18) {
+      periodOfDay = "Tarde";
+      correctGreeting = "Boa tarde";
+    } else if (currentHour >= 18 || currentHour < 5) {
+      periodOfDay = "Noite";
+      correctGreeting = "Boa noite";
+    }
+
     if (!activeApiKey || activeApiKey.includes("sk-or-v1-master-****")) {
       // Fallback response when key is not yet set
       const lastUserMsg = messages?.[messages.length - 1]?.content || "";
-      let responseText = `[OmniRoute Local Engine / OpenRouter API - 2026 Model]\n\nResposta processada pelo modelo de ponta ${model || 'Claude 3.7 Sonnet'}.\n\nAnálise para "${lastUserMsg}": Parâmetros tributários e regulatórios verificados para a Zenitus Inteligência Contábil. Insira sua chave real da OpenRouter ou OmniRoute no Painel Super ADM Master para conexões nativas diretas.`;
+      const lowerMsg = lastUserMsg.toLowerCase();
+      let timeCorrectionNotice = "";
+      
+      if (lowerMsg.includes("bom dia") && (periodOfDay === "Tarde" || periodOfDay === "Noite")) {
+        timeCorrectionNotice = `${correctGreeting}! 😄 Notei que você disse "bom dia", mas no relógio do sistema já são ${timeStr} (${periodOfDay.toLowerCase()}).\n\n`;
+      } else if (lowerMsg.includes("boa tarde") && (periodOfDay === "Manhã" || periodOfDay === "Noite")) {
+        timeCorrectionNotice = `${correctGreeting}! 😄 Notei que você disse "boa tarde", mas no relógio do sistema já são ${timeStr} (${periodOfDay.toLowerCase()}).\n\n`;
+      } else if (lowerMsg.includes("boa noite") && (periodOfDay === "Manhã" || periodOfDay === "Tarde")) {
+        timeCorrectionNotice = `${correctGreeting}! 😄 Notei que você disse "boa noite", mas no relógio do sistema já são ${timeStr} (${periodOfDay.toLowerCase()}).\n\n`;
+      }
+
+      let responseText = `${timeCorrectionNotice}[OmniRoute Local Engine / OpenRouter API - 2026 Model]\n\nResposta processada pelo modelo de ponta ${model || 'Claude 3.7 Sonnet'}.\n\nAnálise para "${lastUserMsg}": Parâmetros tributários e regulatórios verificados para a Zenitus Inteligência Contábil. Insira sua chave real da OpenRouter ou OmniRoute no Painel Super ADM Master para conexões nativas diretas.`;
 
       if (personaPrompt?.includes("SPED")) {
-        responseText = `[OmniRoute Local Engine - ${model || 'SPED & Fiscal'}]\n\nAnálise tributária avançada para "${lastUserMsg}":\n\n1. Enquadramento e Fator R: Cálculo da razão Folha(12m) / Receita Bruta(12m) validado.\n2. Obrigações Acessórias: DCTFWeb, PGDAS-D e EFD-Reinf em conformidade com as Instruções Normativas vigentes no e-CAC.\n3. Recomendação Técnica: Retenção na fonte das contribuições federais conforme IN RFB aplicável.`;
+        responseText = `${timeCorrectionNotice}[OmniRoute Local Engine - ${model || 'SPED & Fiscal'}]\n\nAnálise tributária avançada para "${lastUserMsg}":\n\n1. Enquadramento e Fator R: Cálculo da razão Folha(12m) / Receita Bruta(12m) validado.\n2. Obrigações Acessórias: DCTFWeb, PGDAS-D e EFD-Reinf em conformidade com as Instruções Normativas vigentes no e-CAC.\n3. Recomendação Técnica: Retenção na fonte das contribuições federais conforme IN RFB aplicável.`;
       }
 
       const durationMs = Date.now() - startTime;
       const promptLen = JSON.stringify(messages || []).length;
-      recordChatMetrics(model, persona || "geral", promptLen, responseText.length, (messages || []).length, durationMs);
+      recordChatMetrics(activeTenantId, model, persona || "geral", promptLen, responseText.length, (messages || []).length, durationMs);
 
       return new NextResponse(responseText, {
         headers: { "Content-Type": "text/plain; charset=utf-8" },
       });
     }
 
-    // Inject Dynamic System Context and Formatting Rules
-    let systemContextAddon = "\n\n[DIRETRIZES DE ACESSO E CONTEXTO GLOBAL OMNIZEUS]\n";
-    systemContextAddon += "Você é um agente nativo da plataforma OmniZeus da Zenitus Contábil. Você TEM ACESSO VERDADEIRO aos dados sistêmicos listados abaixo. NUNCA diga ao usuário que você não tem acesso, que ele precisa consultar o sistema manualmente, ou que você é apenas uma IA sem acesso externo. Assuma os dados abaixo como a fonte oficial da verdade em tempo real:\n";
+    // Inject Dynamic System Context, Real-time Clock Awareness, and Formatting Rules
+    let systemContextAddon = "\n\n[CONTEXTO TEMPORAL E DATA/HORA ATUAL DO SISTEMA (FUSO AMÉRICA/SÃO PAULO)]\n";
+    systemContextAddon += `- Data Atual: ${dateStr}\n`;
+    systemContextAddon += `- Hora Atual (Horário de Brasília): ${timeStr}\n`;
+    systemContextAddon += `- Período do Dia: ${periodOfDay} (Saudação oficial no momento: "${correctGreeting}")\n\n`;
+
+    systemContextAddon += "[DIRETRIZES DE SAUDAÇÃO E INTELIGÊNCIA TEMPORAL (MUITO IMPORTANTE)]\n";
+    systemContextAddon += `1. VOCÊ É PLENAMENTE CONSCIENTE DO HORÁRIO E PERÍODO DO DIA ATUAL (${timeStr} - ${periodOfDay}).\n`;
+    systemContextAddon += `2. Se o usuário utilizar uma saudação incompatível com o horário real (por exemplo, disser "Bom dia" quando já for Noite ou Tarde, ou "Boa Noite" durante o dia), VOCÊ DEVE RECONHECER E CORRIGIR A SAUDAÇÃO DE FORMA INTELIGENTE, AMÁVEL E GENTIL COM BOM HUMOR.\n`;
+    systemContextAddon += `   - Exemplo (se o usuário disser "Bom dia" quando já for Noite - ${timeStr}):\n`;
+    systemContextAddon += `     "${correctGreeting}! 😄 Notei que você me deu 'bom dia', mas no relógio do sistema já são ${timeStr} (${periodOfDay.toLowerCase()})... Seja bem-vindo ao OmniZeus! Como posso te ajudar esta noite?"\n`;
+    systemContextAddon += `3. NUNCA responda "Bom dia" se o período do dia for Tarde ou Noite! Responda SEMPRE com a saudação condizente com o relógio do sistema (${correctGreeting}).\n\n`;
+
+    systemContextAddon += "[DIRETRIZES DE ACESSO E CONTEXTO GLOBAL OMNIZEUS (MULTI-TENANT ISOLADO)]\n";
+    systemContextAddon += `Empresa/Tenant ID do Usuário Logado: ${activeTenantId}\n`;
+    systemContextAddon += "Você é um agente nativo da plataforma OmniZeus. Você TEM ACESSO VERDADEIRO aos dados sistêmicos deste tenant. NUNCA diga ao usuário que você não tem acesso ou que ele precisa consultar o sistema manualmente:\n";
 
     try {
       // Inject Conta Azul Customers Details
@@ -149,7 +193,7 @@ export async function POST(req: NextRequest) {
         const sqlData = JSON.parse(fs.readFileSync(sqlPath, "utf-8"));
         
         // Tasks
-        const tasks = sqlData.tasks || [];
+        const tasks = (sqlData.tasks || []).filter((t: any) => !t.company_id || t.company_id === activeTenantId);
         const pendingTasks = tasks.filter((t: any) => t.status === "Pendente" || t.status === "pendente").length;
         systemContextAddon += `- GESTÃO DE TAREFAS: Existem ${pendingTasks} tarefas operacionais pendentes na fila da equipe (Total de ${tasks.length} tarefas cadastradas):\n`;
         tasks.forEach((t: any) => {
@@ -157,21 +201,23 @@ export async function POST(req: NextRequest) {
         });
 
         // Contracts
-        const contracts = sqlData.contracts || [];
+        const contracts = (sqlData.contracts || []).filter((ct: any) => !ct.company_id || ct.company_id === activeTenantId);
         systemContextAddon += `- CONTRATOS BPO/CONTÁBIL (CLIENTES RECORRENTES ATIVOS): Apenas ${contracts.length} clientes possuem contrato mensal formalizado:\n`;
         contracts.forEach((ct: any) => {
           systemContextAddon += `  * [${ct.contract_number || ct.contractNumber}] ${ct.client_name || ct.clientName} (CNPJ: ${ct.cnpj}) | Mensalidade: R$ ${(ct.monthly_fee_brl || ct.monthlyFeeBrl)?.toFixed(2)} | Reajuste: ${ct.adjustment_index || ct.adjustmentIndex} em ${ct.next_adjustment_date || ct.nextAdjustmentDate} | Status: ${ct.status}\n`;
         });
 
         // Payables
-        const payables = sqlData.payables || sqlData.payables_list || sqlData.omnizeus_payables_list || [];
+        const payablesAll = sqlData.payables || sqlData.payables_list || sqlData.omnizeus_payables_list || [];
+        const payables = payablesAll.filter((p: any) => !p.company_id || p.company_id === activeTenantId);
         systemContextAddon += `- CONTAS A PAGAR (PAYABLES): ${payables.length} títulos financeiros cadastrados:\n`;
         payables.forEach((p: any) => {
           systemContextAddon += `  * [${p.id}] ${p.desc || p.description} | Fornecedor: ${p.fornecedor || p.vendor} | Valor: R$ ${(p.valor || p.value_brl)?.toFixed(2)} | Vencimento: ${p.vencimento || p.due_date} | Status: ${p.status}\n`;
         });
 
         // Purchase Requests
-        const reqs = sqlData.purchase_requests || [];
+        const reqsAll = sqlData.purchase_requests || [];
+        const reqs = reqsAll.filter((r: any) => !r.company_id || r.company_id === activeTenantId);
         if (reqs.length > 0) {
           systemContextAddon += `- SOLICITAÇÕES DE COMPRA: ${reqs.length} requisições cadastradas:\n`;
           reqs.forEach((r: any) => {
@@ -221,7 +267,7 @@ export async function POST(req: NextRequest) {
 
     const durationMs = Date.now() - startTime;
     const promptLen = JSON.stringify(apiMessages).length;
-    recordChatMetrics(model, persona || "geral", promptLen, textContent.length, apiMessages.length, durationMs);
+    recordChatMetrics(activeTenantId, model, persona || "geral", promptLen, textContent.length, apiMessages.length, durationMs);
 
     // Save directly to DB for true persistence across browser refreshes
     if (body.conversationId) {

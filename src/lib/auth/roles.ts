@@ -5,33 +5,46 @@ export interface UserProfile {
   name: string;
   email: string;
   role: UserRole;
-  avatarUrl?: string;
+  companyId: string;
   companyName: string;
+  avatarUrl?: string;
 }
 
-export const PRODUCTION_USERS = [
+export const PRODUCTION_USERS: (UserProfile & { passwordHash: string })[] = [
   {
     id: 'usr_super',
-    name: 'Gleisson (Super ADM)',
+    name: 'Gleisson (Master Admin)',
     email: 'jsgleisson@gmail.com',
     passwordHash: 'Design20',
-    role: 'super_adm' as UserRole,
-    companyName: 'OmniZeus Master SaaS'
+    role: 'super_adm',
+    companyId: 'comp_zenitus',
+    companyName: 'Zenitus Inteligência Contábil'
   },
   {
     id: 'usr_gestor',
     name: 'Carlos Mendes (Gestor Master)',
     email: 'gestor@gmail.com',
     passwordHash: '123',
-    role: 'gestor' as UserRole,
+    role: 'gestor',
+    companyId: 'comp_zenitus',
     companyName: 'Zenitus Inteligência Contábil'
+  },
+  {
+    id: 'usr_gestor_alpha',
+    name: 'Roberto Santos (Gestor Alpha)',
+    email: 'roberto@alphabpo.com.br',
+    passwordHash: '123',
+    role: 'gestor',
+    companyId: 'comp_alpha',
+    companyName: 'Alpha BPO Financeiro'
   },
   {
     id: 'usr_demo',
     name: 'Operador Demo (Funcionário)',
     email: 'demo@gmail.com',
     passwordHash: '123',
-    role: 'funcionario' as UserRole,
+    role: 'funcionario',
+    companyId: 'comp_zenitus',
     companyName: 'Zenitus Inteligência Contábil'
   }
 ];
@@ -47,8 +60,12 @@ let activeUserSession: UserProfile = {
   name: PRODUCTION_USERS[0].name,
   email: PRODUCTION_USERS[0].email,
   role: PRODUCTION_USERS[0].role,
+  companyId: PRODUCTION_USERS[0].companyId,
   companyName: PRODUCTION_USERS[0].companyName
 };
+
+// Master Admin Active Tenant Context Switcher
+let activeTenantContextId: string = 'comp_zenitus';
 
 export function getCurrentUser(): UserProfile {
   return activeUserSession;
@@ -58,11 +75,32 @@ export function getActiveRole(): UserRole {
   return activeUserSession.role;
 }
 
+export function getActiveCompanyId(): string {
+  // If Master Admin, return the selected active tenant context ID
+  if (activeUserSession.role === 'super_adm') {
+    return activeTenantContextId || activeUserSession.companyId || 'comp_zenitus';
+  }
+  return activeUserSession.companyId || 'comp_zenitus';
+}
+
+export function setActiveCompanyContext(companyId: string, companyName?: string): void {
+  activeTenantContextId = companyId;
+  if (companyName && activeUserSession.role === 'super_adm') {
+    activeUserSession.companyName = companyName;
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('omnizeus_company_context_change'));
+    window.dispatchEvent(new Event('omnizeus_user_change'));
+  }
+}
+
 export function setCurrentUser(userProfile: UserProfile): void {
   activeUserSession = userProfile;
+  activeTenantContextId = userProfile.companyId;
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('omnizeus_role_change'));
     window.dispatchEvent(new Event('omnizeus_user_change'));
+    window.dispatchEvent(new Event('omnizeus_company_context_change'));
   }
 }
 
@@ -83,14 +121,17 @@ export function loginUser(emailInput: string, passwordInput: string): { success:
     name: found.name,
     email: found.email,
     role: found.role,
+    companyId: found.companyId,
     companyName: found.companyName
   };
 
   activeUserSession = userProfile;
+  activeTenantContextId = userProfile.companyId;
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('omnizeus_role_change'));
     window.dispatchEvent(new Event('omnizeus_user_change'));
+    window.dispatchEvent(new Event('omnizeus_company_context_change'));
   }
 
   return { success: true, user: userProfile };
@@ -102,11 +143,12 @@ export function logoutUser(): void {
     name: PRODUCTION_USERS[0].name,
     email: PRODUCTION_USERS[0].email,
     role: PRODUCTION_USERS[0].role,
+    companyId: PRODUCTION_USERS[0].companyId,
     companyName: PRODUCTION_USERS[0].companyName
   };
+  activeTenantContextId = PRODUCTION_USERS[0].companyId;
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('omnizeus_user_change'));
     window.location.href = '/login';
   }
 }
-

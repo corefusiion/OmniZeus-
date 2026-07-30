@@ -458,7 +458,7 @@ export default function ContaAzulPage() {
       const res = await fetch("/api/contaazul/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, clientSecret, redirectUri: "https://contaazul.com" })
+        body: JSON.stringify({ clientId, clientSecret, redirectUri })
       });
       const data = await res.json();
       setIsConnecting(false);
@@ -1096,10 +1096,10 @@ export default function ContaAzulPage() {
   return (
     <div className="space-y-6 text-gray-900 font-sans">
       {/* Header Banner - Updated Title */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 lg:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
+      <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5 lg:p-6 flex flex-col xl:flex-row xl:items-center justify-between gap-4 shadow-xs">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl lg:text-2xl font-bold text-gray-900 tracking-tight">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 tracking-tight">
               Integração Oficial ContaAzul
             </h1>
             <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border flex items-center gap-1 ${
@@ -1117,7 +1117,7 @@ export default function ContaAzulPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => { setIsAiModalOpen(true); setIsAiMinimized(false); }}
-            className="px-3.5 py-2 bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all shadow-xs border border-gray-800"
+            className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all shadow-xs border border-gray-800"
           >
             <Sparkles className="w-3.5 h-3.5 text-blue-400" />
             <span>Assistente IA BPO</span>
@@ -1125,7 +1125,7 @@ export default function ContaAzulPage() {
 
           <button
             onClick={() => { resetCustomerForm(); setModalErrorMessage(null); setIsAddClientOpen(true); }}
-            className="px-3.5 py-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-900 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all shadow-xs"
+            className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-900 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all shadow-xs"
           >
             <UserPlus className="w-3.5 h-3.5 text-gray-600" />
             <span>+ Novo Cliente</span>
@@ -1133,15 +1133,15 @@ export default function ContaAzulPage() {
 
           <button
             onClick={() => setIsImportModalOpen(true)}
-            className="px-3.5 py-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-800 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all shadow-xs"
+            className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-800 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all shadow-xs"
           >
             <Upload className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Importar (CSV/Excel)</span>
+            <span className="hidden sm:inline">Importar </span>(CSV/Excel)
           </button>
 
           <button
             onClick={() => { setModalErrorMessage(null); setIsAddEntryOpen(true); }}
-            className="px-3.5 py-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-800 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all"
+            className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-800 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all"
           >
             <FilePlus className="w-3.5 h-3.5" />
             <span>+ Nova Cobrança</span>
@@ -1150,7 +1150,7 @@ export default function ContaAzulPage() {
           <button
             onClick={handleRealSync}
             disabled={isSyncing}
-            className="px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-medium rounded-lg flex items-center gap-1.5 transition-all disabled:opacity-50"
+            className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-medium rounded-lg flex items-center gap-1.5 transition-all disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
             <span>{isSyncing ? 'Sincronizando...' : 'Atualizar Dados'}</span>
@@ -1159,7 +1159,7 @@ export default function ContaAzulPage() {
       </div>
 
       {/* KPI Cards Header */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Clientes Sincronizados</span>
           <span className="text-xl font-bold text-gray-900">{syncedClients.length} Cadastros</span>
@@ -1175,15 +1175,15 @@ export default function ContaAzulPage() {
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Status da Conexão</span>
           <span className="text-xl font-bold text-emerald-600 flex items-center gap-1.5">
-            <Zap className="w-4 h-4 text-emerald-600" /> Auto-Refresh 24/7
+            <Zap className="w-4 h-4 text-emerald-600 shrink-0" /> <span className="truncate">Auto-Refresh 24/7</span>
           </span>
-          <span className="text-[11px] text-gray-400 font-medium block mt-0.5">Renovação Silenciosa Sem Login</span>
+          <span className="text-[11px] text-gray-400 font-medium block mt-0.5 truncate">Renovação Silenciosa Sem Login</span>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Conta Integrada</span>
           <span className="text-sm font-bold text-gray-900 truncate block">ContaAzul Pro</span>
-          <span className="text-[11px] text-gray-400 block mt-0.5">glfx20@gmail.com</span>
+          <span className="text-[11px] text-gray-400 block mt-0.5 truncate">glfx20@gmail.com</span>
         </div>
       </div>
 
@@ -1284,8 +1284,8 @@ export default function ContaAzulPage() {
       )}
 
       {/* Tabs Navigation */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-px">
-        <div className="flex items-center gap-1">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-gray-200 pb-px">
+        <div className="flex items-center gap-1 overflow-x-auto max-w-full pb-0.5 shrink-0">
           {[
             { id: 'clientes', label: `Clientes Reais (${syncedClients.length})`, icon: Users },
             { id: 'financeiro', label: `Lançamentos & Cobranças (${syncedEntries.length})`, icon: DollarSign },

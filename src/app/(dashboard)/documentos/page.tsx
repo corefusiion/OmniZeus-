@@ -5,6 +5,41 @@ import { FileText, Download, Sparkles, RefreshCw, Eye, Coins, Copy, CheckCircle2
 import { deductCoins } from "@/lib/coins/store";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
+function cleanDocumentText(rawText: string): string {
+  if (!rawText) return "";
+  let text = rawText.replace(/\[.*?\]/g, '').trim();
+
+  // Strip conversational preambles (e.g. "Boa noite!", "Com base nas...", "Elaborei...")
+  const titleKeywords = ["PROPOSTA", "CONTRATO", "MINUTA", "NOTIFICAÇÃO", "PARECER", "PROCURAÇÃO", "DECLARAÇÃO", "INSTRUMENTO", "TERMO"];
+  const lines = text.split("\n");
+  let startIndex = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmedUpper = lines[i].trim().toUpperCase();
+    if (titleKeywords.some(keyword => trimmedUpper.includes(keyword))) {
+      startIndex = i;
+      break;
+    }
+  }
+
+  if (startIndex > 0) {
+    text = lines.slice(startIndex).join("\n").trim();
+  }
+
+  // Strip conversational postambles if any
+  const endKeywords = ["espero ter ajudado", "qualquer dúvida", "estou à disposição", "atenciosamente, equipe"];
+  const endLines = text.split("\n");
+  let endIndex = endLines.length;
+  for (let i = endLines.length - 1; i >= 0; i--) {
+    const lineLower = endLines[i].toLowerCase();
+    if (endKeywords.some(kw => lineLower.includes(kw))) {
+      endIndex = i;
+    }
+  }
+
+  return endLines.slice(0, endIndex).join("\n").trim();
+}
+
 export default function DocumentosPage() {
   const [template, setTemplate] = useState("contrato");
   const [clientName, setClientName] = useState("Posto Shell Alvorada Ltda");
@@ -31,13 +66,20 @@ export default function DocumentosPage() {
 
     try {
       // Call Edge proxy LLM to draft specialized legal text
-      const prompt = `Redija uma minuta completa e profissional de ${template === 'contrato' ? 'Contrato de Prestação de Serviços Contábeis' : template === 'proposta' ? 'Proposta Comercial de BPO Financeiro' : template === 'notificacao' ? 'Parecer Tributário / Notificação Fiscal' : 'Procuração Eletrônica e-CAC'}.
-Cliente: ${clientName} (CNPJ: ${cnpj}).
-Valor: R$ ${value}.
-Escopo: ${serviceDesc}.
-Contratada: ZENITUS INTELIGÊNCIA CONTÁBIL LTDA (CNPJ 42.189.902/0001-55).
-Cidade: Salvador/BA. Data: ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}.
-Instruções: Use formatação jurídica elegante com Cláusulas numeradas (CLÁUSULA PRIMEIRA, CLÁUSULA SEGUNDA, etc.) e espaço final para assinatura das partes.`;
+      const prompt = `GERAÇÃO EXCLUSIVA DE MINUTA DE DOCUMENTO OFICIAL:
+Redija o texto integral e formal do seguinte documento: ${template === 'contrato' ? 'Contrato de Prestação de Serviços Contábeis' : template === 'proposta' ? 'Proposta Comercial de BPO Financeiro' : template === 'notificacao' ? 'Parecer Tributário / Notificação Fiscal' : 'Procuração Eletrônica e-CAC'}.
+
+DADOS DO DOCUMENTO:
+- Cliente / Contratante: ${clientName} (CNPJ: ${cnpj})
+- Valor dos Honorários: R$ ${value}
+- Escopo dos Serviços: ${serviceDesc}
+- Contratada: ZENITUS INTELIGÊNCIA CONTÁBIL LTDA (CNPJ 42.189.902/0001-55)
+- Cidade: Salvador/BA. Data: ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}.
+
+REGRAS ABSOLUTAS E OBRIGATÓRIAS DE SAÍDA:
+1. COMEÇO DIRETO: Inicie IMEDIATAMENTE pelo título oficial em caixa alta (ex: "PROPOSTA COMERCIAL..." ou "CONTRATO DE PRESTAÇÃO...").
+2. PROIBIÇÃO TOTAL DE COMENTÁRIOS: É ESTRITAMENTE PROIBIDO incluir qualquer saudação ("Boa noite", "Bom dia", "Olá"), introdução ("Com base nas diretrizes", "Elaborei a proposta"), nota de cabeçalho ou comentário explicativo.
+3. SAÍDA EXCLUSIVA: O texto retornado deve conter ÚNICA E EXCLUSIVAMENTE o conteúdo oficial da minuta jurídica.`;
 
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -45,13 +87,13 @@ Instruções: Use formatação jurídica elegante com Cláusulas numeradas (CLÁ
         body: JSON.stringify({
           messages: [{ role: "user", content: prompt }],
           model: "google/gemini-2.5-pro",
-          personaPrompt: "Você é um advogado especialista em direito empresarial e contábil brasileiro.",
+          personaPrompt: "Você é um gerador autônomo de minutas jurídicas. Sua saída deve conter ESTRITAMENTE o texto do documento oficial, sem qualquer saudação, introdução, comentário conversacional ou nota inicial.",
         }),
       });
 
       if (res.ok) {
         const text = await res.text();
-        setDocContent(text.replace(/\[.*?\]/g, '').trim());
+        setDocContent(cleanDocumentText(text));
       } else {
         throw new Error("Fallback para gerador interno");
       }

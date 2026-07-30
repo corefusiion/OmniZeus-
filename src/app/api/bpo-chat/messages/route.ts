@@ -188,8 +188,19 @@ export async function POST(req: Request) {
         content: m.content
       }));
 
+    const nowBr = new Date();
+    const dateStrBr = nowBr.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    const timeStrBr = nowBr.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+    const hourBr = parseInt(nowBr.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }), 10);
+    const periodBr = hourBr >= 12 && hourBr < 18 ? "Tarde" : (hourBr >= 18 || hourBr < 5 ? "Noite" : "Manhã");
+    const greetingBr = periodBr === "Tarde" ? "Boa tarde" : (periodBr === "Noite" ? "Boa noite" : "Bom dia");
+
     const systemPrompt = `Você é o Zeus BPO — Especialista Master em BPO Financeiro, Rotinas Contábeis e API RESTful v2 da ContaAzul Pro.
-Você possui autonomia e autoridade para responder dúvidas contábeis, orientar conciliação bancária, DRE, impostos e sugerir comandos de execução direta de tarefas no sistema.`;
+Você possui autonomia e autoridade para responder dúvidas contábeis, orientar conciliação bancária, DRE, impostos e sugerir comandos de execução direta de tarefas no sistema.
+
+[CONTEXTO TEMPORAL]
+- Data: ${dateStrBr} | Horário de Brasília: ${timeStrBr} | Período: ${periodBr}
+- Se o usuário usar uma saudação incompatível com o horário (${timeStrBr}), responda com "${greetingBr}" e comente a divergência de horário de forma gentil e bem-humorada.`;
 
     const openRouterRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",

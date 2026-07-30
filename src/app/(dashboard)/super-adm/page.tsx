@@ -3,15 +3,27 @@
 import { useState, useEffect } from "react";
 import { 
   Shield, Key, TrendingUp, AlertTriangle, Save, CheckCircle2, Crown, 
-  CreditCard, Cpu, DollarSign, Users, Building2, Plus, Link as LinkIcon, MessageSquare, Trash2, Bot, Sparkles, RefreshCw, Check, X
+  CreditCard, Cpu, DollarSign, Users, Building2, Plus, Link as LinkIcon, MessageSquare, Trash2, Bot, Sparkles, RefreshCw, Check, X,
+  Briefcase, ShieldCheck, UserPlus, Globe, Server
 } from "lucide-react";
 import { getActiveRole, UserRole } from "@/lib/auth/roles";
 import { 
   getCompanies, saveCompany, CompanyProfile, 
-  getEmployees, saveEmployee, EmployeeUser 
+  getEmployees, saveEmployee, EmployeeUser, ALL_SYSTEM_MODULES 
 } from "@/lib/company/store";
-import { fetchServerSettings, updateServerSettings } from "@/lib/db/serverDb";
+import { fetchServerSettings, updateServerSettings, fetchCustomJobRoles, saveCustomJobRoles } from "@/lib/db/serverDb";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+
+const DEFAULT_JOB_ROLES = [
+  "Diretoria Contábil",
+  "Gestor de Escritório",
+  "Analista Fiscal Sênior",
+  "Analista Contábil Pleno",
+  "Assistente de Departamento Pessoal",
+  "Auxiliar Administrativo & BPO",
+  "Consultor Tributário & SPED",
+  "Auditor de Compliance Fiscal"
+];
 
 export default function SuperADMPage() {
   const [role, setRole] = useState<UserRole>("super_adm");
@@ -39,6 +51,15 @@ export default function SuperADMPage() {
   const [isTestingOpenRouter, setIsTestingOpenRouter] = useState(false);
   const [openRouterTestResult, setOpenRouterTestResult] = useState<{ success: boolean; message: string; modelsCount?: number } | null>(null);
 
+  // Individual Saving Loading States
+  const [savingOpenRouter, setSavingOpenRouter] = useState(false);
+  const [savingCustomAi, setSavingCustomAi] = useState(false);
+  const [savingLobeHub, setSavingLobeHub] = useState(false);
+  const [savingEvolution, setSavingEvolution] = useState(false);
+  const [savingStripe, setSavingStripe] = useState(false);
+  const [savingCompany, setSavingCompany] = useState(false);
+  const [savingUser, setSavingUser] = useState(false);
+
   // Individual Success Notices
   const [lobeSuccess, setLobeSuccess] = useState(false);
   const [openRouterSuccess, setOpenRouterSuccess] = useState(false);
@@ -57,13 +78,20 @@ export default function SuperADMPage() {
   const [newPlan, setNewPlan] = useState<'Profissional' | 'Premium' | 'Business'>('Premium');
   const [newCoins, setNewCoins] = useState(15000);
 
-  // User Creation for Company State
+  // Job Roles & Custom Role Creation Modal State
+  const [jobRoles, setJobRoles] = useState<string[]>(DEFAULT_JOB_ROLES);
+  const [showAddRoleModal, setShowAddRoleModal] = useState(false);
+  const [newRoleInput, setNewRoleInput] = useState("");
+
+  // Rich User Creation for Company State
   const [allEmployees, setAllEmployees] = useState<EmployeeUser[]>([]);
   const [targetCompanyId, setTargetCompanyId] = useState("");
   const [newUserName, setNewUserName] = useState("");
   const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserBirthDate, setNewUserBirthDate] = useState("");
   const [newUserRole, setNewUserRole] = useState<'gestor' | 'funcionario'>('gestor');
   const [newUserDept, setNewUserDept] = useState("Diretoria Contábil");
+  const [selectedUserModules, setSelectedUserModules] = useState<string[]>(['omni-ia', 'financeiro', 'contaazul', 'tarefas', 'documentos']);
 
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
 
@@ -73,6 +101,10 @@ export default function SuperADMPage() {
     setCompanies(listComp);
     if (listComp.length > 0) setTargetCompanyId(listComp[0].id);
     setAllEmployees(getEmployees());
+
+    fetchCustomJobRoles().then((savedRoles) => {
+      if (savedRoles && savedRoles.length > 0) setJobRoles(savedRoles);
+    }).catch(() => {});
 
     // Load master settings directly from local SQL Database file
     async function loadSqlSettings() {
@@ -113,12 +145,30 @@ export default function SuperADMPage() {
     };
   }, []);
 
+  const handleCreateNewRole = () => {
+    if (!newRoleInput.trim()) {
+      setWarningMessage("Por favor, digite o nome do novo cargo.");
+      return;
+    }
+    const roleTitle = newRoleInput.trim();
+    if (!jobRoles.includes(roleTitle)) {
+      const updated = [...jobRoles, roleTitle];
+      setJobRoles(updated);
+      saveCustomJobRoles(updated).catch(() => {});
+      setNewUserDept(roleTitle);
+    }
+    setNewRoleInput("");
+    setShowAddRoleModal(false);
+  };
+
   const handleSaveLobeHub = async () => {
+    setSavingLobeHub(true);
     const ok = await updateServerSettings({
       lobehub_url: lobeHubServerUrl,
       lobehub_api_key: lobeHubApiKey,
       lobehub_model: lobeDefaultModel
     });
+    setSavingLobeHub(false);
     if (ok) {
       setLobeSuccess(true);
       setTimeout(() => setLobeSuccess(false), 2500);
@@ -126,12 +176,14 @@ export default function SuperADMPage() {
   };
 
   const handleSaveCustomAi = async () => {
+    setSavingCustomAi(true);
     const ok = await updateServerSettings({
       custom_ai_enabled: customAiEnabled,
       custom_ai_url: customAiUrl.trim(),
       custom_ai_key: customAiKey.trim(),
       custom_ai_model: customAiModel.trim()
     });
+    setSavingCustomAi(false);
     if (ok) {
       setCustomAiSuccess(true);
       setTimeout(() => setCustomAiSuccess(false), 2500);
@@ -143,9 +195,11 @@ export default function SuperADMPage() {
       setWarningMessage("Por favor, informe uma chave de API válida da OpenRouter.");
       return;
     }
+    setSavingOpenRouter(true);
     const ok = await updateServerSettings({
       openrouter_api_key: openRouterMasterKey.trim()
     });
+    setSavingOpenRouter(false);
     if (ok) {
       setOpenRouterSuccess(true);
       setTimeout(() => setOpenRouterSuccess(false), 2500);
@@ -192,10 +246,12 @@ export default function SuperADMPage() {
   };
 
   const handleSaveEvolution = async () => {
+    setSavingEvolution(true);
     const ok = await updateServerSettings({
       evolution_url: evolutionUrl,
       evolution_api_key: evolutionApiKey
     });
+    setSavingEvolution(false);
     if (ok) {
       setEvolutionSuccess(true);
       setTimeout(() => setEvolutionSuccess(false), 2500);
@@ -203,10 +259,12 @@ export default function SuperADMPage() {
   };
 
   const handleSaveStripe = async () => {
+    setSavingStripe(true);
     const ok = await updateServerSettings({
       stripe_pub_key: stripePublishableKey,
       stripe_secret_key: stripeSecretKey
     });
+    setSavingStripe(false);
     if (ok) {
       setStripeSuccess(true);
       setTimeout(() => setStripeSuccess(false), 2500);
@@ -218,7 +276,7 @@ export default function SuperADMPage() {
       setWarningMessage("Por favor, preencha a Razão Social e o CNPJ da nova empresa contratante.");
       return;
     }
-
+    setSavingCompany(true);
     saveCompany({
       corporateName: newCorpName.trim(),
       tradeName: newCorpName.trim().split(" ")[0] + " Contábil",
@@ -232,6 +290,7 @@ export default function SuperADMPage() {
       status: 'Ativo'
     });
 
+    setSavingCompany(false);
     setNewCorpName("");
     setNewCnpj("");
     setCompanySuccess(true);
@@ -243,19 +302,22 @@ export default function SuperADMPage() {
       setWarningMessage("Por favor, preencha a empresa destinatária, o nome e o e-mail do usuário.");
       return;
     }
-
+    setSavingUser(true);
     saveEmployee({
       companyId: targetCompanyId,
       name: newUserName.trim(),
       email: newUserEmail.trim(),
       department: newUserDept,
       role: newUserRole,
-      allowedModules: ['omni-ia', 'financeiro', 'contaazul', 'whatsapp-bot', 'tarefas', 'documentos', 'apresentacoes'],
+      birthDate: newUserBirthDate || undefined,
+      allowedModules: selectedUserModules,
       status: 'Ativo'
     });
 
+    setSavingUser(false);
     setNewUserName("");
     setNewUserEmail("");
+    setNewUserBirthDate("");
     setUserSuccess(true);
     setTimeout(() => setUserSuccess(false), 2500);
   };
@@ -268,14 +330,63 @@ export default function SuperADMPage() {
         </div>
         <h2 className="text-base font-bold text-slate-900">Acesso Estritamente Negado ao Painel Master</h2>
         <p className="text-xs text-slate-500 mt-2 max-w-sm mx-auto leading-relaxed">
-          Este painel é reservado exclusivamente para o perfil Super ADM Master da plataforma OmniZeus.
+          Este painel é reservado exclusivamente para o perfil Super ADM Master da plataforma.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 text-slate-900 font-sans">
+    <div className="space-y-6 text-slate-900 font-sans pb-12">
+      {/* Modal for Creating New Job Role */}
+      {showAddRoleModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl border border-slate-200 p-5 max-w-md w-full shadow-lg space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Briefcase className="w-4 h-4 text-[#1E6FD9]" />
+                <span>Criar Novo Cargo / Departamento</span>
+              </h3>
+              <button onClick={() => setShowAddRoleModal(false)} className="text-slate-400 hover:text-slate-700">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                Nome do Novo Cargo / Função:
+              </label>
+              <input
+                type="text"
+                placeholder="Ex: Coordenador de BPO & Controladoria"
+                value={newRoleInput}
+                onChange={(e) => setNewRoleInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCreateNewRole()}
+                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9]"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAddRoleModal(false)}
+                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateNewRole}
+                className="px-4 py-1.5 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-semibold rounded-lg shadow-xs"
+              >
+                Adicionar Cargo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Warning Modal */}
       <ConfirmModal
         isOpen={warningMessage !== null}
@@ -288,367 +399,406 @@ export default function SuperADMPage() {
         variant="warning"
       />
 
-      {/* Header */}
-      <div className="bg-white rounded-xl border border-slate-200/80 p-5 lg:p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center">
-            <Crown className="w-4 h-4" />
+      {/* Header Limpo */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5 lg:p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-blue-50 text-[#1E6FD9] flex items-center justify-center">
+            <Crown className="w-5 h-5" />
           </div>
           <div>
             <h1 className="text-xl lg:text-2xl font-bold text-slate-900 tracking-tight">
-              Painel Master Super ADM (SQL Local Server)
+              Painel Master Super ADM
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Persistência direta no Banco SQL Local (`data/omnizeus_local_sql_database.json`) compatível com Supabase PostgreSQL
+              Persistência direta no Banco SQL Local com Supabase PostgreSQL
             </p>
           </div>
         </div>
-
-        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200/60 uppercase tracking-wider">
-          Super ADM Master
-        </span>
       </div>
 
-      {/* Top KPIs */}
+      {/* Top KPIs Limpos */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs hover:border-slate-300 transition-all">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Margem Líquida Média</span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4" />
-            </div>
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2">
+          <div className="flex items-center justify-between text-slate-500">
+            <span className="text-xs font-bold uppercase tracking-wider">Margem Líquida Média</span>
+            <TrendingUp className="w-4 h-4 text-emerald-600" />
           </div>
-          <div className="text-2xl font-extrabold text-slate-900 tracking-tight">85.9% – 98.6%</div>
-          <div className="flex items-center gap-2 mt-2 text-xs">
-            <span className="font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded text-[11px]">
-              Altíssima
-            </span>
-            <span className="text-slate-400">Cobrança R$ 890 vs Custo ~US$ 2.16</span>
-          </div>
+          <p className="text-2xl font-bold text-slate-900">98.6%</p>
+          <p className="text-[10px] text-emerald-600 font-semibold">Margem Líquida Real do SaaS</p>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs hover:border-slate-300 transition-all">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Status da API OpenRouter</span>
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#1E6FD9] flex items-center justify-center">
-              <Cpu className="w-4 h-4" />
-            </div>
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2">
+          <div className="flex items-center justify-between text-slate-500">
+            <span className="text-xs font-bold uppercase tracking-wider">Status da API OpenRouter</span>
+            <Cpu className="w-4 h-4 text-[#1E6FD9]" />
           </div>
-          <div className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            {openRouterMasterKey ? 'Chave Gravada no SQL' : 'Pendente no SQL'}
-          </div>
-          <div className="flex items-center gap-2 mt-2 text-xs">
-            <span className="text-slate-400">Banco de Dados Local Servidor Ativo</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs hover:border-slate-300 transition-all">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Escritórios Cadastrados</span>
-            <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
-              <Building2 className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-extrabold text-slate-900 tracking-tight">{companies.length} Empresa</div>
-          <div className="flex items-center gap-2 mt-2 text-xs">
-            <span className="font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded text-[11px]">
-              Zenitus Contábil (Master)
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Independent Section 1: OpenRouter API Integration */}
-      <div className="bg-white p-5 lg:p-6 rounded-xl border border-slate-200/80 shadow-xs space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <Cpu className="w-4.5 h-4.5 text-purple-600" />
-            <span>OpenRouter Master Enterprise API Key (Acesso Global a 15 LLMs)</span>
-          </h3>
-          <button
-            onClick={handleSaveOpenRouter}
-            className="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition-all shadow-xs"
-          >
-            <Save className="w-4 h-4" />
-            <span>Salvar no Banco SQL Local</span>
-          </button>
-        </div>
-
-        {openRouterSuccess && (
-          <div className="p-3 bg-emerald-50 border border-emerald-200/60 text-emerald-800 text-xs font-semibold rounded-lg flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>Chave da OpenRouter salva diretamente no Banco SQL Local do Servidor com sucesso!</span>
-          </div>
-        )}
-
-        <div>
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
-            Insira sua chave de API OpenRouter (`sk-or-v1-...`):
-          </label>
-          <input
-            type="password"
-            placeholder="sk-or-v1-********************************"
-            value={openRouterMasterKey}
-            onChange={(e) => setOpenRouterMasterKey(e.target.value)}
-            className="w-full h-9 px-4 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-purple-500 transition-all"
-          />
-        </div>
-
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-          <button
-            onClick={handleTestOpenRouterConnection}
-            disabled={isTestingOpenRouter}
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-lg flex items-center gap-2 transition-all shrink-0"
-          >
-            {isTestingOpenRouter ? <RefreshCw className="w-4 h-4 animate-spin text-purple-600" /> : <Sparkles className="w-4 h-4 text-purple-600" />}
-            <span>{isTestingOpenRouter ? "Testando Conexão..." : "Testar Conexão OpenRouter API"}</span>
-          </button>
-
-          {openRouterTestResult && (
-            <div className={`p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 border flex-1 ${
-              openRouterTestResult.success ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-red-50 text-red-800 border-red-200'
+          <div className="flex items-center gap-2">
+            <p className="text-lg font-bold text-slate-900">
+              {openRouterMasterKey ? 'Chave Master Ativa' : 'Chave Pendente'}
+            </p>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+              openRouterMasterKey ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
             }`}>
-              {openRouterTestResult.success ? <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" /> : <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />}
-              <span>{openRouterTestResult.message}</span>
+              {openRouterMasterKey ? 'Conectado' : 'Aguardando'}
+            </span>
+          </div>
+          <p className="text-[10px] text-slate-400">Acesso global a 15 LLMs (GPT-4o, Claude 3.7, Gemini 2.5)</p>
+        </div>
+
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2">
+          <div className="flex items-center justify-between text-slate-500">
+            <span className="text-xs font-bold uppercase tracking-wider">Escritórios Cadastrados</span>
+            <Building2 className="w-4 h-4 text-[#1E6FD9]" />
+          </div>
+          <p className="text-2xl font-bold text-slate-900">{companies.length} Empresa(s)</p>
+          <p className="text-[10px] text-slate-400">Ambientes cadastrados e ativos</p>
+        </div>
+      </div>
+
+      {/* MODERN RESPONSIVE GRID OF INDEPENDENT CARDS (Breakpoints: 4 cols ≥1440px | 3 cols ≥1024px | 2 cols ≥768px | 1 col <768px) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 items-stretch">
+        
+        {/* CARD 1: OpenRouter API Integration (1 Coluna) */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all space-y-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#1E6FD9] flex items-center justify-center font-bold">
+                  <Cpu className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900">OpenRouter API Master</h3>
+                  <span className="text-[10px] text-slate-400 block">Acesso Global a 15 LLMs</span>
+                </div>
+              </div>
+              <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase ${
+                openRouterMasterKey ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+              }`}>
+                {openRouterMasterKey ? 'Ativo' : 'Pendente'}
+              </span>
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* Independent Section: Custom AI Endpoint */}
-      <div className="bg-white p-5 lg:p-6 rounded-xl border border-slate-200/80 shadow-xs space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2">
-            <Cpu className="w-4.5 h-4.5 text-indigo-600" />
-            <h3 className="text-base font-bold text-slate-900">Integração de Endpoint Customizado IA (Local/Proxy)</h3>
-          </div>
-          <button
-            onClick={handleSaveCustomAi}
-            className="px-4 py-2 bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition-all shadow-xs"
-          >
-            <Save className="w-4 h-4" />
-            <span>Salvar no Banco SQL</span>
-          </button>
-        </div>
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                Chave de API (`sk-or-v1-...`):
+              </label>
+              <input
+                type="password"
+                placeholder="sk-or-v1-****************"
+                value={openRouterMasterKey}
+                onChange={(e) => setOpenRouterMasterKey(e.target.value)}
+                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-[#1E6FD9]"
+              />
+            </div>
 
-        {customAiSuccess && (
-          <div className="p-3 bg-emerald-50 border border-emerald-200/60 text-emerald-800 text-xs font-semibold rounded-lg flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>Parâmetros do Endpoint Customizado salvos no Banco SQL Local!</span>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="flex flex-col gap-2 sm:col-span-2">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Status da Integração Customizada:</label>
             <button
-              onClick={() => setCustomAiEnabled(!customAiEnabled)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${customAiEnabled ? 'bg-indigo-600' : 'bg-slate-300'}`}
+              onClick={handleTestOpenRouterConnection}
+              disabled={isTestingOpenRouter}
+              className="w-full py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all"
             >
-              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${customAiEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+              {isTestingOpenRouter ? <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#1E6FD9]" /> : <Sparkles className="w-3.5 h-3.5 text-[#1E6FD9]" />}
+              <span>{isTestingOpenRouter ? "Testando..." : "Testar Conexão API"}</span>
             </button>
-            <p className="text-xs text-slate-500">Se ativo, todas as requisições de IA (chat) serão roteadas para este endpoint em vez da OpenRouter.</p>
-          </div>
 
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Endpoint da API (ex: http://localhost:20128/v1):</label>
-            <input
-              type="text"
-              value={customAiUrl}
-              onChange={(e) => setCustomAiUrl(e.target.value)}
-              className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Token de Acesso:</label>
-            <input
-              type="text"
-              value={customAiKey}
-              onChange={(e) => setCustomAiKey(e.target.value)}
-              className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Modelo / Combo (ex: kimicode, auto):</label>
-            <input
-              type="text"
-              value={customAiModel}
-              onChange={(e) => setCustomAiModel(e.target.value)}
-              className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-indigo-500"
-              placeholder="Digite o ID do modelo ou combo"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Independent Section 2: LobeHub Integration */}
-      <div className="bg-white p-5 lg:p-6 rounded-xl border border-slate-200/80 shadow-xs space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2">
-            <Bot className="w-4.5 h-4.5 text-purple-600" />
-            <h3 className="text-base font-bold text-slate-900">Integração LobeHub AI (Sondagem de Funcionalidades)</h3>
-          </div>
-          <button
-            onClick={handleSaveLobeHub}
-            className="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition-all shadow-xs"
-          >
-            <Save className="w-4 h-4" />
-            <span>Salvar no Banco SQL</span>
-          </button>
-        </div>
-
-        {lobeSuccess && (
-          <div className="p-3 bg-emerald-50 border border-emerald-200/60 text-emerald-800 text-xs font-semibold rounded-lg flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>Parâmetros do LobeHub salvos no Banco SQL Local!</span>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">URL do Servidor LobeHub:</label>
-            <input
-              type="text"
-              value={lobeHubServerUrl}
-              onChange={(e) => setLobeHubServerUrl(e.target.value)}
-              className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-purple-500"
-            />
-          </div>
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Chave de API LobeHub:</label>
-            <input
-              type="password"
-              value={lobeHubApiKey}
-              onChange={(e) => setLobeHubApiKey(e.target.value)}
-              className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-purple-500"
-            />
-          </div>
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Modelo Padrão Lobe AI:</label>
-            <select
-              value={lobeDefaultModel}
-              onChange={(e) => setLobeDefaultModel(e.target.value)}
-              className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-purple-500 cursor-pointer"
-            >
-              <option value="lobe-gpt-4o-mini">Lobe GPT-4o Mini Agent</option>
-              <option value="lobe-claude-3.7-sonnet">Lobe Claude 3.7 Sonnet Agent</option>
-              <option value="lobe-deepseek-v3">Lobe DeepSeek V3 Agent</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Independent Section 3: Evolution API WhatsApp */}
-      <div className="bg-white p-5 lg:p-6 rounded-xl border border-slate-200/80 shadow-xs space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2">
-            <MessageSquare className="w-4.5 h-4.5 text-emerald-600" />
-            <h3 className="text-base font-bold text-slate-900">Evolution API (WhatsApp Bot Multi-Tenant)</h3>
-          </div>
-          <button
-            onClick={handleSaveEvolution}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition-all shadow-xs"
-          >
-            <Save className="w-4 h-4" />
-            <span>Salvar no Banco SQL</span>
-          </button>
-        </div>
-
-        {evolutionSuccess && (
-          <div className="p-3 bg-emerald-50 border border-emerald-200/60 text-emerald-800 text-xs font-semibold rounded-lg flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>Parâmetros da Evolution API salvos no Banco SQL Local!</span>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">URL Base Evolution API:</label>
-            <input
-              type="text"
-              value={evolutionUrl}
-              onChange={(e) => setEvolutionUrl(e.target.value)}
-              className="w-full h-9 px-4 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-emerald-600 transition-all"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Chave Global Evolution API Key:</label>
-            <input
-              type="password"
-              value={evolutionApiKey}
-              onChange={(e) => setEvolutionApiKey(e.target.value)}
-              className="w-full h-9 px-4 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-emerald-600 transition-all"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Independent Section 4: Stripe Checkout */}
-      <div className="bg-white p-5 lg:p-6 rounded-xl border border-slate-200/80 shadow-xs space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2">
-            <CreditCard className="w-4.5 h-4.5 text-blue-600" />
-            <h3 className="text-base font-bold text-slate-900">Stripe (Checkout & Faturamento de OmniCoins)</h3>
-          </div>
-          <button
-            onClick={handleSaveStripe}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition-all shadow-xs"
-          >
-            <Save className="w-4 h-4" />
-            <span>Salvar no Banco SQL</span>
-          </button>
-        </div>
-
-        {stripeSuccess && (
-          <div className="p-3 bg-emerald-50 border border-emerald-200/60 text-emerald-800 text-xs font-semibold rounded-lg flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>Chaves do Stripe salvas no Banco SQL Local!</span>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Publishable Key (Produção):</label>
-            <input
-              type="text"
-              value={stripePublishableKey}
-              onChange={(e) => setStripePublishableKey(e.target.value)}
-              className="w-full h-9 px-4 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-blue-600 transition-all"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Secret Key (Master):</label>
-            <input
-              type="password"
-              value={stripeSecretKey}
-              onChange={(e) => setStripeSecretKey(e.target.value)}
-              className="w-full h-9 px-4 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-blue-600 transition-all"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Multi-Tenant Companies & Users Creation Forms */}
-      <div className="bg-white p-5 lg:p-6 rounded-xl border border-slate-200/80 shadow-xs space-y-6">
-        <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
-          <Building2 className="w-4.5 h-4.5 text-purple-600" />
-          <span>Cadastrar Empresa Contratante & Criar Acessos (Gestor / Funcionário)</span>
-        </h3>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Form: Create Company */}
-          <div className="lg:col-span-6 bg-slate-50/70 p-5 rounded-xl border border-slate-200/80 space-y-4">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-purple-700 flex items-center gap-1.5">
-              <Plus className="w-3.5 h-3.5" />
-              1. Cadastrar Nova Empresa Contratante
-            </h4>
-
-            {companySuccess && (
-              <div className="p-2.5 bg-emerald-50 border border-emerald-200/60 text-emerald-800 text-xs font-semibold rounded-lg flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>Empresa cadastrada no Banco SQL com sucesso!</span>
+            {openRouterTestResult && (
+              <div className={`p-2 rounded text-[10px] font-semibold flex items-center gap-1.5 border ${
+                openRouterTestResult.success ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-red-50 text-red-800 border-red-200'
+              }`}>
+                {openRouterTestResult.success ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> : <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0" />}
+                <span className="truncate">{openRouterTestResult.message}</span>
               </div>
             )}
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 mt-auto space-y-2">
+            {openRouterSuccess && (
+              <div className="p-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold rounded-md flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Salvo com sucesso!</span>
+              </div>
+            )}
+            <button
+              onClick={handleSaveOpenRouter}
+              disabled={savingOpenRouter}
+              className="w-full py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
+            >
+              {savingOpenRouter ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              <span>{savingOpenRouter ? "Salvando..." : "Salvar"}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* CARD 2: LobeHub AI Integration (1 Coluna) */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all space-y-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#1E6FD9] flex items-center justify-center font-bold">
+                  <Bot className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900">Integração LobeHub AI</h3>
+                  <span className="text-[10px] text-slate-400 block">Sondagem de Agentes</span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">URL do Servidor LobeHub:</label>
+              <input
+                type="text"
+                value={lobeHubServerUrl}
+                onChange={(e) => setLobeHubServerUrl(e.target.value)}
+                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-[#1E6FD9]"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Chave de API LobeHub:</label>
+              <input
+                type="password"
+                value={lobeHubApiKey}
+                onChange={(e) => setLobeHubApiKey(e.target.value)}
+                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-[#1E6FD9]"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Modelo Padrão Lobe AI:</label>
+              <select
+                value={lobeDefaultModel}
+                onChange={(e) => setLobeDefaultModel(e.target.value)}
+                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9] cursor-pointer"
+              >
+                <option value="lobe-gpt-4o-mini">Lobe GPT-4o Mini Agent</option>
+                <option value="lobe-claude-3.7-sonnet">Lobe Claude 3.7 Sonnet Agent</option>
+                <option value="lobe-deepseek-v3">Lobe DeepSeek V3 Agent</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 mt-auto space-y-2">
+            {lobeSuccess && (
+              <div className="p-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold rounded-md flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Parâmetros LobeHub salvos!</span>
+              </div>
+            )}
+            <button
+              onClick={handleSaveLobeHub}
+              disabled={savingLobeHub}
+              className="w-full py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
+            >
+              {savingLobeHub ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              <span>{savingLobeHub ? "Salvando..." : "Salvar"}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* CARD 3: Evolution API WhatsApp (1 Coluna) */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all space-y-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                  <MessageSquare className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900">Evolution API WhatsApp</h3>
+                  <span className="text-[10px] text-slate-400 block">Bot Multi-Tenant</span>
+                </div>
+              </div>
+              <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-50 text-amber-800 border border-amber-200">
+                Em breve
+              </span>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">URL Base Evolution API:</label>
+              <input
+                type="text"
+                value={evolutionUrl}
+                onChange={(e) => setEvolutionUrl(e.target.value)}
+                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-[#1E6FD9]"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Chave Global Evolution API Key:</label>
+              <input
+                type="password"
+                value={evolutionApiKey}
+                onChange={(e) => setEvolutionApiKey(e.target.value)}
+                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-[#1E6FD9]"
+              />
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 mt-auto space-y-2">
+            {evolutionSuccess && (
+              <div className="p-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold rounded-md flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Evolution API salva!</span>
+              </div>
+            )}
+            <button
+              onClick={handleSaveEvolution}
+              disabled={savingEvolution}
+              className="w-full py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
+            >
+              {savingEvolution ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              <span>{savingEvolution ? "Salvando..." : "Salvar"}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* CARD 4: Stripe Checkout & Faturamento (1 Coluna) */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all space-y-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                  <CreditCard className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900">Stripe Checkout</h3>
+                  <span className="text-[10px] text-slate-400 block">Faturamento de OmniCoins</span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Publishable Key (Produção):</label>
+              <input
+                type="text"
+                value={stripePublishableKey}
+                onChange={(e) => setStripePublishableKey(e.target.value)}
+                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-blue-600"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Secret Key (Master):</label>
+              <input
+                type="password"
+                value={stripeSecretKey}
+                onChange={(e) => setStripeSecretKey(e.target.value)}
+                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-blue-600"
+              />
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 mt-auto space-y-2">
+            {stripeSuccess && (
+              <div className="p-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold rounded-md flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Chaves Stripe salvas!</span>
+              </div>
+            )}
+            <button
+              onClick={handleSaveStripe}
+              disabled={savingStripe}
+              className="w-full py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
+            >
+              {savingStripe ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              <span>{savingStripe ? "Salvando..." : "Salvar"}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* CARD COMPLEXO 5: Endpoint Customizado IA (Local/Proxy) — (Spans 2 Colunas) */}
+        <div className="col-span-1 md:col-span-2 bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all space-y-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#1E6FD9] flex items-center justify-center font-bold">
+                  <Server className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900">Endpoint Customizado IA (Local / Proxy)</h3>
+                  <span className="text-[10px] text-slate-400 block">Roteamento direto de requisições LLM</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase text-slate-400">Status:</span>
+                <button
+                  onClick={() => setCustomAiEnabled(!customAiEnabled)}
+                  className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors ${customAiEnabled ? 'bg-[#1E6FD9]' : 'bg-slate-300'}`}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${customAiEnabled ? 'translate-x-5' : 'translate-x-1'}`} />
+                </button>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-500">
+              Se ativo, todas as requisições de IA serão roteadas para este endpoint em vez da OpenRouter.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Endpoint API:</label>
+                <input
+                  type="text"
+                  value={customAiUrl}
+                  onChange={(e) => setCustomAiUrl(e.target.value)}
+                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-[#1E6FD9]"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Token de Acesso:</label>
+                <input
+                  type="text"
+                  value={customAiKey}
+                  onChange={(e) => setCustomAiKey(e.target.value)}
+                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-[#1E6FD9]"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Modelo / Combo:</label>
+                <input
+                  type="text"
+                  value={customAiModel}
+                  onChange={(e) => setCustomAiModel(e.target.value)}
+                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-[#1E6FD9]"
+                  placeholder="auto"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 mt-auto space-y-2">
+            {customAiSuccess && (
+              <div className="p-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold rounded-md flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Endpoint Customizado salvo com sucesso!</span>
+              </div>
+            )}
+            <button
+              onClick={handleSaveCustomAi}
+              disabled={savingCustomAi}
+              className="w-full py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
+            >
+              {savingCustomAi ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              <span>{savingCustomAi ? "Salvando..." : "Salvar Endpoint Customizado"}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* CARD COMPLEXO 6: Cadastrar Nova Empresa Contratante (Spans 2 Colunas) */}
+        <div className="col-span-1 md:col-span-2 bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all space-y-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#1E6FD9] flex items-center justify-center font-bold">
+                  <Building2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900">Cadastrar Nova Empresa Contratante</h3>
+                  <span className="text-[10px] text-slate-400 block">Provisionar novo Tenant isolado</span>
+                </div>
+              </div>
+            </div>
 
             <div className="space-y-3">
               <div>
@@ -658,11 +808,11 @@ export default function SuperADMPage() {
                   placeholder="Ex: Alfa Contabilidade & BPO Eireli"
                   value={newCorpName}
                   onChange={(e) => setNewCorpName(e.target.value)}
-                  className="w-full h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-purple-500"
+                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">CNPJ:</label>
                   <input
@@ -670,7 +820,7 @@ export default function SuperADMPage() {
                     placeholder="00.000.000/0001-00"
                     value={newCnpj}
                     onChange={(e) => setNewCnpj(e.target.value)}
-                    className="w-full h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-purple-500"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
                   />
                 </div>
                 <div>
@@ -682,7 +832,7 @@ export default function SuperADMPage() {
                       setNewPlan(p);
                       setNewCoins(p === 'Profissional' ? 5000 : p === 'Premium' ? 15000 : 50000);
                     }}
-                    className="w-full h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-purple-500 cursor-pointer"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9] cursor-pointer"
                   >
                     <option value="Profissional">Profissional (R$ 490 / 5k Coins)</option>
                     <option value="Premium">Premium (R$ 890 / 15k Coins)</option>
@@ -691,30 +841,40 @@ export default function SuperADMPage() {
                 </div>
               </div>
             </div>
-
-            <button
-              type="button"
-              onClick={handleCreateCompany}
-              className="w-full py-2.5 bg-purple-700 hover:bg-purple-800 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition-all shadow-xs"
-            >
-              <Building2 className="w-4 h-4" />
-              <span>Cadastrar Empresa no Banco SQL</span>
-            </button>
           </div>
 
-          {/* Right Form: Create User for Company */}
-          <div className="lg:col-span-6 bg-slate-50/70 p-5 rounded-xl border border-slate-200/80 space-y-4">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-purple-700 flex items-center gap-1.5">
-              <Plus className="w-3.5 h-3.5" />
-              2. Criar Usuário (Gestor ou Funcionário) para Empresa
-            </h4>
-
-            {userSuccess && (
-              <div className="p-2.5 bg-emerald-50 border border-emerald-200/60 text-emerald-800 text-xs font-semibold rounded-lg flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>Usuário vinculado no Banco SQL com sucesso!</span>
+          <div className="pt-3 border-t border-slate-100 mt-auto space-y-2">
+            {companySuccess && (
+              <div className="p-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold rounded-md flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Empresa cadastrada com sucesso!</span>
               </div>
             )}
+            <button
+              onClick={handleCreateCompany}
+              disabled={savingCompany}
+              className="w-full py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
+            >
+              {savingCompany ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Building2 className="w-3.5 h-3.5" />}
+              <span>{savingCompany ? "Cadastrando..." : "Cadastrar Empresa"}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* CARD COMPLEXO 7: Criar Usuário para Empresa (Spans 2 Colunas) */}
+        <div className="col-span-1 md:col-span-2 bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all space-y-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#1E6FD9] flex items-center justify-center font-bold">
+                  <UserPlus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900">Criar Usuário (Gestor ou Funcionário)</h3>
+                  <span className="text-[10px] text-slate-400 block">Vincular acesso à empresa contratante</span>
+                </div>
+              </div>
+            </div>
 
             <div className="space-y-3">
               <div>
@@ -722,23 +882,23 @@ export default function SuperADMPage() {
                 <select
                   value={targetCompanyId}
                   onChange={(e) => setTargetCompanyId(e.target.value)}
-                  className="w-full h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-purple-500 cursor-pointer"
+                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9] cursor-pointer"
                 >
                   {companies.map(c => (
-                    <option key={c.id} value={c.id}>{c.corporateName} ({c.cnpj})</option>
+                    <option key={c.id} value={c.id}>{c.tradeName || c.corporateName} ({c.cnpj})</option>
                   ))}
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Nome do Usuário:</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Nome Completo:</label>
                   <input
                     type="text"
                     placeholder="Ex: Carlos Mendes"
                     value={newUserName}
                     onChange={(e) => setNewUserName(e.target.value)}
-                    className="w-full h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-purple-500"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9]"
                   />
                 </div>
                 <div>
@@ -748,53 +908,135 @@ export default function SuperADMPage() {
                     placeholder="carlos@empresa.com.br"
                     value={newUserEmail}
                     onChange={(e) => setNewUserEmail(e.target.value)}
-                    className="w-full h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-purple-500"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Perfil de Acesso:</label>
-                  <select
-                    value={newUserRole}
-                    onChange={(e) => setNewUserRole(e.target.value as any)}
-                    className="w-full h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-purple-500 cursor-pointer"
-                  >
-                    <option value="gestor">Gestor do Escritório</option>
-                    <option value="funcionario">Funcionário Operacional</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Departamento:</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Data de Nascimento (Opcional):</label>
                   <input
-                    type="text"
-                    value={newUserDept}
-                    onChange={(e) => setNewUserDept(e.target.value)}
-                    className="w-full h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-purple-500"
+                    type="date"
+                    value={newUserBirthDate}
+                    onChange={(e) => setNewUserBirthDate(e.target.value)}
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
                   />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Cargo / Departamento:</label>
+                  <div className="flex items-center gap-1">
+                    <select
+                      value={newUserDept}
+                      onChange={(e) => setNewUserDept(e.target.value)}
+                      className="flex-1 h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9] cursor-pointer truncate"
+                    >
+                      {jobRoles.map(jr => (
+                        <option key={jr} value={jr}>{jr}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddRoleModal(true)}
+                      className="w-9 h-9 bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-700 rounded-lg flex items-center justify-center transition-colors shrink-0"
+                      title="Criar Novo Cargo"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleCreateUserForCompany}
-                className="w-full py-2.5 bg-purple-700 hover:bg-purple-800 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition-all shadow-xs"
-              >
-                <Users className="w-4 h-4" />
-                <span>Vincular Usuário no Banco SQL</span>
-              </button>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Função de Acesso:</label>
+                <select
+                  value={newUserRole}
+                  onChange={(e) => setNewUserRole(e.target.value as any)}
+                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9] cursor-pointer"
+                >
+                  <option value="gestor">Gestor do Escritório</option>
+                  <option value="funcionario">Funcionário Operacional</option>
+                </select>
+              </div>
+
+              <div className="pt-2 space-y-1.5 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                    Permissão por Módulos (Módulos Iniciais):
+                  </label>
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold">
+                    <button 
+                      type="button" 
+                      onClick={() => setSelectedUserModules(ALL_SYSTEM_MODULES.map(m => m.id))} 
+                      className="text-blue-600 hover:underline"
+                    >
+                      Todos
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button 
+                      type="button" 
+                      onClick={() => setSelectedUserModules([])} 
+                      className="text-slate-400 hover:underline"
+                    >
+                      Nenhum
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1 max-h-[100px] overflow-y-auto pr-1">
+                  {ALL_SYSTEM_MODULES.map(mod => {
+                    const isSelected = selectedUserModules.includes(mod.id);
+                    return (
+                      <button
+                        key={mod.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedUserModules(prev => 
+                            prev.includes(mod.id) ? prev.filter(m => m !== mod.id) : [...prev, mod.id]
+                          );
+                        }}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${
+                          isSelected
+                            ? 'bg-blue-50 text-[#1E6FD9] border-[#1E6FD9]/40'
+                            : 'bg-slate-50 text-slate-400 border-slate-200 hover:text-slate-700'
+                        }`}
+                      >
+                        {isSelected ? `✓ ${mod.label}` : `+ ${mod.label}`}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 mt-auto space-y-2">
+            {userSuccess && (
+              <div className="p-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold rounded-md flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Usuário vinculado com sucesso!</span>
+              </div>
+            )}
+            <button
+              onClick={handleCreateUserForCompany}
+              disabled={savingUser}
+              className="w-full py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
+            >
+              {savingUser ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
+              <span>{savingUser ? "Vribculando..." : "Vincular Usuário à Empresa"}</span>
+            </button>
           </div>
         </div>
 
-        {/* Registered Companies Table */}
-        <div className="border-t border-slate-100 pt-5">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-            Empresas Contratantes Cadastradas no Banco SQL ({companies.length})
+        {/* FULL WIDTH TABLE: Registered Companies Dedicated Table (Spans all columns) */}
+        <div className="col-span-1 md:col-span-2 lg:col-span-3 2xl:col-span-4 bg-white p-5 lg:p-6 rounded-xl border border-slate-200 shadow-xs space-y-3">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-[#1E6FD9]" />
+            <span>Empresas Contratantes Cadastradas ({companies.length})</span>
           </h4>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto border border-slate-200 rounded-lg">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[10px] bg-slate-50">
@@ -809,18 +1051,21 @@ export default function SuperADMPage() {
                 {companies.map(c => {
                   const empCount = allEmployees.filter(e => e.companyId === c.id).length;
                   return (
-                    <tr key={c.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-3.5 px-4 font-bold text-slate-900">{c.corporateName}</td>
+                    <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-3.5 px-4 font-bold text-slate-900">
+                        {c.tradeName || c.corporateName}
+                        <span className="text-[10px] text-slate-400 block font-normal">{c.corporateName}</span>
+                      </td>
                       <td className="py-3.5 px-4 font-medium">{c.cnpj} • {c.city}/{c.state}</td>
                       <td className="py-3.5 px-4">
-                        <span className="font-extrabold text-purple-700">{c.plan}</span>
+                        <span className="font-extrabold text-[#1E6FD9]">{c.plan}</span>
                         <span className="text-[10px] text-slate-500 block">{(c.coinsFranchise).toLocaleString('pt-BR')} Coins/mês</span>
                       </td>
                       <td className="py-3.5 px-4 font-bold text-slate-800">
-                        {empCount} Usuário
+                        {empCount} Colaborador(es)
                       </td>
                       <td className="py-3.5 px-4 text-right">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                           {c.status}
                         </span>
                       </td>
@@ -831,6 +1076,7 @@ export default function SuperADMPage() {
             </table>
           </div>
         </div>
+
       </div>
     </div>
   );

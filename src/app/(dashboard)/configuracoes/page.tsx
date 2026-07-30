@@ -1,27 +1,82 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Settings, User, Save, CheckCircle2, Building2 } from "lucide-react";
-import { getActiveRole, UserRole } from "@/lib/auth/roles";
+import { Settings, User, Save, CheckCircle2, Building2, Lock, ShieldAlert } from "lucide-react";
+import { getCurrentUser, UserProfile, getActiveCompanyId } from "@/lib/auth/roles";
+import { getCompanies, saveCompany, CompanyProfile } from "@/lib/company/store";
 
 export default function ConfiguracoesPage() {
-  const [role, setRole] = useState<UserRole>("gestor");
+  const [user, setUser] = useState<UserProfile>(getCurrentUser());
+  const [activeComp, setActiveComp] = useState<CompanyProfile | null>(null);
+  
+  // Form State
+  const [corpName, setCorpName] = useState("");
+  const [tradeName, setTradeName] = useState("");
+  const [cnpj, setCnpj] = useState("");
+  const [userName, setUserName] = useState("");
+
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   useEffect(() => {
-    setRole(getActiveRole());
-    const handleRoleChange = () => setRole(getActiveRole());
-    window.addEventListener("omnizeus_role_change", handleRoleChange);
-    return () => window.removeEventListener("omnizeus_role_change", handleRoleChange);
+    const u = getCurrentUser();
+    setUser(u);
+    setUserName(u.name);
+
+    const activeId = getActiveCompanyId();
+    const comps = getCompanies();
+    const comp = comps.find(c => c.id === activeId) || comps[0];
+    if (comp) {
+      setActiveComp(comp);
+      setCorpName(comp.corporateName);
+      setTradeName(comp.tradeName || comp.corporateName);
+      setCnpj(comp.cnpj);
+    }
+
+    const handleUserChange = () => {
+      const updatedUser = getCurrentUser();
+      setUser(updatedUser);
+      setUserName(updatedUser.name);
+
+      const currentActiveId = getActiveCompanyId();
+      const updatedComps = getCompanies();
+      const updatedComp = updatedComps.find(c => c.id === currentActiveId) || updatedComps[0];
+      if (updatedComp) {
+        setActiveComp(updatedComp);
+        setCorpName(updatedComp.corporateName);
+        setTradeName(updatedComp.tradeName || updatedComp.corporateName);
+        setCnpj(updatedComp.cnpj);
+      }
+    };
+
+    window.addEventListener("omnizeus_role_change", handleUserChange);
+    window.addEventListener("omnizeus_user_change", handleUserChange);
+    window.addEventListener("omnizeus_company_context_change", handleUserChange);
+
+    return () => {
+      window.removeEventListener("omnizeus_role_change", handleUserChange);
+      window.removeEventListener("omnizeus_user_change", handleUserChange);
+      window.removeEventListener("omnizeus_company_context_change", handleUserChange);
+    };
   }, []);
 
+  const isMasterAdmin = user.role === "super_adm" || user.email === "jsgleisson@gmail.com";
+
   const handleSaveSettings = () => {
+    if (isMasterAdmin && activeComp) {
+      saveCompany({
+        ...activeComp,
+        corporateName: corpName.trim() || activeComp.corporateName,
+        tradeName: tradeName.trim() || activeComp.tradeName,
+        cnpj: cnpj.trim() || activeComp.cnpj
+      });
+    }
+
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2500);
   };
 
   return (
-    <div className="space-y-6 text-slate-900 font-sans">
+    <div className="space-y-6 text-slate-900 font-sans pb-12">
       {/* Header */}
       <div className="bg-white rounded-xl border border-slate-200/80 p-5 lg:p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -29,7 +84,7 @@ export default function ConfiguracoesPage() {
             Configurações Gerais
           </h1>
           <p className="text-xs lg:text-sm text-slate-500 mt-1">
-            Dados básicos do escritório, fuso horário e informações do sistema.
+            Informações do perfil do usuário e preferências do sistema.
           </p>
         </div>
 
@@ -53,40 +108,125 @@ export default function ConfiguracoesPage() {
 
       {/* Dados da Empresa & Perfil */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs">
-          <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-[#1E6FD9]" />
-            <span>Dados da Empresa</span>
-          </h2>
+        {/* Dados da Empresa (Desativado para não-Master ADM) */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-[#1E6FD9]" />
+              <span>Dados da Empresa</span>
+            </h2>
+
+            {!isMasterAdmin && (
+              <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold border border-slate-200 flex items-center gap-1">
+                <Lock className="w-3 h-3 text-slate-400" />
+                <span>Apenas Leitura</span>
+              </span>
+            )}
+          </div>
+
+          {!isMasterAdmin && (
+            <div className="p-2.5 bg-slate-50 border border-slate-200/60 rounded-lg text-[11px] text-slate-500 flex items-center gap-2 font-medium">
+              <ShieldAlert className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span>A alteração dos dados cadastrais da empresa é restrita exclusivamente ao Administrador Master.</span>
+            </div>
+          )}
+
           <div className="space-y-3 text-xs">
             <div>
               <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Razão Social:</label>
-              <input type="text" defaultValue="Zenitus Inteligência Contábil Ltda" className="w-full h-8 px-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium" />
+              <input
+                type="text"
+                value={corpName}
+                onChange={(e) => setCorpName(e.target.value)}
+                disabled={!isMasterAdmin}
+                className={`w-full h-9 px-3 border rounded-lg font-semibold transition-all ${
+                  isMasterAdmin 
+                    ? "bg-slate-50 border-slate-200 text-slate-900 focus:outline-none focus:border-[#1E6FD9]" 
+                    : "bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed"
+                }`}
+              />
             </div>
+
+            <div>
+              <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Nome Fantasia:</label>
+              <input
+                type="text"
+                value={tradeName}
+                onChange={(e) => setTradeName(e.target.value)}
+                disabled={!isMasterAdmin}
+                className={`w-full h-9 px-3 border rounded-lg font-semibold transition-all ${
+                  isMasterAdmin 
+                    ? "bg-slate-50 border-slate-200 text-slate-900 focus:outline-none focus:border-[#1E6FD9]" 
+                    : "bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed"
+                }`}
+              />
+            </div>
+
             <div>
               <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">CNPJ:</label>
-              <input type="text" defaultValue="42.189.902/0001-55" disabled className="w-full h-8 px-3 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 font-medium" />
+              <input
+                type="text"
+                value={cnpj}
+                onChange={(e) => setCnpj(e.target.value)}
+                disabled={!isMasterAdmin}
+                className={`w-full h-9 px-3 border rounded-lg font-semibold transition-all ${
+                  isMasterAdmin 
+                    ? "bg-slate-50 border-slate-200 text-slate-900 focus:outline-none focus:border-[#1E6FD9]" 
+                    : "bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed"
+                }`}
+              />
             </div>
+
             <div>
               <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Fuso Horário (Sistema):</label>
-              <input type="text" defaultValue="America/Sao_Paulo (BRT)" disabled className="w-full h-8 px-3 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 font-medium" />
+              <input
+                type="text"
+                value="America/Sao_Paulo (BRT)"
+                disabled
+                className="w-full h-9 px-3 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 font-medium cursor-not-allowed"
+              />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs">
-          <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
-            <User className="w-4 h-4 text-[#1E6FD9]" />
-            <span>Perfil do Usuário Logado</span>
-          </h2>
+        {/* Perfil do Usuário Logado (Editável pelo Usuário) */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs space-y-4">
+          <div className="border-b border-slate-100 pb-3">
+            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <User className="w-4 h-4 text-[#1E6FD9]" />
+              <span>Perfil do Usuário Logado</span>
+            </h2>
+          </div>
+
           <div className="space-y-3 text-xs">
             <div>
               <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Nome Completo:</label>
-              <input type="text" defaultValue="Carlos Mendes" className="w-full h-8 px-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold" />
+              <input
+                type="text"
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
+                className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9]"
+              />
             </div>
+
             <div>
-              <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Cargo / Perfil:</label>
-              <input type="text" defaultValue="Gestor — Diretoria Fiscal" disabled className="w-full h-8 px-3 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 font-medium" />
+              <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">E-mail de Acesso:</label>
+              <input
+                type="email"
+                value={user.email}
+                disabled
+                className="w-full h-9 px-3 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 font-medium cursor-not-allowed"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">Função / Perfil no Sistema:</label>
+              <input
+                type="text"
+                value={user.role === 'super_adm' ? 'Master Admin' : user.role === 'gestor' ? 'Gestor do Escritório' : 'Funcionário Operacional'}
+                disabled
+                className="w-full h-9 px-3 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 font-bold cursor-not-allowed"
+              />
             </div>
           </div>
         </div>

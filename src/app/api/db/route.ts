@@ -151,6 +151,7 @@ export interface DatabaseSchema {
   dashboard_metrics: any[];
   ai_stress_test_logs: any[];
   ai_usage_metrics: any[];
+  audit_logs: any[];
   contaazul_categories: any[];
 }
 
@@ -185,9 +186,33 @@ const DEFAULT_DB: DatabaseSchema = {
       cnpj: "42.189.902/0001-55",
       city: "Salvador",
       state: "BA",
+      plan: "Business",
+      coins_franchise: 50000,
+      monthly_revenue_brl: 184500.00,
+      status: "Ativo",
+      created_at: new Date().toISOString()
+    },
+    {
+      id: "comp_alpha",
+      corporate_name: "Alpha BPO Financeiro Ltda",
+      cnpj: "18.420.910/0001-88",
+      city: "São Paulo",
+      state: "SP",
       plan: "Premium",
       coins_franchise: 15000,
-      monthly_revenue_brl: 184500.00,
+      monthly_revenue_brl: 92400.00,
+      status: "Ativo",
+      created_at: new Date().toISOString()
+    },
+    {
+      id: "comp_beta",
+      corporate_name: "Beta Tax Consultoria Tributária Ltda",
+      cnpj: "33.918.402/0001-12",
+      city: "Curitiba",
+      state: "PR",
+      plan: "Profissional",
+      coins_franchise: 5000,
+      monthly_revenue_brl: 48000.00,
       status: "Ativo",
       created_at: new Date().toISOString()
     }
@@ -200,7 +225,29 @@ const DEFAULT_DB: DatabaseSchema = {
       email: "carlos@zenitus.com.br",
       department: "Diretoria Contábil & Master",
       role: "gestor",
-      allowed_modules: ["omni-ia", "financeiro", "contaazul", "whatsapp-bot", "tarefas", "documentos", "apresentacoes", "contratos", "solicitacoes"],
+      allowed_modules: ["omni-ia", "financeiro", "contaazul", "whatsapp-bot", "tarefas", "documentos", "apresentacoes"],
+      status: "Ativo",
+      created_at: new Date().toISOString()
+    },
+    {
+      id: "emp_alpha_1",
+      company_id: "comp_alpha",
+      name: "Roberto Santos",
+      email: "roberto@alphabpo.com.br",
+      department: "Gerência Operacional",
+      role: "gestor",
+      allowed_modules: ["omni-ia", "financeiro", "tarefas", "documentos"],
+      status: "Ativo",
+      created_at: new Date().toISOString()
+    },
+    {
+      id: "emp_beta_1",
+      company_id: "comp_beta",
+      name: "Fernanda Lima",
+      email: "fernanda@betatax.com.br",
+      department: "Consultoria Tributária",
+      role: "gestor",
+      allowed_modules: ["omni-ia", "tarefas", "apresentacoes"],
       status: "Ativo",
       created_at: new Date().toISOString()
     }
