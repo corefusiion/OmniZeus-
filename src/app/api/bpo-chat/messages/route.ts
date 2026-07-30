@@ -153,11 +153,19 @@ export async function POST(req: Request) {
       }
     }
 
-    // Check if openrouter API key is configured
-    const openRouterApiKey = process.env.OPENROUTER_API_KEY;
+    // Configurações dinâmicas baseadas no painel Super ADM
+    const dbSettings = db.settings || {};
+    const useCustomEndpoint = dbSettings.custom_ai_enabled === true;
+    const aiEndpoint = useCustomEndpoint && dbSettings.custom_ai_url 
+      ? `${dbSettings.custom_ai_url}/chat/completions` 
+      : "https://openrouter.ai/api/v1/chat/completions";
+      
+    const apiKey = useCustomEndpoint && dbSettings.custom_ai_key
+      ? dbSettings.custom_ai_key
+      : process.env.OPENROUTER_API_KEY || dbSettings.openrouter_api_key || "sk-or-v1-mock-key";
 
-    if (!openRouterApiKey || openRouterApiKey === "sk-or-v1-mock-key") {
-      const errText = "Nenhum provedor de IA está configurado no momento";
+    if (!apiKey || apiKey === "sk-or-v1-mock-key") {
+      const errText = "Nenhum provedor de IA está configurado ou chave inválida no momento";
       const aiErrObj = {
         id: `msg_${Date.now()}_ai_err`,
         conversation_id: conversationId,
@@ -200,16 +208,16 @@ Você possui autonomia e autoridade para responder dúvidas contábeis, orientar
 
 [CONTEXTO TEMPORAL]
 - Data: ${dateStrBr} | Horário de Brasília: ${timeStrBr} | Período: ${periodBr}
-- Se o usuário usar uma saudação incompatível com o horário (${timeStrBr}), responda com "${greetingBr}" e comente a divergência de horário de forma gentil e bem-humorada.`;
+- Se o usuário cumprimentar, responda de forma cordial, profissional e direta ao ponto, apenas dando o ${greetingBr} correspondente ao horário. NUNCA seja sarcástico.`;
 
-    const openRouterRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const openRouterRes = await fetch(aiEndpoint, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${openRouterApiKey}`,
+        "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: model || "google/gemini-2.5-pro",
+        model: (useCustomEndpoint ? dbSettings.custom_ai_model : undefined) || model || "google/gemini-2.5-pro",
         messages: [
           { role: "system", content: systemPrompt },
           ...historyMsgs
@@ -235,8 +243,27 @@ Você possui autonomia e autoridade para responder dúvidas contábeis, orientar
       return NextResponse.json({ success: true, message: errText, isConfigError: true });
     }
 
-    const aiData = await openRouterRes.json();
-    const aiResponseText = aiData.choices?.[0]?.message?.content || "Entendido! Como posso ajudar você na operação?";
+    const rawText = await openRouterRes.text();
+    let aiResponseText = "Entendido! Como posso ajudar você na operação?";
+    try {
+      const aiData = JSON.parse(rawText);
+      aiResponseText = aiData.choices?.[0]?.message?.content || aiResponseText;
+    } catch (parseErr) {
+      // Reconstruir o Stream SSE caso o proxy ignore a ausência do stream: true
+      const lines = rawText.split('\\n');
+      let hasData = false;
+      let streamContent = "";
+      for (const line of lines) {
+        if (line.trim().startsWith('data: ') && !line.includes('[DONE]')) {
+          try {
+            const chunk = JSON.parse(line.replace('data: ', '').trim());
+            streamContent += chunk.choices?.[0]?.delta?.content || chunk.choices?.[0]?.message?.content || "";
+            hasData = true;
+          } catch (e) {}
+        }
+      }
+      if (hasData) aiResponseText = streamContent;
+    }
 
     const aiMsgObj = {
       id: `msg_${Date.now()}_ai`,

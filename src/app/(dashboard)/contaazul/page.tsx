@@ -4,13 +4,15 @@ import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { 
   Link as LinkIcon, Download, RefreshCw, CheckCircle2, DollarSign, FileText, ArrowUpRight, 
-  ShieldCheck, Key, Users, Layers, AlertCircle, Settings, Check, ExternalLink, ArrowRight, Database, XCircle, AlertTriangle, Mail, Phone, Plus, Search, UserPlus, FilePlus, Zap, Edit, Mic, MicOff, Bot, Send, Sparkles, MessageSquare, Minimize2, Maximize2, Trash2, Edit2, PlusCircle, Folder, ChevronRight, X, Upload, FileSpreadsheet, MapPin, Building, Info, CheckSquare, Pin, PinOff
+  ShieldCheck, Key, Users, Layers, AlertCircle, Settings, Check, ExternalLink, ArrowRight, Database, XCircle, AlertTriangle, Mail, Phone, Plus, Search, UserPlus, FilePlus, Zap, Edit, Mic, MicOff, Bot, Send, Sparkles, MessageSquare, Minimize2, Maximize2, Trash2, Edit2, PlusCircle, Folder, ChevronRight, ChevronDown, X, Upload, FileSpreadsheet, MapPin, Building, Info, CheckSquare, Pin, PinOff
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { getActiveRole, UserRole } from "@/lib/auth/roles";
 import { 
   fetchContaAzulConfig, updateContaAzulConfig, 
   fetchContaAzulClients, saveContaAzulClients, 
   fetchContaAzulEntries, saveContaAzulEntries, 
+  fetchContaAzulSuppliers, saveContaAzulSuppliers,
   fetchContaAzulCategories, saveContaAzulCategories 
 } from "@/lib/db/serverDb";
 
@@ -27,6 +29,7 @@ export interface ContaAzulConfig {
 
 export interface ContaAzulCategory {
   id: string;
+  name?: string;
   categoryName: string;
   type: 'RECEITA' | 'DESPESA';
   dreLine: string;
@@ -48,7 +51,7 @@ export default function ContaAzulPage() {
   const errorFromUrl = searchParams?.get("error");
 
   const [role, setRole] = useState<UserRole>("gestor");
-  const [activeTab, setActiveTab] = useState<'conexao' | 'clientes' | 'financeiro' | 'categorias'>('clientes');
+  const [activeTab, setActiveTab] = useState<'conexao' | 'clientes' | 'fornecedores' | 'financeiro' | 'categorias'>('clientes');
   
   // Config State
   const [clientId, setClientId] = useState("1mbtg7ok5lp46p0j9oir48fda0");
@@ -69,6 +72,7 @@ export default function ContaAzulPage() {
 
   // Synced Real Items State
   const [syncedClients, setSyncedClients] = useState<any[]>([]);
+  const [syncedSuppliers, setSyncedSuppliers] = useState<any[]>([]);
   const [syncedEntries, setSyncedEntries] = useState<any[]>([]);
   const [categories, setCategories] = useState<ContaAzulCategory[]>([]);
 
@@ -81,6 +85,7 @@ export default function ContaAzulPage() {
 
   // Modals & Form Notifications
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
+  const [isAddSupplierOpen, setIsAddSupplierOpen] = useState(false);
   const [isEditClientOpen, setIsEditClientOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isAddEntryOpen, setIsAddEntryOpen] = useState(false);
@@ -103,6 +108,13 @@ export default function ContaAzulPage() {
   const [newClientWhatsapp, setNewClientWhatsapp] = useState("");
   const [newClientPersonType, setNewClientPersonType] = useState<"Física" | "Jurídica" | "Estrangeira">("Jurídica");
   const [newClientCode, setNewClientCode] = useState("");
+
+  // Form States - Supplier
+  const [newSupplierName, setNewSupplierName] = useState("");
+  const [newSupplierDoc, setNewSupplierDoc] = useState("");
+  const [newSupplierEmail, setNewSupplierEmail] = useState("");
+  const [newSupplierPhone, setNewSupplierPhone] = useState("");
+  const [newSupplierPersonType, setNewSupplierPersonType] = useState<"Física" | "Jurídica" | "Estrangeira">("Jurídica");
   
   // Roles
   const [roleIsClient, setRoleIsClient] = useState(true);
@@ -130,7 +142,11 @@ export default function ContaAzulPage() {
   const [newEntryDesc, setNewEntryDesc] = useState("");
   const [newEntryVal, setNewEntryVal] = useState("");
   const [newEntryDueDate, setNewEntryDueDate] = useState("");
-  const [newEntryType, setNewEntryType] = useState<"RECEBIMENTO" | "PAGAMENTO">("RECEBIMENTO");
+  const [newEntryCompetenceDate, setNewEntryCompetenceDate] = useState("");
+  const [newEntryType, setNewEntryType] = useState<string>("DESPESA");
+  const [newEntryCustomerId, setNewEntryCustomerId] = useState("");
+  const [newEntrySupplierId, setNewEntrySupplierId] = useState("");
+  const [newEntryCategoryId, setNewEntryCategoryId] = useState("");
 
   // Import CSV State
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -147,6 +163,71 @@ export default function ContaAzulPage() {
   const [convSearchQuery, setConvSearchQuery] = useState("");
 
   const [aiInputText, setAiInputText] = useState("");
+
+  // AI Import State
+  const [isAiImportOpen, setIsAiImportOpen] = useState(false);
+  const [aiImportProgress, setAiImportProgress] = useState(0);
+  const [aiImportStep, setAiImportStep] = useState<"idle" | "uploading" | "processing" | "done">("idle");
+
+  const handleAiUploadDemo = () => {
+    setAiImportStep("uploading");
+    setAiImportProgress(0);
+    
+    let prog = 0;
+    const interval = setInterval(() => {
+      prog += 10;
+      setAiImportProgress(prog);
+      if (prog >= 50) setAiImportStep("processing");
+      if (prog >= 100) {
+        clearInterval(interval);
+        setAiImportStep("done");
+        setTimeout(() => {
+          setIsAiImportOpen(false);
+          setImportedRows([{ name: "Cliente Extraído via IA Ltda", doc: "99.888.777/0001-66", email: "ia@empresa.com", phone: "(11) 99999-9999" }]);
+          setIsImportModalOpen(true);
+        }, 1000);
+      }
+    }, 400);
+  };
+
+  const handleExport = (type: 'csv' | 'xlsx' | 'xml') => {
+    if (syncedClients.length === 0) {
+      setNoticeMessage({ type: 'warning', text: 'Nenhum cliente para exportar.' });
+      return;
+    }
+    
+    const exportData = syncedClients.map(c => ({
+      Nome: c.name,
+      'CPF/CNPJ': c.doc,
+      Email: c.email,
+      Telefone: c.phone,
+      'Status': 'Ativo'
+    }));
+
+    if (type === 'csv' || type === 'xlsx') {
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Clientes");
+      XLSX.writeFile(workbook, `conta_azul_clientes.${type}`);
+    } else if (type === 'xml') {
+      let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<Clientes>\n';
+      exportData.forEach((client: any) => {
+        xml += '  <Cliente>\n';
+        for (const [key, value] of Object.entries(client)) {
+          const safeKey = key.replace(/[^a-zA-Z0-9]/g, '');
+          xml += `    <${safeKey}>${value}</${safeKey}>\n`;
+        }
+        xml += '  </Cliente>\n';
+      });
+      xml += '</Clientes>';
+      const blob = new Blob([xml], { type: 'application/xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "conta_azul_clientes.xml";
+      a.click();
+    }
+  };
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [selectedModel, setSelectedModel] = useState("google/gemini-2.5-pro");
@@ -187,8 +268,8 @@ export default function ContaAzulPage() {
       const cfg = await fetchContaAzulConfig();
       if (cfg && cfg.clientId) setClientId(cfg.clientId);
       if (cfg && cfg.clientSecret) setClientSecret(cfg.clientSecret);
-      if (cfg && cfg.redirectUri && !cfg.redirectUri.includes('localhost')) {
-        setRedirectUri(cfg.redirectUri);
+      if (cfg && (cfg as any).redirectUri && !(cfg as any).redirectUri.includes('localhost')) {
+        setRedirectUri((cfg as any).redirectUri);
       }
       if (cfg && cfg.accessToken) {
         setAccessToken(cfg.accessToken);
@@ -200,6 +281,11 @@ export default function ContaAzulPage() {
       const clients = await fetchContaAzulClients();
       if (Array.isArray(clients) && clients.length > 0) {
         setSyncedClients(clients);
+      }
+
+      const suppliers = await fetchContaAzulSuppliers();
+      if (Array.isArray(suppliers) && suppliers.length > 0) {
+        setSyncedSuppliers(suppliers);
       }
 
       const entries = await fetchContaAzulEntries();
@@ -235,6 +321,19 @@ export default function ContaAzulPage() {
       lastSyncAt: connected ? new Date().toISOString() : undefined
     };
     await updateContaAzulConfig(cfg);
+
+    if (activeAccToken || activeRefToken) {
+      fetch("/api/contaazul/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accessToken: activeAccToken,
+          refreshToken: activeRefToken,
+          clientId,
+          clientSecret
+        })
+      }).catch(() => {});
+    }
   };
 
   // CPF/CNPJ auto-mask
@@ -531,13 +630,22 @@ export default function ContaAzulPage() {
       if (res.ok && data.success) {
         const clients = data.customers || [];
         const entries = data.entries || [];
+        const suppliers = data.suppliers || [];
+        const categories = data.categories || [];
+        
         setSyncedClients(clients);
         setSyncedEntries(entries);
+        setSyncedSuppliers(suppliers);
+        setCategories(categories);
+        
         await saveContaAzulClients(clients);
         await saveContaAzulEntries(entries);
+        await saveContaAzulSuppliers(suppliers);
+        await saveContaAzulCategories(categories);
+        
         setNoticeMessage({ 
           type: 'success', 
-          text: `Sincronização 24/7 concluída! Retornados ${data.customersCount || 0} clientes e ${data.entriesCount || 0} lançamentos reais.` 
+          text: `Sincronização 24/7 concluída! Retornados ${data.customersCount || 0} clientes, ${data.suppliersCount || 0} fornecedores, ${data.categoriesCount || 0} categorias e ${data.entriesCount || 0} lançamentos reais.` 
         });
       } else {
         setNoticeMessage({ 
@@ -761,7 +869,85 @@ export default function ContaAzulPage() {
       }
     } catch (err: any) {
       setIsSubmittingForm(false);
-      setModalErrorMessage("Erro de conexão ao comunicar com a ContaAzul.");
+      setModalErrorMessage(err.message || "Falha na comunicação com o servidor.");
+    }
+  };
+
+  const handleCreateSupplier = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setModalErrorMessage(null);
+
+    if (!newSupplierName.trim() || !newSupplierDoc.trim()) {
+      setModalErrorMessage("Preencha o Nome/Razão Social e CPF/CNPJ.");
+      return;
+    }
+
+    const tokenToUse = accessToken || manualTokenInput.trim();
+    setIsSubmittingForm(true);
+
+    try {
+      const res = await fetch("/api/contaazul/suppliers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accessToken: tokenToUse,
+          refreshToken,
+          clientId,
+          clientSecret,
+          supplier: {
+            name: newSupplierName,
+            tradeName: newSupplierName,
+            document: newSupplierDoc,
+            email: newSupplierEmail,
+            phone: newSupplierPhone,
+            personType: newSupplierPersonType,
+            roleIsSupplier: true
+          }
+        })
+      });
+
+      const data = await res.json();
+      setIsSubmittingForm(false);
+
+      if (data.new_access_token) {
+        setAccessToken(data.new_access_token);
+        if (data.new_refresh_token) setRefreshToken(data.new_refresh_token);
+        await saveConfig(true, data.new_access_token, data.new_refresh_token);
+      }
+
+      if (res.ok && data.success) {
+        const caId = data.supplier?.id || null;
+        const newSuppObj = {
+          id: caId,
+          name: newSupplierName,
+          nome: newSupplierName,
+          cpf_cnpj: newSupplierDoc.replace(/\D/g, ""),
+          document: newSupplierDoc.replace(/\D/g, ""),
+          email: newSupplierEmail,
+          phone: newSupplierPhone,
+          status: "API v2 Real"
+        };
+
+        const updated = [newSuppObj, ...syncedSuppliers];
+        setSyncedSuppliers(updated);
+        await saveContaAzulSuppliers(updated);
+
+        setIsAddSupplierOpen(false);
+        // Reset form
+        setNewSupplierName("");
+        setNewSupplierDoc("");
+        setNewSupplierEmail("");
+        setNewSupplierPhone("");
+        setNewSupplierPersonType("Jurídica");
+        setNoticeMessage({ type: 'success', text: `Fornecedor '${newSupplierName}' cadastrado com sucesso!` });
+      } else {
+        const rawErr = data.raw ? (data.raw.message || JSON.stringify(data.raw)) : "";
+        const errMsg = data.error || rawErr || "Erro ao criar fornecedor na ContaAzul. Verifique se o CPF/CNPJ é válido e se a sessão OAuth está autorizada.";
+        setModalErrorMessage(errMsg);
+      }
+    } catch (err: any) {
+      setIsSubmittingForm(false);
+      setModalErrorMessage(err.message || "Falha na comunicação com o servidor.");
     }
   };
 
@@ -788,43 +974,49 @@ export default function ContaAzulPage() {
     setCustomerModalSection('gerais');
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setImportFile(file);
 
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const text = evt.target?.result as string;
-      if (!text) return;
-
-      const lines = text.split("\n").filter(l => l.trim().length > 0);
-      if (lines.length <= 1) return;
-
-      const headers = lines[0].split(/[,;]/).map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheetName = workbook.SheetNames.includes("Dados") ? "Dados" : workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const json = XLSX.utils.sheet_to_json<any>(worksheet, { header: 1 });
+      
+      if (json.length <= 1) return;
+      
+      const headers = (json[0] as string[]).map(h => (h || '').toString().trim().toLowerCase());
       
       const parsed: any[] = [];
-      for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(/[,;]/).map(c => c.trim().replace(/['"]/g, ''));
-        if (cols.length < 2) continue;
-
+      for (let i = 1; i < json.length; i++) {
+        const cols = json[i] as any[];
+        if (!cols || cols.length === 0) continue;
+        
         const row: any = {};
         headers.forEach((h, idx) => {
           row[h] = cols[idx] || '';
         });
 
-        const name = row.name || row.nome || row.razao_social || cols[0];
-        const doc = row.cpf_cnpj || row.document || row.cnpj || row.cpf || cols[1] || '';
-        const email = row.email || row.email_principal || cols[2] || '';
-        const phone = row.phone || row.telefone || row.whatsapp || cols[3] || '';
+        // Mapeamento específico da "Planilha_Modelo_clientes.xls"
+        const name = row['nome do cliente / nome fantasia *'] || row['nome'] || row['razão social'] || cols[1] || cols[0];
+        const doc = row['cnpj'] || row['cpf'] || row['cpf_cnpj'] || cols[3] || cols[9] || '';
+        const email = row['email'] || cols[12] || '';
+        const phone = row['celular'] || row['telefone'] || cols[21] || cols[20] || '';
 
         if (name) {
           parsed.push({ name, doc, email, phone });
         }
       }
       setImportedRows(parsed);
-    };
-    reader.readAsText(file);
+      if (parsed.length > 0) {
+        setIsImportModalOpen(true);
+      }
+    } catch (err) {
+      console.error("Erro ao ler o arquivo Excel/CSV", err);
+    }
   };
 
   const downloadSampleCsv = () => {
@@ -919,7 +1111,11 @@ export default function ContaAzulPage() {
           description: newEntryDesc,
           value: parseFloat(newEntryVal),
           dueDate: newEntryDueDate,
-          type: newEntryType
+          competenceDate: newEntryCompetenceDate || newEntryDueDate,
+          type: newEntryType,
+          customerId: newEntryCustomerId || undefined,
+          supplierId: newEntrySupplierId || undefined,
+          categoryId: newEntryCategoryId || undefined
         })
       });
 
@@ -1045,6 +1241,10 @@ export default function ContaAzulPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: userText,
+          history: chatMessages.map(m => ({
+            role: m.role,
+            content: m.content
+          })).slice(-10),
           conversationId: currentConvId,
           model: selectedModel,
           accessToken: accessToken || manualTokenInput.trim(),
@@ -1083,6 +1283,13 @@ export default function ContaAzulPage() {
     return name.includes(q) || doc.includes(q);
   });
 
+  const filteredSuppliers = syncedSuppliers.filter(c => {
+    const q = searchQuery.toLowerCase();
+    const name = (c.name || c.nome || c.company_name || c.razao_social || '').toLowerCase();
+    const doc = (c.document || c.cnpj || c.cpf || c.cpf_cnpj || c.documento || '').toLowerCase();
+    return name.includes(q) || doc.includes(q);
+  });
+
   const filteredEntries = syncedEntries.filter(e => {
     const q = searchQuery.toLowerCase();
     const desc = (e.desc || e.description || '').toLowerCase();
@@ -1102,12 +1309,6 @@ export default function ContaAzulPage() {
             <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 tracking-tight">
               Integração Oficial ContaAzul
             </h1>
-            <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border flex items-center gap-1 ${
-              isConnected && accessToken ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-600 border-gray-200'
-            }`}>
-              <Zap className="w-3 h-3 text-emerald-600" />
-              {isConnected && accessToken ? 'Conexão 24/7 (Auto-Refresh Ativo)' : 'Aguardando Conexão'}
-            </span>
           </div>
           <p className="text-xs lg:text-sm text-gray-500 mt-1">
             Gestão integrada de Clientes, Contas a Pagar/Receber e DRE com a ContaAzul Pro
@@ -1117,34 +1318,10 @@ export default function ContaAzulPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => { setIsAiModalOpen(true); setIsAiMinimized(false); }}
-            className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all shadow-xs border border-gray-800"
+            className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all shadow-xs border border-emerald-700"
           >
-            <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+            <Sparkles className="w-3.5 h-3.5 text-white" />
             <span>Assistente IA BPO</span>
-          </button>
-
-          <button
-            onClick={() => { resetCustomerForm(); setModalErrorMessage(null); setIsAddClientOpen(true); }}
-            className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-900 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all shadow-xs"
-          >
-            <UserPlus className="w-3.5 h-3.5 text-gray-600" />
-            <span>+ Novo Cliente</span>
-          </button>
-
-          <button
-            onClick={() => setIsImportModalOpen(true)}
-            className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-800 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all shadow-xs"
-          >
-            <Upload className="w-3.5 h-3.5 text-emerald-600" />
-            <span className="hidden sm:inline">Importar </span>(CSV/Excel)
-          </button>
-
-          <button
-            onClick={() => { setModalErrorMessage(null); setIsAddEntryOpen(true); }}
-            className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-800 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all"
-          >
-            <FilePlus className="w-3.5 h-3.5" />
-            <span>+ Nova Cobrança</span>
           </button>
 
           <button
@@ -1192,12 +1369,12 @@ export default function ContaAzulPage() {
         <div className={`p-3.5 rounded-xl border text-xs font-semibold flex items-start gap-2.5 ${
           noticeMessage.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
           noticeMessage.type === 'error' ? 'bg-red-50 border-red-200 text-red-700' :
-          noticeMessage.type === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-blue-50 border-blue-200 text-blue-800'
+          noticeMessage.type === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-primary/10 border-primary/20 text-primary'
         }`}>
           {noticeMessage.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />}
           {noticeMessage.type === 'error' && <XCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />}
           {noticeMessage.type === 'warning' && <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />}
-          {noticeMessage.type === 'info' && <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />}
+          {noticeMessage.type === 'info' && <AlertCircle className="w-4 h-4 text-primary shrink-0 mt-0.5" />}
           <div className="flex-1 leading-relaxed">{noticeMessage.text}</div>
         </div>
       )}
@@ -1208,7 +1385,7 @@ export default function ContaAzulPage() {
           <div className="bg-white rounded-xl border border-slate-200 p-6 max-w-md w-full shadow-lg relative space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Layers className="w-5 h-5 text-[#1E6FD9]" />
+                <Layers className="w-5 h-5 text-primary" />
                 <span>{editingCatId ? 'Editar Mapeamento DRE' : 'Nova Categoria & Mapeamento DRE'}</span>
               </h3>
               <button onClick={() => setIsCatModalOpen(false)} className="text-slate-400 hover:text-slate-700">
@@ -1226,7 +1403,7 @@ export default function ContaAzulPage() {
                   placeholder="Ex: Honorários de Recorrência Mensal BPO"
                   value={catNameInput}
                   onChange={(e) => setCatNameInput(e.target.value)}
-                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
+                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-primary"
                 />
               </div>
 
@@ -1238,7 +1415,7 @@ export default function ContaAzulPage() {
                   <select
                     value={catTypeInput}
                     onChange={(e) => setCatTypeInput(e.target.value as any)}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9] cursor-pointer"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary cursor-pointer"
                   >
                     <option value="RECEITA">Receita</option>
                     <option value="DESPESA">Despesa</option>
@@ -1251,7 +1428,7 @@ export default function ContaAzulPage() {
                   <select
                     value={dreLineInput}
                     onChange={(e) => setDreLineInput(e.target.value)}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9] cursor-pointer"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary cursor-pointer"
                   >
                     <option value="Receita Bruta (DRE 1.1)">Receita Bruta (DRE 1.1)</option>
                     <option value="Impostos e Abatimentos (DRE 2.1)">Impostos e Abatimentos (DRE 2.1)</option>
@@ -1274,7 +1451,7 @@ export default function ContaAzulPage() {
               <button
                 type="button"
                 onClick={handleSaveCategory}
-                className="px-5 py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-semibold rounded-lg shadow-xs"
+                className="px-5 py-2 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg shadow-xs"
               >
                 Salvar Mapeamento
               </button>
@@ -1288,6 +1465,7 @@ export default function ContaAzulPage() {
         <div className="flex items-center gap-1 overflow-x-auto max-w-full pb-0.5 shrink-0">
           {[
             { id: 'clientes', label: `Clientes Reais (${syncedClients.length})`, icon: Users },
+            { id: 'fornecedores', label: `Fornecedores (${syncedSuppliers.length})`, icon: Building },
             { id: 'financeiro', label: `Lançamentos & Cobranças (${syncedEntries.length})`, icon: DollarSign },
             { id: 'categorias', label: `Plano de Contas & DRE (${categories.length})`, icon: Layers },
             { id: 'conexao', label: 'Credenciais & OAuth 2.0', icon: Key },
@@ -1312,7 +1490,7 @@ export default function ContaAzulPage() {
         </div>
 
         {/* Search bar */}
-        {(activeTab === 'clientes' || activeTab === 'financeiro') && (
+        {(activeTab === 'clientes' || activeTab === 'fornecedores' || activeTab === 'financeiro') && (
           <div className="relative w-full sm:w-64 mb-1">
             <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
             <input
@@ -1335,13 +1513,37 @@ export default function ContaAzulPage() {
               <p className="text-xs text-gray-500">Cadastro completo com consulta pública de CNPJ/CEP e importação de planilhas CSV</p>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setIsImportModalOpen(true)}
-                className="px-3 py-1.5 bg-white border border-gray-200 hover:border-gray-300 text-gray-800 text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-xs"
-              >
-                <Upload className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Importar Planilha</span>
-              </button>
+              {/* Menu Importar Inferior (Dropdown) */}
+              <div className="relative group">
+                <button className="px-3 py-1.5 bg-white border border-gray-200 hover:border-gray-300 text-gray-800 text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-xs transition-all">
+                  <Upload className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Importar</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                </button>
+                <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-100 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 py-1">
+                  <label className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 hover:text-gray-900 cursor-pointer block">
+                    Por planilha manualmente
+                    <input type="file" accept=".xls,.xlsx,.csv" className="hidden" onChange={handleFileChange} />
+                  </label>
+                  <button className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 hover:text-gray-900 block">
+                    Por nota fiscal de venda
+                  </button>
+                </div>
+              </div>
+
+              {/* Menu Exportar Inferior (Dropdown) */}
+              <div className="relative group">
+                <button className="px-3 py-1.5 bg-white border border-gray-200 hover:border-gray-300 text-gray-800 text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-xs transition-all">
+                  <Download className="w-3.5 h-3.5 text-gray-600" />
+                  <span>Exportar</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                </button>
+                <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-100 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 py-1">
+                  <button onClick={() => handleExport('csv')} className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 hover:text-gray-900 block">CSV</button>
+                  <button onClick={() => handleExport('xlsx')} className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 hover:text-gray-900 block">XLSX</button>
+                  <button onClick={() => handleExport('xml')} className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 hover:text-gray-900 block">XML</button>
+                </div>
+              </div>
               <button
                 onClick={() => { resetCustomerForm(); setModalErrorMessage(null); setIsAddClientOpen(true); }}
                 className="px-3.5 py-1.5 bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-xs"
@@ -1415,12 +1617,93 @@ export default function ContaAzulPage() {
         </div>
       )}
 
+      {/* Tab 1.5: Fornecedores Reais */}
+      {activeTab === 'fornecedores' && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+            <div>
+              <h3 className="text-base font-bold text-gray-900">Fornecedores Reais da ContaAzul Pro</h3>
+              <p className="text-xs text-gray-500">Gestão da base de fornecedores para contas a pagar</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Botão temporário para fluxo manual */}
+              <button
+                onClick={() => { setModalErrorMessage(null); setIsAddSupplierOpen(true); }}
+                className="px-3.5 py-1.5 bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-xs"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Novo Fornecedor</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-gray-50 text-gray-500 font-bold uppercase tracking-wider">
+                <tr>
+                  <th className="py-3 px-4 rounded-tl-lg">Nome / Razão Social</th>
+                  <th className="py-3 px-4">CNPJ / CPF</th>
+                  <th className="py-3 px-4">E-mail</th>
+                  <th className="py-3 px-4">Telefone</th>
+                  <th className="py-3 px-4">Situação</th>
+                  <th className="py-3 px-4 rounded-tr-lg text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredSuppliers.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center">
+                      <Building className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                      <p className="text-gray-500 font-medium">Nenhum Fornecedor Encontrado</p>
+                      <p className="text-gray-400 mt-1">Busque na barra acima ou sincronize com a ContaAzul.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredSuppliers.map((c, i) => {
+                    const name = c.name || c.nome || c.company_name || c.razao_social || '—';
+                    const doc = c.document || c.cnpj || c.cpf || c.cpf_cnpj || c.documento || '—';
+                    const email = c.email || c.email_principal || '—';
+                    const phone = c.phone || c.whatsapp || c.telefone || c.celular || '—';
+
+                    return (
+                      <tr key={i} className="hover:bg-gray-50 transition-colors">
+                        <td className="py-3.5 px-4 font-semibold text-gray-900">{name}</td>
+                        <td className="py-3.5 px-4 font-mono text-gray-600">{doc}</td>
+                        <td className="py-3.5 px-4 text-gray-600">{email}</td>
+                        <td className="py-3.5 px-4 text-gray-600">{phone}</td>
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${
+                            c.status === 'API v2 Real' || !c.status ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}>
+                            <CheckCircle2 className="w-3 h-3" />
+                            {c.status || "API v2 Real"}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <button
+                            onClick={() => { setNoticeMessage({ type: 'info', text: 'Edição de fornecedores será implementada em breve.' }); }}
+                            className="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-md text-[11px] font-medium inline-flex items-center gap-1 border border-gray-200"
+                          >
+                            <Edit className="w-3 h-3 text-gray-500" />
+                            <span>Editar</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Tab 2: Financeiro & Lançamentos */}
       {activeTab === 'financeiro' && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
           <div className="flex items-center justify-between border-b border-gray-100 pb-4">
             <div>
-              <h3 className="text-base font-bold text-gray-900">Lançamentos Financeiros & Cobranças (`/v1/financeiro/eventos-financeiros`)</h3>
+              <h3 className="text-base font-bold text-gray-900">Lançamentos Financeiros & Cobranças</h3>
               <p className="text-xs text-gray-500">Títulos a pagar e receber integrados ao DRE Gerencial do OmniZeus</p>
             </div>
             <button
@@ -1487,8 +1770,8 @@ export default function ContaAzulPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
             <div>
               <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                <Layers className="w-5 h-5 text-[#1E6FD9]" />
-                <span>Mapeamento de Categorias & DRE (`/v1/categories`)</span>
+                <Layers className="w-5 h-5 text-primary" />
+                <span>Mapeamento de Categorias & DRE</span>
               </h3>
               <p className="text-xs text-gray-500 mt-1">
                 Integração bidirecional do Plano de Contas ContaAzul com a Demonstração do Resultado do Exercício (DRE Gerencial OmniZeus).
@@ -1496,7 +1779,7 @@ export default function ContaAzulPage() {
             </div>
             <button
               onClick={handleOpenCreateCategory}
-              className="px-4 py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-xs"
+              className="px-4 py-2 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-xs"
             >
               <Plus className="w-4 h-4" />
               <span>+ Nova Categoria</span>
@@ -1582,7 +1865,7 @@ export default function ContaAzulPage() {
                   Arquitetura Multi-Empresa & Multi-Tenant (Roadmap v3.0)
                 </h4>
               </div>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-primary/100/20 text-blue-300 border border-blue-500/30">
                 Enterprise Multi-Tenant Isolation
               </span>
             </div>
@@ -1825,7 +2108,7 @@ export default function ContaAzulPage() {
                             type="button"
                             onClick={handleLookupCnpj}
                             disabled={isFetchingCnpj}
-                            className="px-3 py-2 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 font-semibold rounded-lg whitespace-nowrap flex items-center gap-1 disabled:opacity-50"
+                            className="px-3 py-2 bg-primary/10 border border-primary/20 text-primary hover:bg-blue-100 font-semibold rounded-lg whitespace-nowrap flex items-center gap-1 disabled:opacity-50"
                           >
                             {isFetchingCnpj ? (
                               <>
@@ -1878,15 +2161,15 @@ export default function ContaAzulPage() {
                       <label className="block font-semibold text-gray-700 mb-1.5">Tipo de papel</label>
                       <div className="flex items-center gap-4 text-gray-700 font-medium pt-1">
                         <label className="flex items-center gap-1.5 cursor-pointer">
-                          <input type="checkbox" checked={roleIsClient} onChange={(e) => setRoleIsClient(e.target.checked)} className="rounded text-blue-600" />
+                          <input type="checkbox" checked={roleIsClient} onChange={(e) => setRoleIsClient(e.target.checked)} className="rounded text-primary" />
                           <span>Cliente</span>
                         </label>
                         <label className="flex items-center gap-1.5 cursor-pointer">
-                          <input type="checkbox" checked={roleIsSupplier} onChange={(e) => setRoleIsSupplier(e.target.checked)} className="rounded text-blue-600" />
+                          <input type="checkbox" checked={roleIsSupplier} onChange={(e) => setRoleIsSupplier(e.target.checked)} className="rounded text-primary" />
                           <span>Fornecedor</span>
                         </label>
                         <label className="flex items-center gap-1.5 cursor-pointer">
-                          <input type="checkbox" checked={roleIsCarrier} onChange={(e) => setRoleIsCarrier(e.target.checked)} className="rounded text-blue-600" />
+                          <input type="checkbox" checked={roleIsCarrier} onChange={(e) => setRoleIsCarrier(e.target.checked)} className="rounded text-primary" />
                           <span>Transportadora</span>
                         </label>
                       </div>
@@ -2158,6 +2441,156 @@ export default function ContaAzulPage() {
         </div>
       )}
 
+      {/* MODAL DE NOVO FORNECEDOR */}
+      {isAddSupplierOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-gray-200 max-w-2xl w-full shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-150">
+            <div className="p-4 bg-gray-900 text-white flex items-center justify-between border-b border-gray-800">
+              <div className="flex items-center gap-2">
+                <Building className="w-4 h-4 text-blue-400" />
+                <h3 className="text-sm font-bold">
+                  Novo Fornecedor no ERP ContaAzul Pro
+                </h3>
+              </div>
+              <button 
+                onClick={() => setIsAddSupplierOpen(false)} 
+                className="text-gray-400 hover:text-white text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateSupplier} className="p-6 space-y-4 text-xs">
+              {modalErrorMessage && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 text-red-700">
+                  <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span className="font-semibold">{modalErrorMessage}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block font-semibold text-gray-700 mb-1">Tipo de Pessoa</label>
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="radio" name="suppType" checked={newSupplierPersonType === 'Jurídica'} onChange={() => setNewSupplierPersonType('Jurídica')} />
+                      <span>Jurídica (CNPJ)</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="radio" name="suppType" checked={newSupplierPersonType === 'Física'} onChange={() => setNewSupplierPersonType('Física')} />
+                      <span>Física (CPF)</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block font-semibold text-gray-700 mb-1">
+                    {newSupplierPersonType === 'Jurídica' ? 'Razão Social do Fornecedor' : 'Nome Completo do Fornecedor'}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: Fornecedor XYZ Ltda"
+                    value={newSupplierName}
+                    onChange={(e) => setNewSupplierName(e.target.value)}
+                    className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900"
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block font-semibold text-gray-700 mb-1">
+                    {newSupplierPersonType === 'Jurídica' ? 'CNPJ' : 'CPF'}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder={newSupplierPersonType === 'Jurídica' ? '00.000.000/0001-00' : '000.000.000-00'}
+                    value={newSupplierDoc}
+                    onChange={(e) => setNewSupplierDoc(e.target.value)}
+                    className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-gray-700 mb-1">E-mail Corporativo</label>
+                  <input
+                    type="email"
+                    placeholder="contato@fornecedor.com"
+                    value={newSupplierEmail}
+                    onChange={(e) => setNewSupplierEmail(e.target.value)}
+                    className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-gray-700 mb-1">Telefone / WhatsApp</label>
+                  <input
+                    type="text"
+                    placeholder="(11) 99999-9999"
+                    value={newSupplierPhone}
+                    onChange={(e) => setNewSupplierPhone(e.target.value)}
+                    className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-gray-200 flex items-center justify-between mt-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-gray-400 font-bold uppercase">Preenchimento:</span>
+                  <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    Compatível ContaAzul API v2
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddSupplierOpen(false);
+                      setModalErrorMessage(null);
+                      setRoleIsSupplier(true);
+                      setRoleIsClient(false);
+                      setRoleIsCarrier(false);
+                      setNewClientName(newSupplierName);
+                      setNewClientTradeName(newSupplierName);
+                      setNewClientDoc(newSupplierDoc);
+                      setNewClientEmail(newSupplierEmail);
+                      setNewClientPhone(newSupplierPhone);
+                      setNewClientPersonType(newSupplierPersonType);
+                      setIsAddClientOpen(true);
+                    }}
+                    className="px-3 py-2 border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg text-xs font-semibold"
+                  >
+                    + Formulário Completo (Endereço/Fiscais)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddSupplierOpen(false)}
+                    className="px-4 py-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingForm}
+                    className="px-6 py-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-lg flex items-center gap-2 shadow-xs"
+                  >
+                    {isSubmittingForm ? (
+                      <>
+                        <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Salvando...
+                      </>
+                    ) : (
+                      "Salvar Fornecedor"
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MODAL DE IMPORTAÇÃO DE CLIENTES (CSV / EXCEL) */}
       {isImportModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
@@ -2200,7 +2633,7 @@ export default function ContaAzulPage() {
                 <button
                   type="button"
                   onClick={downloadSampleCsv}
-                  className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1"
+                  className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
                 >
                   <Download className="w-3.5 h-3.5" />
                   Baixar Planilha Modelo (.csv)
@@ -2265,7 +2698,7 @@ export default function ContaAzulPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-gray-700 font-medium mb-1">Valor (R$) *</label>
                   <input
@@ -2280,7 +2713,17 @@ export default function ContaAzulPage() {
                 </div>
 
                 <div>
-                  <label className="block text-gray-700 font-medium mb-1">Data de Vencimento *</label>
+                  <label className="block text-gray-700 font-medium mb-1">Data Competência</label>
+                  <input
+                    type="date"
+                    value={newEntryCompetenceDate}
+                    onChange={(e) => setNewEntryCompetenceDate(e.target.value)}
+                    className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 font-medium mb-1">Vencimento *</label>
                   <input
                     type="date"
                     required
@@ -2292,14 +2735,73 @@ export default function ContaAzulPage() {
               </div>
 
               <div>
-                <label className="block text-gray-700 font-medium mb-1">Tipo de Evento</label>
+                <label className="block text-gray-700 font-medium mb-1">Tipo de Evento *</label>
                 <select
                   value={newEntryType}
                   onChange={(e: any) => setNewEntryType(e.target.value)}
+                  className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 font-medium"
+                >
+                  <optgroup label="Contas a Pagar (Gastos)">
+                    <option value="DESPESA">Despesa</option>
+                    <option value="COMPRA">Compra</option>
+                  </optgroup>
+                  <optgroup label="Contas a Receber (Entradas)">
+                    <option value="RECEITA_SERVICO">Receita de serviço</option>
+                    <option value="RECEITA_PRODUTO">Receita de produto</option>
+                    <option value="RECEITA_DIVERSA">Receita diversa</option>
+                  </optgroup>
+                </select>
+              </div>
+
+              {['DESPESA', 'COMPRA', 'PAGAMENTO'].includes(newEntryType) && (
+                <div>
+                  <label className="block text-gray-700 font-medium mb-1">Vincular a um Fornecedor (Opcional)</label>
+                  <select
+                    value={newEntrySupplierId}
+                    onChange={(e) => setNewEntrySupplierId(e.target.value)}
+                    className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900"
+                  >
+                    <option value="">-- Sem vínculo --</option>
+                    {syncedSuppliers.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name || c.nome || c.company_name} - {c.document || c.cnpj || c.cpf || 'S/Doc'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {['RECEITA_SERVICO', 'RECEITA_PRODUTO', 'RECEITA_DIVERSA', 'RECEBIMENTO'].includes(newEntryType) && (
+                <div>
+                  <label className="block text-gray-700 font-medium mb-1">Vincular a um Cliente (Opcional)</label>
+                  <select
+                    value={newEntryCustomerId}
+                    onChange={(e) => setNewEntryCustomerId(e.target.value)}
+                    className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900"
+                  >
+                    <option value="">-- Sem vínculo --</option>
+                    {syncedClients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name || c.nome || c.company_name} - {c.document || c.cnpj || c.cpf || 'S/Doc'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-gray-700 font-medium mb-1">Categoria (Plano de Contas) Opcional</label>
+                <select
+                  value={newEntryCategoryId}
+                  onChange={(e) => setNewEntryCategoryId(e.target.value)}
                   className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900"
                 >
-                  <option value="RECEBIMENTO">Cobrança a Receber (Receita)</option>
-                  <option value="PAGAMENTO">Conta a Pagar (Despesa)</option>
+                  <option value="">-- Sem vínculo --</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name || c.categoryName || 'Categoria sem nome'}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -2349,23 +2851,23 @@ export default function ContaAzulPage() {
       {isAiModalOpen && !isAiMinimized && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-gray-200 max-w-5xl w-full h-[680px] shadow-2xl flex overflow-hidden animate-in fade-in zoom-in duration-150">
-            <div className="w-64 bg-gray-900 text-white border-r border-gray-800 flex flex-col justify-between shrink-0">
+            <div className="w-64 bg-slate-50 text-gray-900 border-r border-slate-200 flex flex-col justify-between shrink-0">
               <div className="p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-blue-400" />
+                    <Sparkles className="w-4 h-4 text-emerald-600" />
                     <span className="text-xs font-bold tracking-tight">Zeus BPO IA</span>
                   </div>
-                  <span className="text-[9px] bg-gray-800 text-gray-300 font-semibold px-2 py-0.5 rounded border border-gray-700">
+                  <span className="text-[9px] bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded border border-emerald-200">
                     Pro
                   </span>
                 </div>
 
                 <button
                   onClick={createNewConversation}
-                  className="w-full py-2 px-3 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition-all border border-white/10"
+                  className="w-full py-2 px-3 bg-white hover:bg-gray-100 text-gray-800 text-xs font-semibold rounded-lg flex items-center gap-2 transition-all border border-gray-200 shadow-sm"
                 >
-                  <PlusCircle className="w-4 h-4 text-blue-400" />
+                  <PlusCircle className="w-4 h-4 text-emerald-600" />
                   <span>+ Nova Conversa</span>
                 </button>
 
@@ -2376,7 +2878,7 @@ export default function ContaAzulPage() {
                     placeholder="Buscar histórico..."
                     value={convSearchQuery}
                     onChange={(e) => setConvSearchQuery(e.target.value)}
-                    className="w-full h-8 pl-7 pr-2.5 text-[11px] bg-gray-800 border border-gray-700 rounded-md text-white placeholder-gray-500 focus:outline-none"
+                    className="w-full h-8 pl-7 pr-2.5 text-[11px] bg-white border border-gray-200 rounded-md text-gray-800 placeholder-gray-400 focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-all"
                   />
                 </div>
               </div>
@@ -2397,7 +2899,7 @@ export default function ContaAzulPage() {
                         key={c.id}
                         onClick={() => selectConversation(c.id)}
                         className={`group p-2 rounded-lg cursor-pointer flex items-center justify-between transition-all ${
-                          isSelected ? 'bg-blue-600/20 text-white border border-blue-500/30' : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                          isSelected ? 'bg-emerald-50 text-emerald-900 border border-emerald-200 shadow-xs' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'
                         }`}
                       >
                         <div className="flex items-center gap-2 truncate">
@@ -2443,7 +2945,7 @@ export default function ContaAzulPage() {
             <div className="flex-1 flex flex-col bg-white">
               <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-gray-900 text-white flex items-center justify-center font-bold text-xs">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">
                     Z
                   </div>
                   <div>
@@ -2489,14 +2991,14 @@ export default function ContaAzulPage() {
                       className={`flex items-start gap-3 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
                       {m.role !== 'user' && (
-                        <div className="w-7 h-7 rounded-lg bg-gray-900 text-white flex items-center justify-center shrink-0 font-bold text-[11px]">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 font-bold text-[11px]">
                           Z
                         </div>
                       )}
 
                       <div className={`p-4 rounded-2xl max-w-[82%] leading-relaxed shadow-xs ${
                         m.role === 'user'
-                          ? 'bg-gray-900 text-white rounded-tr-none'
+                          ? 'bg-emerald-600 text-white rounded-tr-none'
                           : m.isError
                           ? 'bg-amber-50 border border-amber-200 text-amber-900 rounded-tl-none font-medium'
                           : 'bg-white border border-gray-200 text-gray-800 rounded-tl-none font-normal'
@@ -2509,7 +3011,7 @@ export default function ContaAzulPage() {
 
                 {isAiProcessing && (
                   <div className="flex items-center gap-2 text-gray-500 italic text-[11px] p-3 bg-white rounded-xl border border-gray-200 w-fit shadow-xs">
-                    <span className="w-3.5 h-3.5 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+                    <span className="w-3.5 h-3.5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
                     <span>Zeus BPO processando solicitação...</span>
                   </div>
                 )}
@@ -2562,7 +3064,7 @@ export default function ContaAzulPage() {
                   type="button"
                   onClick={() => handleSendAiMessage()}
                   disabled={isAiProcessing || !aiInputText.trim()}
-                  className="px-5 py-3 bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 disabled:opacity-50 transition-all shadow-xs"
+                  className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 disabled:opacity-50 transition-all shadow-xs"
                 >
                   <Send className="w-3.5 h-3.5" />
                 </button>
@@ -2571,6 +3073,60 @@ export default function ContaAzulPage() {
           </div>
         </div>
       )}
+
+      {/* Drawer: Importar com IA */}
+      <div className={`fixed inset-0 z-[60] bg-black/20 transition-opacity duration-300 ${isAiImportOpen ? "opacity-100 visible" : "opacity-0 invisible"}`} onClick={() => { setIsAiImportOpen(false); setAiImportStep("idle"); }} />
+      <div className={`fixed right-0 top-0 bottom-0 w-full max-w-[400px] bg-white shadow-2xl z-[70] transition-transform duration-300 transform ${isAiImportOpen ? "translate-x-0" : "translate-x-full"} flex flex-col`}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <span className="text-base font-bold text-gray-900">Conta Azul IA</span>
+            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">Beta</span>
+          </div>
+          <button onClick={() => { setIsAiImportOpen(false); setAiImportStep("idle"); }} className="text-gray-400 hover:text-gray-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="p-6 flex-1 flex flex-col">
+          <button onClick={() => { setIsAiImportOpen(false); setAiImportStep("idle"); }} className="text-blue-600 text-xs font-semibold flex items-center gap-1 mb-6 hover:underline w-fit">
+            ← Voltar
+          </button>
+          <h2 className="text-xl font-bold text-gray-900 mb-6">Importar clientes</h2>
+          
+          {aiImportStep === "idle" && (
+            <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 flex flex-col items-center justify-center text-center hover:border-blue-500 hover:bg-blue-50 transition-all group">
+              <Upload className="w-8 h-8 text-gray-300 group-hover:text-blue-500 mb-3 transition-colors" />
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">Selecione um arquivo para importar</h3>
+              <p className="text-xs text-gray-500 mb-6">Formatos suportados: csv, xls, pdf e jpg até 20 mb</p>
+              <button onClick={handleAiUploadDemo} className="px-4 py-2 border border-blue-600 text-blue-600 hover:bg-blue-50 font-semibold text-xs rounded-lg flex items-center justify-center gap-2 transition-all w-full">
+                <Upload className="w-3.5 h-3.5" />
+                Clique ou arraste um arquivo
+              </button>
+            </div>
+          )}
+
+          {aiImportStep !== "idle" && (
+            <div className="flex-1 flex flex-col items-center justify-center text-center">
+              <div className="relative w-28 h-28 mb-6">
+                <svg className="animate-spin h-full w-full text-blue-100" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="#2563eb" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-xl font-bold text-blue-600">{aiImportProgress}%</span>
+                </div>
+              </div>
+              <h3 className="text-base font-bold text-gray-900 mb-1">Importando arquivo...</h3>
+              <p className="text-xs text-gray-500">
+                {aiImportStep === "uploading" ? "Enviando arquivo para nuvem..." : aiImportStep === "processing" ? "Executando agente OCR e LLM..." : "Concluído!"}
+              </p>
+            </div>
+          )}
+          
+          <div className="mt-auto pt-6 text-center">
+            <p className="text-[10px] text-gray-400">Inteligências artificiais podem cometer erros,<br/>então sempre confira as informações.</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

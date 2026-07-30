@@ -114,13 +114,13 @@ export default function NotificationsFilter() {
           {/* Header with filter icon */}
           <div className="flex justify-between items-center border-b border-gray-100 px-4 py-3 bg-gray-50/50">
             <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-              <Filter className="h-4 w-4 text-[#1E6FD9]" /> 
+              <Filter className="h-4 w-4 text-primary" /> 
               Notificações
             </h2>
             {unreadCount > 0 && (
               <button
                 onClick={() => setItems(items.map(i => ({ ...i, read: true })))}
-                className="text-[10px] text-[#1E6FD9] hover:underline font-semibold"
+                className="text-[10px] text-primary hover:underline font-semibold"
               >
                 Marcar lidas
               </button>
@@ -135,7 +135,7 @@ export default function NotificationsFilter() {
                 onClick={() => setSelected(cat.key as NotificationCategory)}
                 className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
                   selected === cat.key 
-                    ? "bg-[#1E6FD9] text-white" 
+                    ? "bg-primary text-white" 
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
               >
@@ -155,7 +155,7 @@ export default function NotificationsFilter() {
               filteredItems.map((item) => (
                 <div
                   key={item.id}
-                  className={`p-4 hover:bg-gray-50 transition-colors cursor-default ${!item.read ? 'bg-blue-50/20' : ''}`}
+                  className={`p-4 hover:bg-gray-50 transition-colors cursor-default ${!item.read ? 'bg-primary/10/20' : ''}`}
                 >
                   <div className="flex justify-between items-start mb-1.5 gap-2">
                     <div className="flex items-center gap-2">

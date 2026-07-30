@@ -116,10 +116,10 @@ export function Header({
 
         {/* Multi-Tenant Company Context Selector ONLY VISIBLE FOR MASTER ADMIN */}
         {isMasterAdmin ? (
-          <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg">
-            <Building2 className="w-4 h-4 text-[#1E6FD9] shrink-0" />
+          <div className="flex items-center gap-2 bg-primary/10 border border-primary/20 px-2.5 py-1 rounded-lg">
+            <Building2 className="w-4 h-4 text-primary shrink-0" />
             <div className="flex flex-col min-w-0">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-blue-600 leading-none">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-primary leading-none">
                 Empresa Ativa (Master Admin):
               </span>
               <select
@@ -171,8 +171,8 @@ export function Header({
 
         {/* Logged User Role Badge */}
         <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 border border-gray-200 rounded-lg text-xs font-medium text-gray-700 shrink-0">
-          {currentUser.role === 'super_adm' && <ShieldCheck className="w-3.5 h-3.5 text-[#1E6FD9]" strokeWidth={1.5} />}
-          {currentUser.role === 'gestor' && <UserCheck className="w-3.5 h-3.5 text-blue-600" strokeWidth={1.5} />}
+          {currentUser.role === 'super_adm' && <ShieldCheck className="w-3.5 h-3.5 text-primary" strokeWidth={1.5} />}
+          {currentUser.role === 'gestor' && <UserCheck className="w-3.5 h-3.5 text-primary" strokeWidth={1.5} />}
           {currentUser.role === 'funcionario' && <Briefcase className="w-3.5 h-3.5 text-gray-700" strokeWidth={1.5} />}
           <span>{ROLE_LABELS[currentUser.role]?.label}</span>
         </div>

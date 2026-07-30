@@ -202,7 +202,7 @@ ${clientName.toUpperCase()}`);
             </button>
             <button
               onClick={handleDownloadPDF}
-              className="px-4 py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition-all shadow-xs"
+              className="px-4 py-2 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition-all shadow-xs"
             >
               <Download className="w-4 h-4" />
               <span>Baixar PDF (A4)</span>
@@ -215,7 +215,7 @@ ${clientName.toUpperCase()}`);
         {/* Left Input Form */}
         <div className="lg:col-span-5 bg-white p-5 lg:p-6 rounded-xl border border-slate-200/80 space-y-5 shadow-xs">
           <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-[#1E6FD9]" />
+            <FileText className="w-4 h-4 text-primary" />
             <span>Parâmetros do Documento</span>
           </h2>
 
@@ -224,7 +224,7 @@ ${clientName.toUpperCase()}`);
             <select
               value={template}
               onChange={(e) => setTemplate(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:border-[#1E6FD9] transition-all cursor-pointer"
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:border-primary transition-all cursor-pointer"
             >
               <option value="contrato">Contrato de Prestação de Serviços Contábeis</option>
               <option value="proposta">Proposta Comercial de BPO Financeiro</option>
@@ -239,7 +239,7 @@ ${clientName.toUpperCase()}`);
               type="text"
               value={clientName}
               onChange={(e) => setClientName(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:border-[#1E6FD9] transition-all"
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:border-primary transition-all"
             />
           </div>
 
@@ -249,7 +249,7 @@ ${clientName.toUpperCase()}`);
               type="text"
               value={cnpj}
               onChange={(e) => setCnpj(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:border-[#1E6FD9] transition-all"
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:border-primary transition-all"
             />
           </div>
 
@@ -259,7 +259,7 @@ ${clientName.toUpperCase()}`);
               type="text"
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:border-[#1E6FD9] transition-all"
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:border-primary transition-all"
             />
           </div>
 
@@ -269,14 +269,14 @@ ${clientName.toUpperCase()}`);
               rows={3}
               value={serviceDesc}
               onChange={(e) => setServiceDesc(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#1E6FD9] transition-all"
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-primary transition-all"
             />
           </div>
 
           <button
             onClick={handleGenerateDoc}
             disabled={isGenerating}
-            className="w-full py-2.5 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition-all shadow-xs disabled:opacity-50"
+            className="w-full py-2.5 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition-all shadow-xs disabled:opacity-50"
           >
             {isGenerating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
             <span>{isGenerating ? "Redigindo Minuta com IA..." : "Gerar Documento com IA"}</span>
@@ -305,10 +305,10 @@ ${clientName.toUpperCase()}`);
               <h3 className="text-xs font-bold text-slate-900 mb-3 uppercase tracking-wider">Últimos Documentos Gerados (IA)</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {history.map(item => (
-                  <div key={item.id} className="relative group flex flex-col p-2.5 bg-slate-50 border border-slate-200 hover:border-[#1E6FD9]/50 rounded-lg cursor-pointer transition-colors" onClick={() => setDocContent(item.content)}>
+                  <div key={item.id} className="relative group flex flex-col p-2.5 bg-slate-50 border border-slate-200 hover:border-primary/50 rounded-lg cursor-pointer transition-colors" onClick={() => setDocContent(item.content)}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                        <FileText className="w-3.5 h-3.5 text-[#1E6FD9] shrink-0" />
+                        <FileText className="w-3.5 h-3.5 text-primary shrink-0" />
                         <span className="text-[11px] font-semibold text-slate-900 truncate">{item.title}</span>
                       </div>
                       <span className="text-[9px] font-medium text-slate-400 shrink-0">{item.date}</span>

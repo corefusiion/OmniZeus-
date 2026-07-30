@@ -67,7 +67,7 @@ const canonical7Themes = [
     cardBg: "bg-slate-800/80 border-slate-700/80 shadow-md",
     accentText: "text-blue-400",
     accentBg: "bg-blue-600 text-white",
-    badgeBg: "bg-blue-500/20 text-blue-300 border-blue-500/40",
+    badgeBg: "bg-primary/100/20 text-blue-300 border-blue-500/40",
     tableHeaderBg: "bg-slate-800 text-blue-300 border-slate-700",
     fontFamily: "font-sans"
   },
@@ -76,13 +76,13 @@ const canonical7Themes = [
     name: "Stripe Corporate (Profissional Azul)", 
     bg: "bg-white", 
     text: "text-[#0F172A]", 
-    border: "border-[#1E6FD9]/30", 
-    bullet: "bg-[#1E6FD9]", 
+    border: "border-primary/30", 
+    bullet: "bg-primary", 
     cardBg: "bg-slate-50 border-slate-200 shadow-xs",
-    accentText: "text-[#1E6FD9]",
-    accentBg: "bg-[#1E6FD9] text-white",
-    badgeBg: "bg-blue-50 text-blue-700 border-blue-200",
-    tableHeaderBg: "bg-[#1E6FD9] text-white",
+    accentText: "text-primary",
+    accentBg: "bg-primary text-white",
+    badgeBg: "bg-primary/10 text-primary border-primary/20",
+    tableHeaderBg: "bg-primary text-white",
     fontFamily: "font-sans"
   },
   { 
@@ -453,7 +453,7 @@ RETORNE APENAS UM ARRAY JSON VÁLIDO:
 <body class="bg-slate-950 text-white min-h-screen flex flex-col justify-between p-6 lg:p-12">
   <div class="flex justify-between items-center border-b border-slate-800 pb-4">
     <div class="flex items-center gap-2">
-      <span class="w-3 h-3 rounded-full bg-blue-500"></span>
+      <span class="w-3 h-3 rounded-full bg-primary/100"></span>
       <span class="text-xs font-bold uppercase tracking-widest text-slate-400">Zenitus Contábil • Slide Deck Executivo</span>
     </div>
     <span class="text-xs font-bold text-slate-400" id="slideIndicator">Slide 1 de ${slides.length}</span>
@@ -605,7 +605,7 @@ RETORNE APENAS UM ARRAY JSON VÁLIDO:
 
           <button
             onClick={() => setIsFullscreen(true)}
-            className="px-4 py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition-all shadow-xs"
+            className="px-4 py-2 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition-all shadow-xs"
           >
             <Maximize2 className="w-3.5 h-3.5" />
             <span>Apresentar</span>
@@ -629,7 +629,7 @@ RETORNE APENAS UM ARRAY JSON VÁLIDO:
               type="text"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:border-[#1E6FD9] transition-all"
+              className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:border-primary transition-all"
             />
           </div>
           
@@ -638,7 +638,7 @@ RETORNE APENAS UM ARRAY JSON VÁLIDO:
             <select
               value={slideCount}
               onChange={(e) => setSlideCount(parseInt(e.target.value))}
-              className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:border-[#1E6FD9] transition-all cursor-pointer"
+              className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:border-primary transition-all cursor-pointer"
             >
               <option value={3}>3 Slides (Resumo Executivo)</option>
               <option value={5}>5 Slides (Padrão Comercial)</option>
@@ -655,20 +655,20 @@ RETORNE APENAS UM ARRAY JSON VÁLIDO:
               rows={2}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:border-[#1E6FD9] transition-all resize-none"
+              className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:border-primary transition-all resize-none"
               placeholder="Ex: Apresentar proposta comercial de BPO financeiro..."
             />
           </div>
 
           <div className="md:col-span-4">
             <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5 flex items-center gap-1.5">
-              <Palette className="w-3.5 h-3.5 text-[#1E6FD9]" />
+              <Palette className="w-3.5 h-3.5 text-primary" />
               Sistema de Design (7):
             </label>
             <select
               value={selectedTheme}
               onChange={(e) => setSelectedTheme(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:border-[#1E6FD9] transition-all cursor-pointer"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:border-primary transition-all cursor-pointer"
             >
               {canonical7Themes.map(t => (
                 <option key={t.id} value={t.id}>{t.name}</option>
@@ -680,7 +680,7 @@ RETORNE APENAS UM ARRAY JSON VÁLIDO:
             <button
               onClick={handleGenerateSlides}
               disabled={isGenerating}
-              className="w-full py-2.5 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition-all shadow-xs disabled:opacity-50"
+              className="w-full py-2.5 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition-all shadow-xs disabled:opacity-50"
             >
               {isGenerating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
               <span>Gerar</span>
@@ -833,7 +833,7 @@ RETORNE APENAS UM ARRAY JSON VÁLIDO:
                 {activeSlide.cards.map((c, i) => (
                   <div key={i} className={`p-3.5 rounded-xl border ${activeThemeObj.cardBg} flex flex-col justify-between space-y-1`}>
                     <div className="flex items-center justify-between">
-                      <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                      <span className="w-2 h-2 rounded-full bg-primary/100"></span>
                       {c.stat && <span className={`text-sm font-extrabold ${activeThemeObj.accentText}`}>{c.stat}</span>}
                     </div>
                     <div>

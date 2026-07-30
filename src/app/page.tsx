@@ -41,7 +41,7 @@ function AppPreview() {
   ];
   const activities = [
     { text: "DAS MEI — vencimento em 3 dias", badge: "Urgente", cls: "text-red-600 bg-red-50" },
-    { text: "Proposta enviada — Farmácia Silva Ltda", badge: "Enviado", cls: "text-blue-600 bg-blue-50" },
+    { text: "Proposta enviada — Farmácia Silva Ltda", badge: "Enviado", cls: "text-primary bg-primary/10" },
     { text: "IA resolveu 4 consultas fiscais", badge: "Concluído", cls: "text-emerald-700 bg-emerald-50" },
     { text: "Folha Jun/2026 — aprovada pelo gestor", badge: "Aprovado", cls: "text-emerald-700 bg-emerald-50" },
   ];
@@ -76,14 +76,14 @@ function AppPreview() {
         {/* Sidebar */}
         <div className="w-36 border-r border-gray-100 bg-white flex flex-col py-3 flex-shrink-0">
           <div className="px-3 mb-4 flex items-center gap-1.5">
-            <div className="w-4 h-4 bg-gray-900 rounded-[3px] flex items-center justify-center flex-shrink-0">
+            <div className="w-4 h-4 bg-primary rounded-[3px] flex items-center justify-center flex-shrink-0">
               <span className="text-white font-bold" style={{ fontSize: 7 }}>Z</span>
             </div>
             <span className="font-semibold text-gray-900" style={{ fontSize: 10 }}>OmniZeus</span>
           </div>
           {navItems.map((item, i) => (
             <div key={item} className={`mx-2 px-2 py-1.5 rounded-md mb-0.5 flex items-center gap-2 ${i === 0 ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-400"}`} style={{ fontSize: 10 }}>
-              <div className={`w-1 h-1 rounded-full flex-shrink-0 ${i === 0 ? "bg-gray-900" : "bg-gray-300"}`} />
+              <div className={`w-1 h-1 rounded-full flex-shrink-0 ${i === 0 ? "bg-primary" : "bg-gray-300"}`} />
               {item}
             </div>
           ))}
@@ -101,7 +101,7 @@ function AppPreview() {
             </div>
             <div className="flex items-center gap-2">
               <Bell strokeWidth={1.5} className="text-gray-400" style={{ width: 12, height: 12 }} />
-              <div className="w-5 h-5 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center" style={{ fontSize: 8 }}>J</div>
+              <div className="w-5 h-5 rounded-full bg-primary text-white font-bold flex items-center justify-center" style={{ fontSize: 8 }}>J</div>
             </div>
           </div>
           <div className="p-3.5">
@@ -172,7 +172,7 @@ function Navbar() {
       style={{ borderBottom: scrolled ? "1px solid #EBEBEB" : "1px solid transparent" }}>
       <div className="max-w-[1400px] mx-auto px-8 h-14 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 group">
-          <div className="w-6 h-6 bg-gray-900 rounded-md flex items-center justify-center group-hover:bg-gray-700 transition-colors">
+          <div className="w-6 h-6 bg-primary rounded-md flex items-center justify-center group-hover:opacity-90 transition-colors">
             <span className="text-white font-bold" style={{ fontSize: 10 }}>Z</span>
           </div>
           <span className="text-sm font-semibold text-gray-900 tracking-tight">OmniZeus</span>
@@ -184,7 +184,7 @@ function Navbar() {
         </nav>
         <div className="hidden md:flex items-center gap-3">
           <Link href="/login" className="text-sm text-gray-600 hover:text-gray-900 transition-colors px-3 py-1.5">Entrar</Link>
-          <Link href="/login" className="text-sm font-medium bg-gray-900 text-white px-5 py-2 rounded-lg hover:bg-gray-700 transition-colors inline-flex items-center gap-1.5">
+          <Link href="/login" className="text-sm font-medium bg-primary text-white px-5 py-2 rounded-lg hover:opacity-90 transition-colors inline-flex items-center gap-1.5">
             Acessar plataforma <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
@@ -199,7 +199,7 @@ function Navbar() {
           ))}
           <div className="flex flex-col gap-2 pt-3 border-t border-gray-100">
             <Link href="/login" className="text-sm text-center text-gray-700 py-2.5 border border-gray-200 rounded-lg">Entrar</Link>
-            <Link href="/login" className="text-sm text-center font-medium bg-gray-900 text-white py-2.5 rounded-lg">Acessar plataforma</Link>
+            <Link href="/login" className="text-sm text-center font-medium bg-primary text-white py-2.5 rounded-lg">Acessar plataforma</Link>
           </div>
         </div>
       )}
@@ -226,7 +226,7 @@ function Hero() {
               Centralize operações, automatize processos fiscais e escale seu escritório com inteligência artificial integrada.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Link href="/login" className="inline-flex items-center gap-2 bg-gray-900 text-white text-sm font-medium px-7 py-3.5 rounded-lg hover:bg-gray-700 transition-colors">
+              <Link href="/login" className="inline-flex items-center gap-2 bg-primary text-white text-sm font-medium px-7 py-3.5 rounded-lg hover:opacity-90 transition-colors">
                 Acessar plataforma <ArrowRight className="w-4 h-4" />
               </Link>
               <a href="#planos" className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 px-7 py-3.5 rounded-lg border border-gray-200 hover:border-gray-300 hover:text-gray-900 transition-colors">
@@ -551,10 +551,10 @@ function Pricing() {
             <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Preços transparentes.</h2>
           </div>
           <div className="flex items-center p-1 border border-gray-200 rounded-lg gap-1">
-            <button onClick={() => setYearly(false)} className={`text-xs px-4 py-2 rounded-md font-medium transition-colors ${!yearly ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-900"}`}>Mensal</button>
-            <button onClick={() => setYearly(true)} className={`text-xs px-4 py-2 rounded-md font-medium transition-colors inline-flex items-center gap-2 ${yearly ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-900"}`}>
+            <button onClick={() => setYearly(false)} className={`text-xs px-4 py-2 rounded-md font-medium transition-colors ${!yearly ? "bg-primary text-white" : "text-gray-500 hover:text-gray-900"}`}>Mensal</button>
+            <button onClick={() => setYearly(true)} className={`text-xs px-4 py-2 rounded-md font-medium transition-colors inline-flex items-center gap-2 ${yearly ? "bg-primary text-white" : "text-gray-500 hover:text-gray-900"}`}>
               Anual
-              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${yearly ? "bg-white/20 text-white" : "bg-blue-50 text-blue-600"}`}>−20%</span>
+              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${yearly ? "bg-white/20 text-white" : "bg-primary/10 text-primary"}`}>−20%</span>
             </button>
           </div>
         </div>
@@ -675,7 +675,7 @@ function Footer() {
           {/* Brand */}
           <div className="col-span-2 lg:col-span-1">
             <div className="flex items-center gap-2 mb-5">
-              <div className="w-6 h-6 bg-gray-900 rounded-md flex items-center justify-center">
+              <div className="w-6 h-6 bg-primary rounded-md flex items-center justify-center">
                 <span className="text-white font-bold" style={{ fontSize: 10 }}>Z</span>
               </div>
               <span className="text-sm font-semibold text-gray-900">OmniZeus</span>
@@ -767,7 +767,7 @@ function Footer() {
             <Link href="/login" className="text-xs text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1.5">
               <BookOpen style={{ width: 12, height: 12 }} /> Documentação
             </Link>
-            <Link href="/login" className="text-xs text-[#2F6FED] hover:text-blue-700 transition-colors font-medium">
+            <Link href="/login" className="text-xs text-[#2F6FED] hover:text-primary transition-colors font-medium">
               Acessar plataforma →
             </Link>
           </div>

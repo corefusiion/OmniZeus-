@@ -54,7 +54,27 @@ export async function POST(req: Request) {
       } : undefined
     };
 
-    const passedTokens = { accessToken, refreshToken, clientId, clientSecret };
+    const db = getLocalDbFile();
+    const config = db.contaazul_config || {};
+
+    const finalAccessToken = accessToken || config.access_token;
+    const finalRefreshToken = refreshToken || config.refresh_token;
+    const finalClientId = clientId || config.client_id;
+    const finalClientSecret = clientSecret || config.client_secret;
+
+    if (!finalAccessToken || !finalClientId) {
+      return NextResponse.json(
+        { success: false, error: "Credenciais da ContaAzul não configuradas. Acesse a aba 'Credenciais & OAuth 2.0' e conecte sua conta oficial." },
+        { status: 401 }
+      );
+    }
+
+    const passedTokens = { 
+      accessToken: finalAccessToken, 
+      refreshToken: finalRefreshToken, 
+      clientId: finalClientId, 
+      clientSecret: finalClientSecret 
+    };
 
     // 1. Try v2 pessoas
     let { res, newAccessToken, newRefreshToken } = await fetchWithAutoRefresh("https://api-v2.contaazul.com/v1/pessoas", {
@@ -99,16 +119,39 @@ export async function POST(req: Request) {
       );
     }
 
+    // Se a chamada oficial tiver sucesso real na API externa, salvamos no cache local
+    if (!Array.isArray(db.contaazul_clients)) db.contaazul_clients = [];
+    db.contaazul_clients.push({
+      id: data.id || `cliente_${Date.now()}`,
+      nome: name.trim(),
+      cpf_cnpj: cleanDoc,
+      email: email ? email.trim() : "",
+      telefone: (whatsapp || phone) ? (whatsapp || phone).trim() : "",
+      ativo: true
+    });
+    
+    // Atualiza os tokens caso tenham sido renovados no auto-refresh
+    if (newAccessToken && newRefreshToken) {
+      db.contaazul_config = {
+        ...db.contaazul_config,
+        access_token: newAccessToken,
+        refresh_token: newRefreshToken,
+        updated_at: new Date().toISOString()
+      };
+    }
+    
+    saveLocalDbFile(db);
+
     return NextResponse.json({
       success: true,
       customer: data,
       new_access_token: newAccessToken,
       new_refresh_token: newRefreshToken,
-      message: `Cliente '${name}' cadastrado com sucesso no ERP ContaAzul!`
+      message: `Cliente '${name}' cadastrado com sucesso no ERP ContaAzul Oficial!`
     });
   } catch (err: any) {
     return NextResponse.json(
-      { success: false, error: err.message || "Falha ao comunicar com a ContaAzul." },
+      { success: false, error: err.message || "Falha ao comunicar com a ContaAzul externa." },
       { status: 500 }
     );
   }

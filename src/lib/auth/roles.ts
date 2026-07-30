@@ -51,7 +51,7 @@ export const PRODUCTION_USERS: (UserProfile & { passwordHash: string })[] = [
 
 export const ROLE_LABELS: Record<UserRole, { label: string; badgeClass: string }> = {
   super_adm: { label: 'Super ADM Master', badgeClass: 'bg-purple-100 text-purple-700 border-purple-200' },
-  gestor: { label: 'Gestor de Escritório', badgeClass: 'bg-blue-100 text-blue-700 border-blue-200' },
+  gestor: { label: 'Gestor de Escritório', badgeClass: 'bg-blue-100 text-primary border-primary/20' },
   funcionario: { label: 'Funcionário Operacional', badgeClass: 'bg-slate-100 text-slate-700 border-slate-200' },
 };
 

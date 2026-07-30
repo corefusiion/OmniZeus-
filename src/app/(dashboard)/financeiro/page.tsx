@@ -503,7 +503,7 @@ export default function FinanceiroPage() {
                   placeholder="Ex: Licença Software Contábil Dominio"
                   value={formDesc}
                   onChange={(e) => setFormDesc(e.target.value)}
-                  className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-[#1E6FD9]"
+                  className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-primary"
                 />
               </div>
 
@@ -515,7 +515,7 @@ export default function FinanceiroPage() {
                     placeholder="Ex: Thomson Reuters"
                     value={formVendor}
                     onChange={(e) => setFormVendor(e.target.value)}
-                    className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-primary"
                   />
                 </div>
 
@@ -524,7 +524,7 @@ export default function FinanceiroPage() {
                   <select
                     value={formCategory}
                     onChange={(e) => setFormCategory(e.target.value)}
-                    className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-primary"
                   >
                     {CATEGORIES.map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
@@ -541,7 +541,7 @@ export default function FinanceiroPage() {
                     placeholder="1250,00"
                     value={formValue}
                     onChange={(e) => setFormValue(e.target.value)}
-                    className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 font-bold focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 font-bold focus:outline-none focus:border-primary"
                   />
                 </div>
 
@@ -551,7 +551,7 @@ export default function FinanceiroPage() {
                     type="date"
                     value={formDueDate}
                     onChange={(e) => setFormDueDate(e.target.value)}
-                    className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-primary"
                   />
                 </div>
 
@@ -560,7 +560,7 @@ export default function FinanceiroPage() {
                   <select
                     value={formStatus}
                     onChange={(e) => setFormStatus(e.target.value as any)}
-                    className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-primary"
                   >
                     <option value="Pendente">Pendente</option>
                     <option value="Agendado">Agendado</option>
@@ -577,7 +577,7 @@ export default function FinanceiroPage() {
                   placeholder="Ex: TI & Sistemas / Operações"
                   value={formCostCenter}
                   onChange={(e) => setFormCostCenter(e.target.value)}
-                  className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-[#1E6FD9]"
+                  className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-primary"
                 />
               </div>
 
@@ -588,7 +588,7 @@ export default function FinanceiroPage() {
                   value={formNotes}
                   onChange={(e) => setFormNotes(e.target.value)}
                   rows={2}
-                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-[#1E6FD9]"
+                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-primary"
                 />
               </div>
             </div>
@@ -604,7 +604,7 @@ export default function FinanceiroPage() {
               <button
                 type="button"
                 onClick={handleSavePayable}
-                className="px-5 py-2 bg-[#1E6FD9] hover:bg-blue-700 text-white text-xs font-medium rounded-lg shadow-xs transition-colors"
+                className="px-5 py-2 bg-primary hover:bg-blue-700 text-white text-xs font-medium rounded-lg shadow-xs transition-colors"
               >
                 Salvar Lançamento
               </button>
@@ -802,7 +802,7 @@ export default function FinanceiroPage() {
             <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Total Agendado</span>
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center border border-blue-100">
                   <Calendar className="w-4 h-4" />
                 </div>
               </div>
@@ -810,7 +810,7 @@ export default function FinanceiroPage() {
                 R$ {totalAgendado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </div>
               <p className="text-[11px] text-gray-400 mt-2 flex items-center gap-1">
-                <span className="font-medium text-blue-600">{scheduledPayables.length}</span> pagamentos agendados
+                <span className="font-medium text-primary">{scheduledPayables.length}</span> pagamentos agendados
               </p>
             </div>
 
@@ -841,7 +841,7 @@ export default function FinanceiroPage() {
               </div>
               <button
                 onClick={handleOpenAddModal}
-                className="px-4 py-2 bg-[#1E6FD9] hover:bg-blue-700 text-white text-xs font-medium rounded-lg flex items-center gap-1.5 transition-colors shadow-xs self-start md:self-auto"
+                className="px-4 py-2 bg-primary hover:bg-blue-700 text-white text-xs font-medium rounded-lg flex items-center gap-1.5 transition-colors shadow-xs self-start md:self-auto"
               >
                 <Plus className="w-4 h-4" />
                 <span>Adicionar Conta</span>
@@ -859,7 +859,7 @@ export default function FinanceiroPage() {
                     placeholder="Buscar descrição ou fornecedor..."
                     value={tableSearch}
                     onChange={(e) => setTableSearch(e.target.value)}
-                    className="w-full h-8 pl-8 pr-3 bg-white border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full h-8 pl-8 pr-3 bg-white border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-primary"
                   />
                 </div>
 
@@ -867,7 +867,7 @@ export default function FinanceiroPage() {
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="h-8 px-3 bg-white border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-[#1E6FD9]"
+                  className="h-8 px-3 bg-white border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-primary"
                 >
                   <option value="todos">Todos os Status</option>
                   <option value="Pendente">Pendente</option>
@@ -880,7 +880,7 @@ export default function FinanceiroPage() {
                 <select
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="h-8 px-3 bg-white border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-[#1E6FD9]"
+                  className="h-8 px-3 bg-white border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-primary"
                 >
                   <option value="todas">Todas as Categorias</option>
                   {CATEGORIES.map(cat => (
@@ -892,7 +892,7 @@ export default function FinanceiroPage() {
                 <select
                   value={vendorFilter}
                   onChange={(e) => setVendorFilter(e.target.value)}
-                  className="h-8 px-3 bg-white border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-[#1E6FD9]"
+                  className="h-8 px-3 bg-white border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:border-primary"
                 >
                   <option value="todos">Todos os Fornecedores</option>
                   {uniqueVendors.map(v => (
@@ -906,7 +906,7 @@ export default function FinanceiroPage() {
                     type="date"
                     value={startDateFilter}
                     onChange={(e) => setStartDateFilter(e.target.value)}
-                    className="w-full h-8 px-2 bg-white border border-gray-200 rounded-lg text-gray-900 text-[11px] focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full h-8 px-2 bg-white border border-gray-200 rounded-lg text-gray-900 text-[11px] focus:outline-none focus:border-primary"
                     title="Data Inicial"
                   />
                   <span className="text-gray-400 text-[10px]">até</span>
@@ -914,7 +914,7 @@ export default function FinanceiroPage() {
                     type="date"
                     value={endDateFilter}
                     onChange={(e) => setEndDateFilter(e.target.value)}
-                    className="w-full h-8 px-2 bg-white border border-gray-200 rounded-lg text-gray-900 text-[11px] focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full h-8 px-2 bg-white border border-gray-200 rounded-lg text-gray-900 text-[11px] focus:outline-none focus:border-primary"
                     title="Data Final"
                   />
                 </div>
@@ -927,7 +927,7 @@ export default function FinanceiroPage() {
                   </span>
                   <button
                     onClick={resetFilters}
-                    className="text-[11px] font-medium text-[#1E6FD9] hover:underline flex items-center gap-1"
+                    className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1"
                   >
                     <X className="w-3 h-3" />
                     <span>Limpar Filtros</span>
@@ -996,7 +996,7 @@ export default function FinanceiroPage() {
                           <td className="py-3.5 px-4 text-center">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${
                               item.status === 'Pago' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                              item.status === 'Agendado' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                              item.status === 'Agendado' ? 'bg-primary/10 text-primary border-primary/20' :
                               item.status === 'Vencido' ? 'bg-rose-50 text-rose-700 border-rose-200' :
                               'bg-amber-50 text-amber-700 border-amber-200'
                             }`}>
@@ -1080,7 +1080,7 @@ export default function FinanceiroPage() {
           {/* Explanation Header Card */}
           <div className="bg-white p-6 rounded-xl border border-slate-200 space-y-3">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#1E6FD9] flex items-center justify-center font-bold text-sm">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-sm">
                 <BarChart3 className="w-5 h-5" />
               </div>
               <div>

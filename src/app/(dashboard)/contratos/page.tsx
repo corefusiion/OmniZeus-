@@ -361,17 +361,17 @@ export default function ContratosPage() {
       <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-xl px-4 py-2 text-xs">
         <div className="flex items-center gap-2 text-slate-600 font-medium">
           <span className="text-slate-400">Módulos Financeiros:</span>
-          <span className="font-bold text-[#1E6FD9] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">Contratos BPO</span>
+          <span className="font-bold text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">Contratos BPO</span>
           <span className="text-slate-300">•</span>
-          <Link href="/financeiro" className="hover:text-[#1E6FD9] transition-colors flex items-center gap-1">
+          <Link href="/financeiro" className="hover:text-primary transition-colors flex items-center gap-1">
             <span>Financeiro & Payables</span>
           </Link>
           <span className="text-slate-300">•</span>
-          <Link href="/solicitacoes" className="hover:text-[#1E6FD9] transition-colors flex items-center gap-1">
+          <Link href="/solicitacoes" className="hover:text-primary transition-colors flex items-center gap-1">
             <span>Solicitações & Compras</span>
           </Link>
           <span className="text-slate-300">•</span>
-          <Link href="/contaazul" className="hover:text-[#1E6FD9] transition-colors flex items-center gap-1">
+          <Link href="/contaazul" className="hover:text-primary transition-colors flex items-center gap-1">
             <span>Integração ContaAzul</span>
           </Link>
         </div>
@@ -483,7 +483,7 @@ export default function ContratosPage() {
           <div className="bg-white rounded-xl border border-slate-200 p-6 max-w-md w-full shadow-lg relative space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-[#1E6FD9]" />
+                <FileText className="w-5 h-5 text-primary" />
                 <span>{editingContractId ? 'Editar Contrato BPO' : 'Novo Contrato de Honorários BPO'}</span>
               </h3>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-700">
@@ -499,7 +499,7 @@ export default function ContratosPage() {
                   placeholder="Ex: Alfa Logística Ltda"
                   value={clientNameInput}
                   onChange={(e) => setClientNameInput(e.target.value)}
-                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
+                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-primary"
                 />
               </div>
 
@@ -511,7 +511,7 @@ export default function ContratosPage() {
                     placeholder="00.000.000/0001-00"
                     value={cnpjInput}
                     onChange={(e) => setCnpjInput(e.target.value)}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-primary"
                   />
                 </div>
                 <div>
@@ -520,7 +520,7 @@ export default function ContratosPage() {
                     type="text"
                     value={monthlyFeeInput}
                     onChange={(e) => setMonthlyFeeInput(e.target.value)}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary"
                   />
                 </div>
               </div>
@@ -531,7 +531,7 @@ export default function ContratosPage() {
                   <select
                     value={indexInput}
                     onChange={(e) => setIndexInput(e.target.value as any)}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9] cursor-pointer"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary cursor-pointer"
                   >
                     <option value="IPCA">IPCA (IBGE)</option>
                     <option value="IGP-M">IGP-M (FGV)</option>
@@ -544,7 +544,7 @@ export default function ContratosPage() {
                   <select
                     value={costCenterInput}
                     onChange={(e) => setCostCenterInput(e.target.value as any)}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9] cursor-pointer"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary cursor-pointer"
                   >
                     <option value="BPO Financeiro">BPO Financeiro</option>
                     <option value="Fiscal">Escrituração Fiscal</option>
@@ -562,7 +562,7 @@ export default function ContratosPage() {
                     type="number"
                     value={allocatedHoursInput}
                     onChange={(e) => setAllocatedHoursInput(Number(e.target.value))}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-primary"
                   />
                 </div>
                 <div>
@@ -571,7 +571,7 @@ export default function ContratosPage() {
                     type="text"
                     value={hourlyRateInput}
                     onChange={(e) => setHourlyRateInput(e.target.value)}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-primary"
                   />
                 </div>
                 <div>
@@ -579,7 +579,7 @@ export default function ContratosPage() {
                   <select
                     value={statusInput}
                     onChange={(e) => setStatusInput(e.target.value as any)}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9] cursor-pointer"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary cursor-pointer"
                   >
                     <option value="Ativo">Ativo</option>
                     <option value="Vencendo">Vencendo</option>
@@ -596,7 +596,7 @@ export default function ContratosPage() {
                     type="date"
                     value={startDateInput}
                     onChange={(e) => setStartDateInput(e.target.value)}
-                    className="w-full h-9 px-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full h-9 px-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-primary"
                   />
                 </div>
                 <div>
@@ -605,7 +605,7 @@ export default function ContratosPage() {
                     type="date"
                     value={endDateInput}
                     onChange={(e) => setEndDateInput(e.target.value)}
-                    className="w-full h-9 px-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full h-9 px-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-primary"
                   />
                 </div>
                 <div>
@@ -614,7 +614,7 @@ export default function ContratosPage() {
                     type="date"
                     value={nextAdjustmentDateInput}
                     onChange={(e) => setNextAdjustmentDateInput(e.target.value)}
-                    className="w-full h-9 px-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full h-9 px-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-primary"
                   />
                 </div>
               </div>
@@ -631,7 +631,7 @@ export default function ContratosPage() {
               <button
                 type="button"
                 onClick={handleSaveContract}
-                className="px-5 py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-semibold rounded-lg shadow-xs"
+                className="px-5 py-2 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg shadow-xs"
               >
                 {editingContractId ? 'Salvar Alterações' : 'Cadastrar Contrato'}
               </button>
@@ -653,7 +653,7 @@ export default function ContratosPage() {
 
         <button
           onClick={handleOpenCreateModal}
-          className="px-5 py-2.5 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition-all shadow-xs"
+          className="px-5 py-2.5 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition-all shadow-xs"
         >
           <Plus className="w-4 h-4" />
           <span>Novo Contrato</span>
@@ -676,7 +676,7 @@ export default function ContratosPage() {
               R$ {totalMrrBrl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </span>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#1E6FD9] flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
             <DollarSign className="w-5 h-5" />
           </div>
         </div>
@@ -732,7 +732,7 @@ export default function ContratosPage() {
                   onClick={() => setStatusFilter(st)}
                   className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
                     statusFilter === st 
-                      ? 'bg-[#1E6FD9] text-white shadow-xs' 
+                      ? 'bg-primary text-white shadow-xs' 
                       : 'text-slate-600 hover:bg-slate-100'
                   }`}
                 >
@@ -782,7 +782,7 @@ export default function ContratosPage() {
               placeholder="Buscar cliente, CNPJ ou contrato..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full lg:w-64 h-8 pl-8 pr-3 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#1E6FD9]"
+              className="w-full lg:w-64 h-8 pl-8 pr-3 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-primary"
             />
           </div>
         </div>

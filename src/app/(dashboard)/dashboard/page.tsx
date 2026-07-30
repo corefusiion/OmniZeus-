@@ -52,7 +52,9 @@ import {
   fetchContracts, 
   fetchPurchaseRequests, 
   fetchTasks, 
-  fetchDashboardMetrics 
+  fetchDashboardMetrics,
+  fetchContaAzulClients,
+  fetchContaAzulEntries
 } from "@/lib/db/serverDb";
 
 const quickActions = [
@@ -77,6 +79,8 @@ export default function DashboardPage() {
   // Analytics Chart Data state
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
   const [requestStatusData, setRequestStatusData] = useState<any[]>([]);
+  const [contaAzulClients, setContaAzulClients] = useState<any[]>([]);
+  const [contaAzulEntries, setContaAzulEntries] = useState<any[]>([]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -90,6 +94,11 @@ export default function DashboardPage() {
         let requests = await fetchPurchaseRequests();
         let tasks = await fetchTasks();
         let metrics = await fetchDashboardMetrics();
+        let caClients = await fetchContaAzulClients();
+        let caEntries = await fetchContaAzulEntries();
+
+        setContaAzulClients(caClients || []);
+        setContaAzulEntries(caEntries || []);
 
         // Auto-seed mock data if SQLite tables are empty
         if (!payables || payables.length === 0) {
@@ -149,7 +158,7 @@ export default function DashboardPage() {
         setRequestStatusData([
           { name: "Aprovadas", value: reqApproved || 2, color: "#10B981" },
           { name: "Pendentes", value: reqPending || 1, color: "#F59E0B" },
-          { name: "Em Análise", value: reqOther || 1, color: "#1E6FD9" }
+          { name: "Em Análise", value: reqOther || 1, color: "hsl(var(--primary))" }
         ]);
 
         // Build 8-month financial trend data (Jan-Ago 2026) for Charts 2, 3, 4
@@ -285,7 +294,7 @@ export default function DashboardPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-slate-100 pb-4">
           <div>
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-[#1E6FD9]" />
+              <BarChart3 className="w-5 h-5 text-primary" />
               <span>Painel Analítico Executivo & Performance</span>
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -294,7 +303,7 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-3 text-xs text-slate-500">
             <span className="flex items-center gap-1.5 font-medium">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#1E6FD9]" /> Receita MRR
+              <span className="w-2.5 h-2.5 rounded-full bg-primary" /> Receita MRR
             </span>
             <span className="flex items-center gap-1.5 font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Despesas Mensais
@@ -306,7 +315,40 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Chart 1: Evolução de Solicitações de Compra & Status */}
+          {/* Chart 1: Evolução de Despesas Mensais (AreaChart) */}
+          <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/70 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <TrendingDown className="w-4 h-4 text-amber-600" />
+                Evolução de Despesas Mensais (Jan - Ago 2026)
+              </h3>
+              <span className="text-[11px] font-semibold text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200">
+                R$ {payablesSum.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div className="h-[210px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={monthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorDespesas" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#F59E0B" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#64748b" }} />
+                  <YAxis tick={{ fontSize: 11, fill: "#64748b" }} />
+                  <Tooltip
+                    formatter={(value: any) => [`R$ ${Number(value).toLocaleString('pt-BR')}`, "Despesas"]}
+                    contentStyle={{ backgroundColor: "#ffffff", borderColor: "#e2e8f0", borderRadius: "8px", fontSize: "12px" }}
+                  />
+                  <Area type="monotone" dataKey="despesas" stroke="#F59E0B" strokeWidth={2} fillOpacity={1} fill="url(#colorDespesas)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Chart 2: Evolução de Solicitações de Compra & Status */}
           <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/70 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
@@ -342,47 +384,14 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Chart 2: Evolução de Despesas Mensais (AreaChart) */}
-          <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/70 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                <TrendingDown className="w-4 h-4 text-amber-600" />
-                Evolução de Despesas Mensais (Jan - Ago 2026)
-              </h3>
-              <span className="text-[11px] font-semibold text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200">
-                R$ {payablesSum.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-            <div className="h-[210px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={monthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorDespesas" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#F59E0B" stopOpacity={0.0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#64748b" }} />
-                  <YAxis tick={{ fontSize: 11, fill: "#64748b" }} />
-                  <Tooltip
-                    formatter={(value: any) => [`R$ ${Number(value).toLocaleString('pt-BR')}`, "Despesas"]}
-                    contentStyle={{ backgroundColor: "#ffffff", borderColor: "#e2e8f0", borderRadius: "8px", fontSize: "12px" }}
-                  />
-                  <Area type="monotone" dataKey="despesas" stroke="#F59E0B" strokeWidth={2} fillOpacity={1} fill="url(#colorDespesas)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
           {/* Chart 3: Receita (MRR) vs Despesas (BarChart) */}
           <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/70 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                <Building2 className="w-4 h-4 text-[#1E6FD9]" />
+                <Building2 className="w-4 h-4 text-primary" />
                 Comparativo: Receita (MRR) vs Despesas
               </h3>
-              <span className="text-[11px] font-semibold text-[#1E6FD9] bg-white px-2 py-0.5 rounded border border-slate-200">
+              <span className="text-[11px] font-semibold text-primary bg-white px-2 py-0.5 rounded border border-slate-200">
                 MRR: R$ {contractsMrr.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </span>
             </div>
@@ -399,7 +408,7 @@ export default function DashboardPage() {
                     ]}
                     contentStyle={{ backgroundColor: "#ffffff", borderColor: "#e2e8f0", borderRadius: "8px", fontSize: "12px" }}
                   />
-                  <Bar dataKey="receita" fill="#1E6FD9" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="receita" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="despesas" fill="#F59E0B" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -431,6 +440,31 @@ export default function DashboardPage() {
                 </LineChart>
               </ResponsiveContainer>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ContaAzul Insights */}
+      <div>
+        <div className="flex items-center justify-between mb-4 mt-2">
+          <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-blue-600" />
+            <span>Integração ContaAzul Pro</span>
+          </h2>
+          <Link href="/contaazul" className="text-xs text-blue-600 font-semibold hover:underline flex items-center gap-1">
+            Ver Detalhes <ArrowUpRight className="w-3 h-3" />
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-white p-5 rounded-xl border border-blue-100 flex flex-col justify-center items-center shadow-sm">
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Clientes Sincronizados</h3>
+            <p className="text-4xl font-bold text-blue-600 mb-1">{contaAzulClients.length}</p>
+            <p className="text-xs text-slate-400">Ativos no banco de dados local</p>
+          </div>
+          <div className="bg-white p-5 rounded-xl border border-blue-100 flex flex-col justify-center items-center shadow-sm">
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Lançamentos Financeiros</h3>
+            <p className="text-4xl font-bold text-blue-600 mb-1">{contaAzulEntries.length}</p>
+            <p className="text-xs text-slate-400">Títulos a Pagar / Receber sincronizados</p>
           </div>
         </div>
       </div>

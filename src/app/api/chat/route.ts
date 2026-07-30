@@ -176,22 +176,18 @@ export async function POST(req: NextRequest) {
     systemContextAddon += "Você é um agente nativo da plataforma OmniZeus. Você TEM ACESSO VERDADEIRO aos dados sistêmicos deste tenant. NUNCA diga ao usuário que você não tem acesso ou que ele precisa consultar o sistema manualmente:\n";
 
     try {
-      // Inject Conta Azul Customers Details
-      const caPath = path.join(process.cwd(), "data", "omnizeus_contaazul_customers.json");
-      if (fs.existsSync(caPath)) {
-        const caData = JSON.parse(fs.readFileSync(caPath, "utf-8"));
-        const customersCount = Array.isArray(caData) ? caData.length : 0;
-        systemContextAddon += `- BASE DE CLIENTES (CRM / CONTA AZUL): Existem ${customersCount} contatos sincronizados (incluindo prospects, clientes pontuais e clientes ativos):\n`;
-        caData.forEach((c: any) => {
-          systemContextAddon += `  * ${c.nome || c.name} (CNPJ/CPF: ${c.cpf_cnpj}, Optante Simples: ${c.optante_simples ?? c.is_simples ? 'Sim' : 'Não'}, Cidade: ${c.endereco?.cidade || c.address?.city || 'Salvador'})\n`;
-        });
-      }
-      
-      // Inject Full SQL Database Context (Tasks, Contracts, Payables, Purchase Requests)
+      // Read Full SQL Database Context first
       const sqlPath = path.join(process.cwd(), "data", "omnizeus_local_sql_database.json");
       if (fs.existsSync(sqlPath)) {
         const sqlData = JSON.parse(fs.readFileSync(sqlPath, "utf-8"));
         
+        // Inject Conta Azul Customers Details (from SQL DB, not old mock)
+        const caData = (sqlData.contaazul_clients || []).filter((c: any) => !c.company_id || c.company_id === activeTenantId);
+        systemContextAddon += `- BASE DE CLIENTES (CRM / CONTA AZUL): Existem ${caData.length} contatos sincronizados (incluindo prospects, clientes pontuais e clientes ativos):\n`;
+        caData.forEach((c: any) => {
+          systemContextAddon += `  * ${c.nome || c.name || c.razao_social} (CNPJ/CPF: ${c.cpf_cnpj || c.cnpj}, Optante Simples: ${c.optante_simples ?? c.is_simples ? 'Sim' : 'Não'}, Cidade: ${c.endereco?.cidade || c.address?.city || c.city || 'Não informada'})\n`;
+        });
+      
         // Tasks
         const tasks = (sqlData.tasks || []).filter((t: any) => !t.company_id || t.company_id === activeTenantId);
         const pendingTasks = tasks.filter((t: any) => t.status === "Pendente" || t.status === "pendente").length;

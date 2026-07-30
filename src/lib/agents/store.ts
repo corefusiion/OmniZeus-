@@ -45,7 +45,7 @@ export const BUILTIN_PERSONAS: CustomAgent[] = [
     id: "geral",
     label: "Assistente Geral Contábil",
     category: "Geral",
-    color: "bg-blue-50 text-[#1E6FD9] border-blue-200/60",
+    color: "bg-primary/10 text-primary border-primary/20/60",
     createdAt: new Date().toISOString(),
     systemPrompt: `[SKILL SUPER ESPECIALISTA: GESTÃO & CONSULTORIA CONTÁBIL V1.0]
 Você é o assistente sênior de produtividade e consultoria contábil da Zenitus Inteligência Contábil.
@@ -140,7 +140,7 @@ export async function fetchCustomAgentsFromServer(): Promise<CustomAgent[]> {
         label: r.label || r.name || 'Agente Customizado',
         category: r.category || 'Geral',
         systemPrompt: r.systemPrompt || r.system_prompt || '',
-        color: r.color || 'bg-blue-50 text-[#1E6FD9] border-blue-200/60',
+        color: r.color || 'bg-primary/10 text-primary border-primary/20/60',
         isCustom: true,
         createdAt: r.createdAt || r.created_at || new Date().toISOString()
       }));

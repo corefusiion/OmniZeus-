@@ -271,7 +271,7 @@ export default function EmpresasPage() {
           <div className="bg-white rounded-xl border border-slate-200 p-6 max-w-lg w-full shadow-xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-[#1E6FD9]" />
+                <Building2 className="w-5 h-5 text-primary" />
                 <span>Cadastrar Nova Empresa Contratante</span>
               </h3>
               <button onClick={() => setShowAddCompanyModal(false)} className="text-slate-400 hover:text-slate-700">
@@ -287,7 +287,7 @@ export default function EmpresasPage() {
                   placeholder="Ex: Alfa Contabilidade & BPO Eireli"
                   value={newCorpName}
                   onChange={(e) => setNewCorpName(e.target.value)}
-                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9]"
+                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary"
                 />
               </div>
 
@@ -298,7 +298,7 @@ export default function EmpresasPage() {
                   placeholder="Ex: Alfa Contábil"
                   value={newTradeName}
                   onChange={(e) => setNewTradeName(e.target.value)}
-                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
+                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-primary"
                 />
               </div>
 
@@ -310,7 +310,7 @@ export default function EmpresasPage() {
                     placeholder="00.000.000/0001-00"
                     value={newCnpj}
                     onChange={(e) => setNewCnpj(e.target.value)}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-primary"
                   />
                 </div>
                 <div>
@@ -321,14 +321,14 @@ export default function EmpresasPage() {
                       placeholder="Salvador"
                       value={newCity}
                       onChange={(e) => setNewCity(e.target.value)}
-                      className="w-full h-9 px-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
+                      className="w-full h-9 px-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-primary"
                     />
                     <input
                       type="text"
                       placeholder="BA"
                       value={newState}
                       onChange={(e) => setNewState(e.target.value)}
-                      className="w-12 h-9 px-2 text-xs uppercase bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold text-center focus:outline-none focus:border-[#1E6FD9]"
+                      className="w-12 h-9 px-2 text-xs uppercase bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold text-center focus:outline-none focus:border-primary"
                     />
                   </div>
                 </div>
@@ -344,7 +344,7 @@ export default function EmpresasPage() {
                       setNewPlan(p);
                       setNewFranchise(p === 'Profissional' ? 5000 : p === 'Premium' ? 15000 : 50000);
                     }}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9] cursor-pointer"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary cursor-pointer"
                   >
                     <option value="Profissional">Profissional (R$ 490 / 5k Coins)</option>
                     <option value="Premium">Premium (R$ 890 / 15k Coins)</option>
@@ -357,7 +357,7 @@ export default function EmpresasPage() {
                     type="number"
                     value={newFranchise}
                     onChange={(e) => setNewFranchise(Number(e.target.value))}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary"
                   />
                 </div>
               </div>
@@ -374,7 +374,7 @@ export default function EmpresasPage() {
               <button
                 type="button"
                 onClick={handleCreateNewTenant}
-                className="px-5 py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-semibold rounded-lg shadow-xs flex items-center gap-1.5"
+                className="px-5 py-2 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg shadow-xs flex items-center gap-1.5"
               >
                 <Building2 className="w-4 h-4" />
                 <span>Cadastrar Empresa</span>
@@ -398,7 +398,7 @@ export default function EmpresasPage() {
           <div className="bg-white rounded-xl border border-slate-200 p-5 lg:p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h1 className="text-xl lg:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                <Building2 className="w-6 h-6 text-[#1E6FD9]" />
+                <Building2 className="w-6 h-6 text-primary" />
                 <span>Centro de Comando Multi-Finance</span>
               </h1>
               <p className="text-xs text-slate-500 mt-1">
@@ -408,7 +408,7 @@ export default function EmpresasPage() {
 
             <button
               onClick={() => setShowAddCompanyModal(true)}
-              className="px-4 py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-bold rounded-lg flex items-center gap-2 transition-all shadow-xs shrink-0"
+              className="px-4 py-2 bg-primary hover:opacity-90 text-white text-xs font-bold rounded-lg flex items-center gap-2 transition-all shadow-xs shrink-0"
             >
               <Plus className="w-4 h-4" />
               <span>Cadastrar Nova Empresa</span>
@@ -420,7 +420,7 @@ export default function EmpresasPage() {
             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2">
               <div className="flex items-center justify-between text-slate-500">
                 <span className="text-xs font-bold uppercase tracking-wider">Empresas Ativas</span>
-                <Building2 className="w-4 h-4 text-[#1E6FD9]" />
+                <Building2 className="w-4 h-4 text-primary" />
               </div>
               <p className="text-2xl font-bold text-slate-900">{totalActiveCompanies} Tenants</p>
               <p className="text-[10px] text-slate-400">Ambientes totalmente isolados</p>
@@ -440,7 +440,7 @@ export default function EmpresasPage() {
             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2">
               <div className="flex items-center justify-between text-slate-500">
                 <span className="text-xs font-bold uppercase tracking-wider">Total de Colaboradores</span>
-                <Users className="w-4 h-4 text-blue-600" />
+                <Users className="w-4 h-4 text-primary" />
               </div>
               <p className="text-2xl font-bold text-slate-900">{totalPlatformEmployees} Usuários</p>
               <p className="text-[10px] text-slate-400">Vinculados nos escritórios</p>
@@ -462,7 +462,7 @@ export default function EmpresasPage() {
           <div className="bg-white p-5 lg:p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-[#1E6FD9]" />
+                <Building2 className="w-4 h-4 text-primary" />
                 <span>Empresas Cadastradas na Plataforma ({companies.length})</span>
               </h3>
 
@@ -473,7 +473,7 @@ export default function EmpresasPage() {
                   placeholder="Buscar por empresa, CNPJ..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full h-8 pl-8 pr-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-[#1E6FD9]"
+                  className="w-full h-8 pl-8 pr-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-primary"
                 />
               </div>
             </div>
@@ -506,7 +506,7 @@ export default function EmpresasPage() {
                           <span className="text-[10px] text-slate-400 block">{comp.city}/{comp.state}</span>
                         </td>
                         <td className="py-3.5 px-4">
-                          <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-[#1E6FD9] border border-blue-200">
+                          <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
                             {comp.plan}
                           </span>
                         </td>
@@ -524,7 +524,7 @@ export default function EmpresasPage() {
                         <td className="py-3.5 px-4 text-right">
                           <button
                             onClick={() => handleOpenTenantDashboard(comp)}
-                            className="px-3 py-1.5 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 ml-auto transition-all shadow-xs"
+                            className="px-3 py-1.5 bg-primary hover:opacity-90 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 ml-auto transition-all shadow-xs"
                           >
                             <span>Gerenciar Empresa</span>
                             <ChevronRight className="w-3.5 h-3.5" />
@@ -569,7 +569,7 @@ export default function EmpresasPage() {
               </div>
 
               <div>
-                <span className="px-3 py-1.5 rounded-lg bg-blue-50 text-[#1E6FD9] border border-blue-200 text-xs font-bold">
+                <span className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary border border-primary/20 text-xs font-bold">
                   Plano {selectedTenant.plan} ({selectedTenant.coinsFranchise.toLocaleString('pt-BR')} Coins)
                 </span>
               </div>
@@ -591,7 +591,7 @@ export default function EmpresasPage() {
                   onClick={() => setActiveTab(tab.id as any)}
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap ${
                     activeTab === tab.id
-                      ? 'bg-[#1E6FD9] text-white shadow-xs'
+                      ? 'bg-primary text-white shadow-xs'
                       : 'bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200'
                   }`}
                 >
@@ -610,7 +610,7 @@ export default function EmpresasPage() {
                 <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2">
                   <div className="flex items-center justify-between text-slate-500">
                     <span className="text-xs font-bold uppercase tracking-wider">Usuários Ativos</span>
-                    <Users className="w-4 h-4 text-blue-600" />
+                    <Users className="w-4 h-4 text-primary" />
                   </div>
                   <p className="text-2xl font-bold text-slate-900">
                     {tenantEmployees.length || 1}
@@ -621,7 +621,7 @@ export default function EmpresasPage() {
                 <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2">
                   <div className="flex items-center justify-between text-slate-500">
                     <span className="text-xs font-bold uppercase tracking-wider">Agentes IA Ativos</span>
-                    <Bot className="w-4 h-4 text-[#1E6FD9]" />
+                    <Bot className="w-4 h-4 text-primary" />
                   </div>
                   <p className="text-2xl font-bold text-slate-900">8 Agentes</p>
                   <p className="text-[10px] text-slate-400">Especialistas fiscais e financeiros</p>
@@ -648,11 +648,11 @@ export default function EmpresasPage() {
                         type="number"
                         value={newFranchiseValue}
                         onChange={(e) => setNewFranchiseValue(Number(e.target.value))}
-                        className="w-full h-8 px-2 text-xs font-bold border border-slate-300 rounded-lg focus:outline-none focus:border-[#1E6FD9]"
+                        className="w-full h-8 px-2 text-xs font-bold border border-slate-300 rounded-lg focus:outline-none focus:border-primary"
                       />
                       <button
                         onClick={handleUpdateTenantFranchise}
-                        className="px-2 py-1 bg-[#1E6FD9] text-white text-xs font-bold rounded-lg"
+                        className="px-2 py-1 bg-primary text-white text-xs font-bold rounded-lg"
                       >
                         OK
                       </button>
@@ -676,7 +676,7 @@ export default function EmpresasPage() {
               {/* Real Health Score Diagnostic Panel */}
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <HeartPulse className="w-4 h-4 text-[#1E6FD9]" />
+                  <HeartPulse className="w-4 h-4 text-primary" />
                   <span>Diagnóstico de Isolamento & Saúde (Multi-Finance)</span>
                 </h3>
 
@@ -721,7 +721,7 @@ export default function EmpresasPage() {
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <Users className="w-4 h-4 text-[#1E6FD9]" />
+                  <Users className="w-4 h-4 text-primary" />
                   <span>Integrantes & Equipe de {selectedTenant.corporateName} ({tenantEmployees.length})</span>
                 </h3>
               </div>
@@ -752,12 +752,12 @@ export default function EmpresasPage() {
                           <td className="py-3.5 px-4 font-medium">{emp.department}</td>
                           <td className="py-3.5 px-4">
                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                              emp.role === 'gestor' ? 'bg-amber-50 text-amber-800' : 'bg-blue-50 text-blue-800'
+                              emp.role === 'gestor' ? 'bg-amber-50 text-amber-800' : 'bg-primary/10 text-primary'
                             }`}>
                               {emp.role === 'gestor' ? 'Gestor' : 'Funcionário'}
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 font-bold text-[#1E6FD9]">
+                          <td className="py-3.5 px-4 font-bold text-primary">
                             {emp.allowedModules?.length || 7} / 7 Módulos
                           </td>
                           <td className="py-3.5 px-4 text-right">
@@ -780,7 +780,7 @@ export default function EmpresasPage() {
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <Bot className="w-4 h-4 text-[#1E6FD9]" />
+                    <Bot className="w-4 h-4 text-primary" />
                     <span>Catálogo de Agentes IA Especialistas ({selectedTenant.tradeName})</span>
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
@@ -797,7 +797,7 @@ export default function EmpresasPage() {
                   <div key={agent.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 transition-all space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#1E6FD9] flex items-center justify-center font-bold text-xs">
+                        <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">
                           <Bot className="w-4 h-4" />
                         </div>
                         <h4 className="font-bold text-slate-900 text-xs">{agent.name}</h4>
@@ -811,7 +811,7 @@ export default function EmpresasPage() {
 
                     <div className="pt-2 flex items-center justify-between border-t border-slate-200/60 text-[10px]">
                       <span className="font-mono text-slate-500">Modelo: <strong>{agent.model}</strong></span>
-                      <span className="font-bold text-[#1E6FD9] bg-blue-50 px-2 py-0.5 rounded">Persona: {agent.persona}</span>
+                      <span className="font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">Persona: {agent.persona}</span>
                     </div>
                   </div>
                 ))}
@@ -843,7 +843,7 @@ export default function EmpresasPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
                   <div>
                     <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                      <MessageSquare className="w-5 h-5 text-[#1E6FD9]" />
+                      <MessageSquare className="w-5 h-5 text-primary" />
                       <span>Histórico de Chats & Conversas IA ({selectedTenant.tradeName})</span>
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5">
@@ -851,7 +851,7 @@ export default function EmpresasPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="px-3 py-1 bg-blue-50 text-[#1E6FD9] border border-blue-200 rounded-lg text-xs font-bold flex items-center gap-1.5">
+                    <span className="px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded-lg text-xs font-bold flex items-center gap-1.5">
                       <MessageCircle className="w-3.5 h-3.5" />
                       <span>{tenantConvs.length} Sessão(ões) de Chat Ativa(s)</span>
                     </span>
@@ -893,12 +893,12 @@ export default function EmpresasPage() {
                               <>
                                 <tr 
                                   key={conv.id} 
-                                  className={`hover:bg-slate-50 transition-colors cursor-pointer ${isExpanded ? 'bg-blue-50/40' : ''}`}
+                                  className={`hover:bg-slate-50 transition-colors cursor-pointer ${isExpanded ? 'bg-primary/10/40' : ''}`}
                                   onClick={() => setExpandedConvId(isExpanded ? null : conv.id)}
                                 >
                                   <td className="py-3.5 px-4 font-bold text-slate-900">
                                     <div className="flex items-center gap-2">
-                                      <Sparkles className="w-3.5 h-3.5 text-[#1E6FD9]" />
+                                      <Sparkles className="w-3.5 h-3.5 text-primary" />
                                       <span>{conv.title || "Consulta IA"}</span>
                                     </div>
                                   </td>
@@ -911,7 +911,7 @@ export default function EmpresasPage() {
                                     {lastMsg ? lastMsg.text : "Sessão iniciada"}
                                   </td>
                                   <td className="py-3.5 px-4 text-center font-bold text-slate-900">
-                                    <span className="px-2 py-0.5 rounded-full bg-blue-50 text-[#1E6FD9] border border-blue-200 text-[10px]">
+                                    <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-[10px]">
                                       {convMsgs.length} msgs
                                     </span>
                                   </td>
@@ -921,7 +921,7 @@ export default function EmpresasPage() {
                                         e.stopPropagation();
                                         setExpandedConvId(isExpanded ? null : conv.id);
                                       }}
-                                      className="px-3 py-1 bg-slate-100 hover:bg-blue-50 hover:text-[#1E6FD9] text-slate-700 text-xs font-bold rounded-md transition-colors"
+                                      className="px-3 py-1 bg-slate-100 hover:bg-primary/10 hover:text-primary text-slate-700 text-xs font-bold rounded-md transition-colors"
                                     >
                                       {isExpanded ? "Ocultar" : "Ver Transcrição"}
                                     </button>
@@ -946,7 +946,7 @@ export default function EmpresasPage() {
                                                 key={m.id || idx}
                                                 className={`p-3 rounded-lg text-xs space-y-1 ${
                                                   m.sender === 'user'
-                                                    ? 'bg-blue-50 border border-blue-100 text-blue-900 ml-8'
+                                                    ? 'bg-primary/10 border border-blue-100 text-blue-900 ml-8'
                                                     : 'bg-slate-50 border border-slate-200 text-slate-800 mr-8'
                                                 }`}
                                               >
@@ -978,7 +978,7 @@ export default function EmpresasPage() {
           {activeTab === 'integrations' && (
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Share2 className="w-4 h-4 text-[#1E6FD9]" />
+                <Share2 className="w-4 h-4 text-primary" />
                 <span>Integrações da Empresa {selectedTenant.tradeName}</span>
               </h3>
 
@@ -1005,7 +1005,7 @@ export default function EmpresasPage() {
           {activeTab === 'ai_usage' && (
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-[#1E6FD9]" />
+                <Cpu className="w-4 h-4 text-primary" />
                 <span>Métricas de Consumo de IA ({selectedTenant.tradeName})</span>
               </h3>
 
@@ -1022,7 +1022,7 @@ export default function EmpresasPage() {
                 </div>
                 <div className="p-4 border border-slate-200 rounded-lg bg-slate-50 space-y-1">
                   <span className="text-[10px] font-bold uppercase text-slate-400">Latência Média API</span>
-                  <p className="text-xl font-bold text-blue-600">840 ms</p>
+                  <p className="text-xl font-bold text-primary">840 ms</p>
                 </div>
               </div>
             </div>
@@ -1031,7 +1031,7 @@ export default function EmpresasPage() {
           {activeTab === 'audit' && (
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <ShieldAlert className="w-4 h-4 text-[#1E6FD9]" />
+                <ShieldAlert className="w-4 h-4 text-primary" />
                 <span>Auditoria & Logs de Segurança ({selectedTenant.tradeName})</span>
               </h3>
 
@@ -1058,7 +1058,7 @@ export default function EmpresasPage() {
                           </td>
                           <td className="py-3 px-4 font-bold text-slate-900">{log.user_name || 'Sistema'}</td>
                           <td className="py-3 px-4 font-semibold text-slate-800">{log.action}</td>
-                          <td className="py-3 px-4 text-right font-mono text-[#1E6FD9]">{log.resource}</td>
+                          <td className="py-3 px-4 text-right font-mono text-primary">{log.resource}</td>
                         </tr>
                       ))
                     )}

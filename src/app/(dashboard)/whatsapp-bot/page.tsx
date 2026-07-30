@@ -246,7 +246,7 @@ export default function WhatsAppBotPage() {
               <X className="w-5 h-5" strokeWidth={1.75} />
             </button>
             <h3 className="text-base font-bold flex items-center gap-2">
-              <QrCode className="w-5 h-5 text-[#1E6FD9]" strokeWidth={1.75} />
+              <QrCode className="w-5 h-5 text-primary" strokeWidth={1.75} />
               <span>Leitor de QR Code Base64</span>
             </h3>
             <p className="text-xs font-medium text-slate-500 mt-1">Escaneie com o WhatsApp da empresa para re-autenticar a sessão.</p>
@@ -262,7 +262,7 @@ export default function WhatsAppBotPage() {
 
             <button
               onClick={() => setShowQrModal(false)}
-              className="mt-5 w-full py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-semibold rounded-lg shadow-xs transition-all"
+              className="mt-5 w-full py-2 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg shadow-xs transition-all"
             >
               Fechar Modal
             </button>
@@ -278,7 +278,7 @@ export default function WhatsAppBotPage() {
             {(['aguardando', 'atendimento', 'transferido', 'finalizado'] as const).map((stage) => {
               const stageLabels = {
                 aguardando: { title: "Aguardando", color: "border-amber-400 bg-amber-50/50 text-amber-700" },
-                atendimento: { title: "Em Atendimento", color: "border-blue-400 bg-blue-50/50 text-blue-700" },
+                atendimento: { title: "Em Atendimento", color: "border-blue-400 bg-primary/10/50 text-primary" },
                 transferido: { title: "Transferido", color: "border-purple-400 bg-purple-50/50 text-purple-700" },
                 finalizado: { title: "Finalizado", color: "border-emerald-400 bg-emerald-50/50 text-emerald-700" }
               };
@@ -297,12 +297,12 @@ export default function WhatsAppBotPage() {
                         key={chat.id}
                         onClick={() => setSelectedChatId(chat.id)}
                         className={`p-4 rounded-xl border cursor-pointer transition-all hover:shadow-md group relative ${
-                          selectedChatId === chat.id ? 'border-[#1E6FD9] ring-1 ring-[#1E6FD9] bg-slate-50/50' : 'border-slate-200/80 bg-white'
+                          selectedChatId === chat.id ? 'border-primary ring-1 ring-[#1E6FD9] bg-slate-50/50' : 'border-slate-200/80 bg-white'
                         }`}
                       >
                         <div className="flex items-center justify-between mb-1.5">
                           <span className="font-bold text-sm truncate pr-2">{chat.clientName}</span>
-                          {chat.isPinned && <Pin className="w-3.5 h-3.5 text-[#1E6FD9] fill-[#1E6FD9]" strokeWidth={1.75} />}
+                          {chat.isPinned && <Pin className="w-3.5 h-3.5 text-primary fill-[#1E6FD9]" strokeWidth={1.75} />}
                         </div>
                         <span className="text-[10px] font-medium text-slate-500 block mb-3 uppercase tracking-wider">{chat.cnpj} • <strong className="text-slate-700">{chat.sector}</strong></span>
                         <p className="text-xs font-medium text-slate-600 line-clamp-2 leading-relaxed bg-slate-50 p-2.5 rounded-lg border border-slate-200/80">
@@ -316,7 +316,7 @@ export default function WhatsAppBotPage() {
                             {chat.waitTime}
                           </span>
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={(e) => togglePin(chat.id, e)} title="Fixar Conversa" className="p-1.5 rounded-lg hover:bg-slate-100 hover:text-[#1E6FD9] transition-colors">
+                            <button onClick={(e) => togglePin(chat.id, e)} title="Fixar Conversa" className="p-1.5 rounded-lg hover:bg-slate-100 hover:text-primary transition-colors">
                               <Pin className="w-3.5 h-3.5" strokeWidth={1.75} />
                             </button>
                             <button onClick={(e) => transferSector(chat.id, "DP / Folha", e)} title="Transferir para Folha" className="p-1.5 rounded-lg hover:bg-slate-100 hover:text-purple-600 transition-colors">
@@ -399,7 +399,7 @@ export default function WhatsAppBotPage() {
                     />
                     <button 
                       onClick={handleSendDirectMessage}
-                      className="px-5 py-2.5 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-semibold rounded-lg flex items-center gap-2 shadow-xs transition-colors"
+                      className="px-5 py-2.5 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg flex items-center gap-2 shadow-xs transition-colors"
                     >
                       <span>Enviar</span>
                       <Send className="w-4 h-4" strokeWidth={1.75} />
@@ -420,7 +420,7 @@ export default function WhatsAppBotPage() {
       {activeTab === 'persona' && (
         <div className="bg-white p-6 rounded-xl border border-slate-200/80 shadow-xs hover:border-slate-300 transition-all space-y-6">
           <h2 className="text-base font-extrabold border-b border-slate-200/80 pb-4 flex items-center gap-2">
-            <Sliders className="w-5 h-5 text-[#1E6FD9]" strokeWidth={1.75} />
+            <Sliders className="w-5 h-5 text-primary" strokeWidth={1.75} />
             <span>Configuração da Persona de Atendimento do WhatsApp Bot</span>
           </h2>
 
@@ -464,7 +464,7 @@ export default function WhatsAppBotPage() {
 
             <button
               onClick={handleSavePersona}
-              className="px-5 py-2.5 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors"
+              className="px-5 py-2.5 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors"
             >
               Salvar Alterações da Persona
             </button>
@@ -476,7 +476,7 @@ export default function WhatsAppBotPage() {
       {activeTab === 'disparos' && (
         <div className="bg-white p-6 rounded-xl border border-slate-200/80 shadow-xs hover:border-slate-300 transition-all space-y-6">
           <h2 className="text-base font-extrabold border-b border-slate-200/80 pb-4 flex items-center gap-2">
-            <Zap className="w-5 h-5 text-[#1E6FD9]" strokeWidth={1.75} />
+            <Zap className="w-5 h-5 text-primary" strokeWidth={1.75} />
             <span>Simulador de Disparos Automáticos de Impostos & Folha</span>
           </h2>
 
@@ -510,7 +510,7 @@ export default function WhatsAppBotPage() {
 
               <button
                 onClick={handleSimulateDispatch}
-                className="w-full py-3 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition-all shadow-xs"
+                className="w-full py-3 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition-all shadow-xs"
               >
                 <Send className="w-4 h-4" strokeWidth={1.75} />
                 <span>Simular Disparo via Evolution API</span>

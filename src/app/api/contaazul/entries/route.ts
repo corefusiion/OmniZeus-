@@ -1,15 +1,31 @@
 import { NextResponse } from "next/server";
+import { fetchWithAutoRefresh, getContaAzulTokens } from "@/lib/contaazul/store";
+import fs from "fs";
+import path from "path";
+
+const DATA_DIR = path.join(process.cwd(), "data");
+const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
+
+function saveLocalEntry(entry: any) {
+  try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    let db: any = { contaazul_entries: [] };
+    if (fs.existsSync(DB_FILE_PATH)) {
+      db = JSON.parse(fs.readFileSync(DB_FILE_PATH, "utf-8"));
+    }
+    if (!Array.isArray(db.contaazul_entries)) db.contaazul_entries = [];
+    db.contaazul_entries.unshift(entry);
+    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(db, null, 2), "utf-8");
+  } catch (e) {}
+}
 
 export async function POST(req: Request) {
   try {
-    const { accessToken, refreshToken, clientId, clientSecret, description, value, dueDate, type, customerId } = await req.json();
-
-    if (!accessToken && !refreshToken) {
-      return NextResponse.json(
-        { success: false, error: "Sessão OAuth ausente." },
-        { status: 401 }
-      );
-    }
+    const { 
+      accessToken, refreshToken, clientId, clientSecret, 
+      description, value, dueDate, competenceDate, type, 
+      customerId, supplierId, categoryId, notes 
+    } = await req.json();
 
     if (!description || !value || !dueDate) {
       return NextResponse.json(
@@ -18,76 +34,173 @@ export async function POST(req: Request) {
       );
     }
 
-    let activeToken = accessToken ? accessToken.trim() : "";
-    const payload = {
-      description: description.trim(),
-      value: Number(value),
-      due_date: dueDate,
-      type: type || "RECEBIMENTO",
-      customer_id: customerId || undefined
+    const storedTokens = getContaAzulTokens();
+    const passedTokens = { 
+      accessToken: accessToken || storedTokens.accessToken, 
+      refreshToken: refreshToken || storedTokens.refreshToken, 
+      clientId: clientId || storedTokens.clientId, 
+      clientSecret: clientSecret || storedTokens.clientSecret 
     };
 
-    const makeRequest = async (token: string) => {
-      const headers = {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
+    const numValue = Number(value);
+    const isoDueDate = new Date(dueDate).toISOString();
+    const isReceita = (type || "").includes("RECEITA") || type === "RECEBIMENTO";
+
+    let res: Response | undefined;
+    let newAccessToken: string | undefined;
+    let newRefreshToken: string | undefined;
+    let data: any = {};
+
+    if (isReceita) {
+      // 1. Endpoint v1 para Vendas / Receitas
+      const salesPayload = {
+        number: Math.floor(Date.now() / 1000) % 100000,
+        emission: new Date().toISOString(),
+        status: "COMMITTED",
+        customer_id: customerId || undefined,
+        services: [
+          {
+            name: description.trim(),
+            quantity: 1,
+            value: numValue
+          }
+        ],
+        payment: {
+          type: "CASH",
+          installments: [
+            {
+              number: 1,
+              value: numValue,
+              due_date: isoDueDate,
+              status: "PENDING"
+            }
+          ]
+        },
+        notes: notes || undefined
       };
 
-      let res = await fetch("https://api-v2.contaazul.com/v1/financeiro/eventos-financeiros", {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload)
-      });
-
-      if (!res.ok) {
-        res = await fetch("https://api.contaazul.com/v1/financial-events", {
+      const salesRes = await fetchWithAutoRefresh(
+        "https://api.contaazul.com/v1/sales",
+        {
           method: "POST",
-          headers,
-          body: JSON.stringify(payload)
-        });
-      }
-      return res;
-    };
+          body: JSON.stringify(salesPayload)
+        },
+        passedTokens
+      );
 
-    let res = await makeRequest(activeToken);
+      res = salesRes.res;
+      newAccessToken = salesRes.newAccessToken;
+      newRefreshToken = salesRes.newRefreshToken;
+    } else {
+      // 2. Endpoint v1 para Despesas / Compras (Contas a Pagar)
+      const expensePayload = {
+        description: description.trim(),
+        value: numValue,
+        due_date: dueDate,
+        competence_date: competenceDate || dueDate,
+        type: "PAGAMENTO",
+        supplier_id: supplierId || undefined,
+        category_id: categoryId || undefined,
+        notes: notes || undefined
+      };
 
-    let newAccessToken = activeToken;
-    let newRefreshToken = refreshToken;
+      const expRes = await fetchWithAutoRefresh(
+        "https://api.contaazul.com/v1/financial-events",
+        {
+          method: "POST",
+          body: JSON.stringify(expensePayload)
+        },
+        passedTokens
+      );
 
-    if (res.status === 401 && refreshToken) {
-      const refreshRes = await fetch(`${req.headers.get("origin") || "http://localhost:3000"}/api/contaazul/refresh`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken, clientId, clientSecret })
-      });
+      res = expRes.res;
+      newAccessToken = expRes.newAccessToken;
+      newRefreshToken = expRes.newRefreshToken;
+    }
 
-      const refreshData = await refreshRes.json().catch(() => ({}));
-      if (refreshRes.ok && refreshData.access_token) {
-        newAccessToken = refreshData.access_token;
-        newRefreshToken = refreshData.refresh_token || refreshToken;
-        res = await makeRequest(newAccessToken);
+    if (res && res.ok) {
+      data = await res.json().catch(() => ({}));
+    } else {
+      // Fallback para API v2 lancamentos (se v1 falhar com qualquer erro)
+      console.log("[ContaAzul Entries] Tentando fallback para API-v2 lancamentos...");
+      const fallbackPayload = {
+        descricao: description.trim(),
+        valor: numValue,
+        data_vencimento: dueDate,
+        data_competencia: competenceDate || dueDate,
+        tipo: isReceita ? "RECEBIMENTO" : "PAGAMENTO",
+        cliente_id: customerId || undefined,
+        fornecedor_id: supplierId || undefined,
+        categoria_id: categoryId || undefined
+      };
+
+      const v2Res = await fetchWithAutoRefresh(
+        "https://api-v2.contaazul.com/v1/financeiro/lancamentos",
+        {
+          method: "POST",
+          body: JSON.stringify(fallbackPayload)
+        },
+        passedTokens
+      );
+
+      if (v2Res.res.ok) {
+        res = v2Res.res;
+        data = await v2Res.res.json().catch(() => ({}));
+        if (v2Res.newAccessToken) newAccessToken = v2Res.newAccessToken;
+        if (v2Res.newRefreshToken) newRefreshToken = v2Res.newRefreshToken;
+      } else {
+        const v2Err = await v2Res.res.json().catch(() => ({}));
+        console.error("[ContaAzul Entries Fallback Error]:", v2Err);
+        if (!res || !res.ok) {
+          res = v2Res.res;
+          data = v2Err;
+        }
       }
     }
 
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
+    // Se as APIs da ContaAzul falharem, reporta o erro limpo ao usuário sem salvar entrada falsa
+    if (res && !res.ok) {
+      const rawErr = data?.message || data?.error_description || data?.error || (Array.isArray(data) ? data[0]?.message : undefined);
+      let cleanError = rawErr;
+      if (res.status === 401 || rawErr === "invalid_token") {
+        cleanError = "Sua sessão OAuth da ContaAzul expirou. Acesse a aba 'Credenciais & OAuth 2.0' e clique no botão 'Autorizar via Navegador' para reativar o acesso.";
+      } else if (!cleanError) {
+        cleanError = `ContaAzul HTTP ${res.status}: Rejeitado. Verifique as credenciais ou dados digitados.`;
+      }
+      
       return NextResponse.json(
-        { success: false, error: data.message || data.error || `Erro da API ContaAzul (HTTP ${res.status}).` },
+        { success: false, error: cleanError, raw: data },
         { status: res.status }
       );
     }
 
+    // Grava no banco local OmniZeus se a ContaAzul aceitou o lançamento real!
+    const newEntryObj = {
+      id: data?.id || `ent_${Date.now()}`,
+      desc: description,
+      description,
+      val: numValue,
+      value: numValue,
+      dueDate,
+      vencimento: dueDate,
+      type,
+      status: "Em Aberto",
+      created_at: new Date().toISOString()
+    };
+
+    saveLocalEntry(newEntryObj);
+
     return NextResponse.json({
       success: true,
-      entry: data,
-      new_access_token: newAccessToken !== activeToken ? newAccessToken : undefined,
-      new_refresh_token: newRefreshToken !== refreshToken ? newRefreshToken : undefined,
-      message: `Lançamento '${description}' registrado com sucesso!`
+      entry: newEntryObj,
+      new_access_token: newAccessToken,
+      new_refresh_token: newRefreshToken,
+      message: `Lançamento '${description}' registrado com sucesso na ContaAzul!`
     });
+
   } catch (err: any) {
     return NextResponse.json(
-      { success: false, error: err.message || "Falha ao registrar lançamento na ContaAzul." },
+      { success: false, error: err.message || "Falha ao registrar lançamento." },
       { status: 500 }
     );
   }

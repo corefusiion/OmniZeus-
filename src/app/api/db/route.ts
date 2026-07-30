@@ -146,6 +146,7 @@ export interface DatabaseSchema {
     updated_at?: string;
   };
   contaazul_clients: any[];
+  contaazul_suppliers: any[];
   contaazul_entries: any[];
   custom_job_roles: string[];
   dashboard_metrics: any[];
@@ -269,6 +270,7 @@ const DEFAULT_DB: DatabaseSchema = {
     updated_at: new Date().toISOString()
   },
   contaazul_clients: [],
+  contaazul_suppliers: [],
   contaazul_entries: [],
   custom_job_roles: [
     "Gestor de Escritório",

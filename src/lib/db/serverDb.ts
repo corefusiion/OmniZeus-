@@ -193,12 +193,24 @@ export async function fetchContaAzulConfig() {
     const res = await fetch("/api/db?table=contaazul_config", { cache: "no-store" });
     if (res.ok) {
       const json = await res.json();
-      return json.data || {};
+      const dbCfg = json.data;
+      if (dbCfg) {
+        return {
+          clientId: dbCfg.client_id,
+          clientSecret: dbCfg.client_secret,
+          redirectUri: dbCfg.redirect_uri,
+          accessToken: dbCfg.access_token,
+          refreshToken: dbCfg.refresh_token,
+          isConnected: dbCfg.is_connected,
+          updatedAt: dbCfg.updated_at
+        };
+      }
+      return null;
     }
   } catch (err) {
     console.error("Error fetching contaazul_config:", err);
   }
-  return {};
+  return null;
 }
 
 export async function updateContaAzulConfig(config: any) {
@@ -208,7 +220,13 @@ export async function updateContaAzulConfig(config: any) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "update_contaazul_config",
-        contaazul_config: config
+        contaazul_config: {
+          client_id: config.clientId,
+          client_secret: config.clientSecret,
+          access_token: config.accessToken,
+          refresh_token: config.refreshToken,
+          is_connected: config.isConnected
+        }
       })
     });
     return res.ok;
@@ -224,8 +242,14 @@ export async function insertContaAzulCustomer(customer: any) { return insertServ
 export async function fetchContaAzulClients() { return fetchServerTable('contaazul_clients'); }
 export async function saveContaAzulClients(clients: any[]) { return setServerTable('contaazul_clients', clients); }
 
+export async function fetchContaAzulSuppliers() { return fetchServerTable('contaazul_suppliers'); }
+export async function saveContaAzulSuppliers(suppliers: any[]) { return setServerTable('contaazul_suppliers', suppliers); }
+
 export async function fetchContaAzulEntries() { return fetchServerTable('contaazul_entries'); }
 export async function saveContaAzulEntries(entries: any[]) { return setServerTable('contaazul_entries', entries); }
+
+export async function fetchContaAzulPayables() { return fetchServerTable('contaazul_payables'); }
+export async function saveContaAzulPayables(payables: any[]) { return setServerTable('contaazul_payables', payables); }
 
 export async function fetchContaAzulCategories() { return fetchServerTable('contaazul_categories'); }
 export async function insertContaAzulCategory(cat: any) { return insertServerTable('contaazul_categories', cat); }

@@ -8,7 +8,7 @@ import {
   FileText, Presentation, Settings, Shield, ChevronLeft, ChevronRight, X,
   Link as LinkIcon, FileCheck, Briefcase, Bell, Calendar, Bot, History,
   Activity, PenTool, Users, Building2, ChevronDown, User, Network,
-  Layers, ShieldAlert, Cpu, Share2, ScrollText
+  Layers, ShieldAlert, Cpu, Share2, ScrollText, BrainCircuit
 } from "lucide-react";
 import { getActiveRole, UserRole, getCurrentUser } from "@/lib/auth/roles";
 import { getEmployees, EmployeeUser } from "@/lib/company/store";
@@ -44,6 +44,7 @@ const mainNavGroups: NavGroup[] = [
     icon: Sparkles,
     items: [
       { href: "/omni-ia", label: "Omni IA Hub", icon: Sparkles },
+      { href: "/omni-contaazul-ia", label: "Omni Conta Azul IA", icon: BrainCircuit },
       { href: "/treinar-agente", label: "Meus Agentes IA", icon: Bot },
       { href: "/estatisticas-ia", label: "Consumo & Métricas IA", icon: Cpu },
     ],
@@ -181,37 +182,32 @@ export function Sidebar({
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 bottom-0 z-50 flex flex-col transition-all duration-300 ${
+        className={`fixed top-0 left-0 bottom-0 z-50 flex flex-col transition-all duration-300 bg-slate-50 border-r border-slate-200 ${
           isCollapsed ? "w-16" : "w-64"
         } ${isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
-        style={{
-          background: "#18181B",
-          borderRight: "1px solid rgba(255,255,255,0.08)",
-        }}
       >
         {/* Header */}
         <div
-          className={`h-14 flex items-center shrink-0 ${
+          className={`h-14 flex items-center shrink-0 border-b border-slate-100 ${
             isCollapsed ? "justify-center px-2" : "justify-between px-4"
           }`}
-          style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
         >
           {isCollapsed ? (
             <button
               onClick={toggleCollapse}
-              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"
+              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors"
               title="Expandir menu"
             >
-              <ChevronRight className="w-4 h-4 text-gray-400" strokeWidth={2} />
+              <ChevronRight className="w-4 h-4 text-slate-500" strokeWidth={2} />
             </button>
           ) : (
             <>
               <div className="flex items-center gap-2.5 overflow-hidden">
                 <div className="flex flex-col min-w-0 py-1">
-                  <span className="font-bold text-white text-[15px] tracking-tight leading-none truncate mb-1">
+                  <span className="font-extrabold text-primary text-[15px] tracking-tight leading-none truncate mb-1 flex items-center gap-2">
                     OmniZeus
                   </span>
-                  <span className="text-[10px] text-gray-400 font-medium tracking-wider uppercase">
+                  <span className="text-[10px] text-slate-400 font-medium tracking-wider uppercase">
                     • Multi-Finance
                   </span>
                 </div>
@@ -219,7 +215,7 @@ export function Sidebar({
 
               <button
                 onClick={toggleCollapse}
-                className="hidden lg:flex p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+                className="hidden lg:flex p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
                 title="Recolher menu"
               >
                 <ChevronLeft className="w-4 h-4" strokeWidth={2} />
@@ -230,7 +226,7 @@ export function Sidebar({
           {/* Mobile close */}
           <button
             onClick={() => setIsMobileOpen(false)}
-            className="lg:hidden p-1.5 rounded-lg text-gray-500 hover:text-white transition-colors ml-auto"
+            className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-700 transition-colors ml-auto"
           >
             <X className="w-4 h-4" strokeWidth={2} />
           </button>
@@ -252,18 +248,18 @@ export function Sidebar({
                   title={isCollapsed ? group.category : undefined}
                 >
                   <div className={`flex items-center gap-2 ${
-                    group.id === 'master-saas' ? 'text-blue-400 font-extrabold' : 'text-slate-400 group-hover/header:text-slate-200'
+                    group.id === 'master-saas' ? 'text-primary font-semibold' : 'text-slate-500 group-hover/header:text-slate-700'
                   }`}>
                     {isCollapsed && <group.icon className="w-4 h-4" />}
                     {!isCollapsed && (
-                      <span className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5">
+                      <span className="text-[11px] font-semibold uppercase tracking-tight flex items-center gap-1.5">
                         {group.category}
                       </span>
                     )}
                   </div>
                   {!isCollapsed && (
                     <ChevronDown 
-                      className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} 
+                      className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ease-out ${isOpen ? "rotate-180" : ""}`} 
                     />
                   )}
                 </button>
@@ -284,28 +280,25 @@ export function Sidebar({
                             setIsMobileOpen(false);
                           }}
                           title={isCollapsed ? item.label : undefined}
-                          className={`flex items-center gap-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all group ${
-                            isCollapsed ? "justify-center px-0" : "px-2"
-                          } ${item.isFuture ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+                          className={`flex items-center gap-3 py-2 rounded-lg text-xs transition-all duration-200 ease-out group ${
+                            isCollapsed ? "justify-center px-0" : "px-3"
+                          } ${item.isFuture ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${
+                            isActive
+                              ? "bg-primary/5 text-primary font-semibold"
+                              : "text-slate-500 font-medium hover:bg-slate-200/50 hover:text-slate-900"
+                          }`}
                           style={{
-                            background: isActive 
-                              ? "rgba(30, 111, 217, 0.15)"
-                              : "transparent",
-                            color: isActive ? "#FFFFFF" : "rgba(255,255,255,0.6)",
                             borderLeft: isActive && !isCollapsed 
-                              ? "3px solid #1E6FD9" 
+                              ? "3px solid hsl(var(--primary))" 
                               : isCollapsed ? undefined : "3px solid transparent",
                           }}
                         >
                           <Icon
-                            className="shrink-0 transition-colors"
+                            className={`shrink-0 transition-all duration-200 ease-out ${isActive ? "text-primary" : "text-slate-400 group-hover:text-slate-600"}`}
                             style={{
-                              width: 15,
-                              height: 15,
-                              strokeWidth: 2,
-                              color: isActive 
-                                ? "#1E6FD9" 
-                                : "rgba(255,255,255,0.45)",
+                              width: 17,
+                              height: 17,
+                              strokeWidth: isActive ? 2 : 1.5,
                             }}
                           />
                           {!isCollapsed && (
@@ -316,7 +309,7 @@ export function Sidebar({
                               
                               {item.badge && !item.isFuture && (
                                 <span className={`ml-2 px-1.5 py-0.5 rounded-md text-[9px] font-bold ${
-                                  isActive ? 'bg-[#1E6FD9] text-white' : 'bg-slate-700 text-slate-300'
+                                  isActive ? 'bg-primary text-white' : 'bg-slate-700 text-slate-300'
                                 }`}>
                                   {item.badge}
                                 </span>

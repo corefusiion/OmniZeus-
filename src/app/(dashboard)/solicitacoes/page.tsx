@@ -340,17 +340,17 @@ export default function SolicitacoesPage() {
       <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-xl px-4 py-2 text-xs">
         <div className="flex items-center gap-2 text-slate-600 font-medium">
           <span className="text-slate-400">Módulos Financeiros:</span>
-          <Link href="/contratos" className="hover:text-[#1E6FD9] transition-colors">
+          <Link href="/contratos" className="hover:text-primary transition-colors">
             <span>Contratos BPO</span>
           </Link>
           <span className="text-slate-300">•</span>
-          <Link href="/financeiro" className="hover:text-[#1E6FD9] transition-colors">
+          <Link href="/financeiro" className="hover:text-primary transition-colors">
             <span>Financeiro & Payables</span>
           </Link>
           <span className="text-slate-300">•</span>
-          <span className="font-bold text-[#1E6FD9] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">Solicitações & Compras</span>
+          <span className="font-bold text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">Solicitações & Compras</span>
           <span className="text-slate-300">•</span>
-          <Link href="/contaazul" className="hover:text-[#1E6FD9] transition-colors">
+          <Link href="/contaazul" className="hover:text-primary transition-colors">
             <span>Integração ContaAzul</span>
           </Link>
         </div>
@@ -414,7 +414,7 @@ export default function SolicitacoesPage() {
           <div className="bg-white rounded-xl border border-slate-200 p-6 max-w-md w-full shadow-lg relative space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <FileCheck className="w-5 h-5 text-[#1E6FD9]" />
+                <FileCheck className="w-5 h-5 text-primary" />
                 <span>{editingReqId ? 'Editar Solicitação BPO' : 'Nova Solicitação de Compra / Saldo'}</span>
               </h3>
               <button onClick={() => setShowNewModal(false)} className="text-slate-400 hover:text-slate-700">
@@ -431,7 +431,7 @@ export default function SolicitacoesPage() {
                   <select
                     value={reqType}
                     onChange={(e) => setReqType(e.target.value as any)}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9] cursor-pointer"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary cursor-pointer"
                   >
                     <option value="recarga_coins">Inclusão de Saldo de OmniCoins</option>
                     <option value="compra_material">Compra de Suprimento / Equipamento</option>
@@ -445,7 +445,7 @@ export default function SolicitacoesPage() {
                   <select
                     value={reqDepartment}
                     onChange={(e) => setReqDepartment(e.target.value)}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9] cursor-pointer"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary cursor-pointer"
                   >
                     <option value="Operações Tributárias">Operações Tributárias</option>
                     <option value="Diretoria Fiscal">Diretoria Fiscal</option>
@@ -464,7 +464,7 @@ export default function SolicitacoesPage() {
                   <select
                     value={reqCoins}
                     onChange={(e) => setReqCoins(Number(e.target.value))}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9] cursor-pointer"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary cursor-pointer"
                   >
                     <option value={2000}>+2.000 Coins (R$ 200,00)</option>
                     <option value={5000}>+5.000 Coins (R$ 490,00)</option>
@@ -481,7 +481,7 @@ export default function SolicitacoesPage() {
                   type="text"
                   value={reqValue}
                   onChange={(e) => setReqValue(e.target.value)}
-                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9]"
+                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary"
                 />
               </div>
 
@@ -494,7 +494,7 @@ export default function SolicitacoesPage() {
                   placeholder="Explique a necessidade da compra ou verba para aprovação do gestor..."
                   value={reqDesc}
                   onChange={(e) => setReqDesc(e.target.value)}
-                  className="w-full p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
+                  className="w-full p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium focus:outline-none focus:border-primary"
                 />
               </div>
             </div>
@@ -510,7 +510,7 @@ export default function SolicitacoesPage() {
               <button
                 type="button"
                 onClick={handleSaveRequest}
-                className="px-5 py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-semibold rounded-lg shadow-xs"
+                className="px-5 py-2 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg shadow-xs"
               >
                 {editingReqId ? 'Salvar Alterações' : 'Enviar Solicitação'}
               </button>
@@ -532,7 +532,7 @@ export default function SolicitacoesPage() {
 
         <button
           onClick={handleOpenCreateModal}
-          className="px-5 py-2.5 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition-all shadow-xs"
+          className="px-5 py-2.5 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition-all shadow-xs"
         >
           <Plus className="w-4 h-4" />
           <span>Nova Solicitação</span>
@@ -577,7 +577,7 @@ export default function SolicitacoesPage() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Solicitações Registradas</span>
             <span className="text-2xl font-extrabold text-slate-900">{visibleRequests.length} Registros</span>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#1E6FD9] flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
             <FileText className="w-5 h-5" />
           </div>
         </div>
@@ -596,7 +596,7 @@ export default function SolicitacoesPage() {
                   onClick={() => setFilterStatus(st)}
                   className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
                     filterStatus === st 
-                      ? 'bg-[#1E6FD9] text-white shadow-xs' 
+                      ? 'bg-primary text-white shadow-xs' 
                       : 'text-slate-600 hover:bg-slate-100'
                   }`}
                 >
@@ -645,7 +645,7 @@ export default function SolicitacoesPage() {
               placeholder="Buscar por código, nome ou palavra..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full lg:w-64 h-8 pl-8 pr-3 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#1E6FD9]"
+              className="w-full lg:w-64 h-8 pl-8 pr-3 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-primary"
             />
           </div>
         </div>
@@ -691,7 +691,7 @@ export default function SolicitacoesPage() {
                     </td>
                     <td className="py-3.5 px-4 max-w-xs">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-[#1E6FD9]">
+                        <span className="font-bold text-primary">
                           {req.type === 'recarga_coins' ? 'Inclusão de Coins' : req.type === 'compra_material' ? 'Compra de Suprimento' : 'Serviço Terceiro'}
                         </span>
                         {req.status === 'Pendente' && (
@@ -863,7 +863,7 @@ export default function SolicitacoesPage() {
               {/* Header */}
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <div>
-                  <span className="text-[10px] font-bold text-[#1E6FD9] uppercase tracking-wider block">Detalhes da Solicitação</span>
+                  <span className="text-[10px] font-bold text-primary uppercase tracking-wider block">Detalhes da Solicitação</span>
                   <h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
                     {selectedDetailReq.reqNumber}
                   </h2>
@@ -921,10 +921,10 @@ export default function SolicitacoesPage() {
               {/* Items & Values */}
               <div className="space-y-2 text-xs">
                 <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-1">Valores & Justificativa</h4>
-                <div className="p-4 bg-blue-50/40 rounded-xl border border-blue-100 space-y-2">
+                <div className="p-4 bg-primary/10/40 rounded-xl border border-blue-100 space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-slate-700">Tipo de Recurso:</span>
-                    <span className="font-bold text-[#1E6FD9]">
+                    <span className="font-bold text-primary">
                       {selectedDetailReq.type === 'recarga_coins' ? 'Inclusão de OmniCoins' : selectedDetailReq.type === 'compra_material' ? 'Compra de Material' : 'Serviço de Terceiros'}
                     </span>
                   </div>

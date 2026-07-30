@@ -481,7 +481,7 @@ function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'con
             </h1>
             <span className={`text-[10px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full border shadow-xs ${
               role === 'gestor' || role === 'super_adm'
-                ? 'bg-blue-50 text-[#1E6FD9] border-blue-200'
+                ? 'bg-primary/10 text-primary border-primary/20'
                 : 'bg-slate-50 text-slate-600 border-slate-200'
             }`}>
               {role === 'gestor' || role === 'super_adm' ? 'Visão Gestor' : 'Visão Funcionário'}
@@ -496,7 +496,7 @@ function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'con
 
         <button
           onClick={() => setShowNewTaskModal(true)}
-          className="px-4 py-2.5 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition-all shadow-xs"
+          className="px-4 py-2.5 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition-all shadow-xs"
         >
           <Plus className="w-4 h-4" strokeWidth={1.75} />
           <span>Criar Nova Tarefa</span>
@@ -523,10 +523,10 @@ function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'con
 
         <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider">Em Andamento</span>
+            <span className="text-[11px] font-bold text-primary uppercase tracking-wider">Em Andamento</span>
             <Play className="w-4 h-4 text-blue-500 fill-blue-500/20" strokeWidth={1.75} />
           </div>
-          <div className="text-xl font-extrabold text-[#1E6FD9] mt-1">{inProgressCount}</div>
+          <div className="text-xl font-extrabold text-primary mt-1">{inProgressCount}</div>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
@@ -540,7 +540,7 @@ function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'con
         <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Horas Registradas</span>
-            <Clock className="w-4 h-4 text-[#1E6FD9]" strokeWidth={1.75} />
+            <Clock className="w-4 h-4 text-primary" strokeWidth={1.75} />
           </div>
           <div className="text-lg font-extrabold text-slate-900 mt-1">{formatTime(totalTimeSpentSec)}</div>
         </div>
@@ -582,7 +582,7 @@ function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'con
               placeholder="Buscar por título, cliente ou responsável..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:border-[#1E6FD9] focus:ring-1 focus:ring-[#1E6FD9] transition-all"
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:border-primary focus:ring-1 focus:ring-[#1E6FD9] transition-all"
             />
           </div>
         </div>
@@ -599,7 +599,7 @@ function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'con
             <select
               value={deptFilter}
               onChange={(e) => setDeptFilter(e.target.value)}
-              className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-md text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#1E6FD9]"
+              className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-md text-xs font-semibold text-slate-700 focus:outline-none focus:border-primary"
             >
               <option value="todos">Todos os Setores</option>
               <option value="Fiscal">Fiscal</option>
@@ -615,7 +615,7 @@ function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'con
             <select
               value={priorityFilter}
               onChange={(e) => setPriorityFilter(e.target.value)}
-              className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-md text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#1E6FD9]"
+              className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-md text-xs font-semibold text-slate-700 focus:outline-none focus:border-primary"
             >
               <option value="todas">Todas</option>
               <option value="alta">Alta</option>
@@ -646,7 +646,7 @@ function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'con
           <div className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-lg w-full p-6 space-y-4 animate-in fade-in duration-200">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                <CheckSquare className="w-5 h-5 text-[#1E6FD9]" strokeWidth={1.75} />
+                <CheckSquare className="w-5 h-5 text-primary" strokeWidth={1.75} />
                 Nova Tarefa Operacional
               </h3>
               <button
@@ -665,7 +665,7 @@ function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'con
                   placeholder="Ex: Apuração Fator R - Simples Nacional..."
                   value={newTaskTitle}
                   onChange={(e) => setNewTaskTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:border-[#1E6FD9]"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:border-primary"
                 />
               </div>
 
@@ -676,7 +676,7 @@ function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'con
                   placeholder="Ex: Posto Shell Alvorada..."
                   value={newTaskClient}
                   onChange={(e) => setNewTaskClient(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:border-[#1E6FD9]"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:border-primary"
                 />
               </div>
 
@@ -687,7 +687,7 @@ function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'con
                   placeholder="Informe instruções detalhadas sobre a execução desta atividade contábil..."
                   value={newTaskDescription}
                   onChange={(e) => setNewTaskDescription(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:border-[#1E6FD9]"
+                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:border-primary"
                 />
               </div>
 
@@ -697,7 +697,7 @@ function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'con
                   <select
                     value={newTaskDept}
                     onChange={(e) => setNewTaskDept(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:border-primary"
                   >
                     <option value="Fiscal">Fiscal</option>
                     <option value="Contábil">Contábil</option>
@@ -712,7 +712,7 @@ function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'con
                   <select
                     value={newTaskPriority}
                     onChange={(e) => setNewTaskPriority(e.target.value as any)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:border-primary"
                   >
                     <option value="alta">Alta</option>
                     <option value="media">Média</option>
@@ -736,7 +736,7 @@ function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'con
                       setShowAssigneeDropdown(true);
                     }}
                     onFocus={() => setShowAssigneeDropdown(true)}
-                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:border-primary"
                   />
                 </div>
 
@@ -776,7 +776,7 @@ function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'con
               <button
                 onClick={handleCreateTask}
                 disabled={!newTaskTitle.trim() || !newTaskAssignee.trim()}
-                className="px-5 py-2 bg-[#1E6FD9] hover:bg-blue-600 disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-colors shadow-xs"
+                className="px-5 py-2 bg-primary hover:opacity-90 disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-colors shadow-xs"
               >
                 Salvar Tarefa (Persistir SQL)
               </button>
@@ -805,7 +805,7 @@ function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'con
               onClick={() => setSelectedDetailTask(task)}
               className={`bg-white p-3.5 lg:p-4 rounded-xl border transition-all cursor-pointer shadow-xs hover:shadow-md ${
                 task.isTimerRunning
-                  ? 'border-[#1E6FD9] ring-1 ring-[#1E6FD9] bg-blue-50/20'
+                  ? 'border-primary ring-1 ring-[#1E6FD9] bg-primary/10/20'
                   : 'border-slate-200/80 hover:border-slate-300'
               }`}
             >
@@ -818,7 +818,7 @@ function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'con
                       task.status === 'concluido'
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                         : task.status === 'em_andamento'
-                        ? task.isTimerRunning ? 'bg-blue-50 text-[#1E6FD9] border-blue-200' : 'bg-amber-50 text-amber-600 border-amber-200'
+                        ? task.isTimerRunning ? 'bg-primary/10 text-primary border-primary/20' : 'bg-amber-50 text-amber-600 border-amber-200'
                         : 'bg-slate-50 text-slate-500 border-slate-200'
                     }`}>
                       {task.status === 'concluido' ? 'Concluído' : task.status === 'em_andamento' ? (task.isTimerRunning ? 'Em Andamento' : 'Pausado') : 'Pendente'}
@@ -847,7 +847,7 @@ function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'con
                   {/* Timer Display */}
                   <div className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md border text-[11px] font-mono font-bold transition-colors ${
                     task.isTimerRunning
-                      ? 'bg-blue-50 text-[#1E6FD9] border-blue-200 animate-pulse'
+                      ? 'bg-primary/10 text-primary border-primary/20 animate-pulse'
                       : task.status === 'concluido'
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       : 'bg-slate-50 text-slate-700 border-slate-200'

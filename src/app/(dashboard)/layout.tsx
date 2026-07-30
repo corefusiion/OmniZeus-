@@ -13,7 +13,7 @@ export default function DashboardLayout({
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] antialiased selection:bg-[#1E6FD9] selection:text-white">
+    <div className="min-h-screen bg-[#F8FAFC] antialiased selection:bg-primary selection:text-white">
       <Sidebar 
         isCollapsed={isCollapsed} 
         setIsCollapsed={setIsCollapsed}

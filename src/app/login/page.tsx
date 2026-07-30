@@ -42,12 +42,11 @@ export default function LoginPage() {
     >
       {/* Left panel — branding */}
       <div
-        className="hidden lg:flex lg:w-[480px] xl:w-[560px] flex-col justify-between p-12 flex-shrink-0"
-        style={{ background: "#181818" }}
+        className="hidden lg:flex lg:w-[480px] xl:w-[560px] flex-col justify-between p-12 flex-shrink-0 bg-primary"
       >
         <Link href="/" className="flex items-center gap-2.5 group w-fit">
-          <div className="w-7 h-7 bg-white rounded-md flex items-center justify-center group-hover:bg-gray-100 transition-colors">
-            <span className="text-gray-900 font-bold" style={{ fontSize: 11 }}>Z</span>
+          <div className="w-7 h-7 bg-white rounded-md flex items-center justify-center group-hover:bg-white/90 transition-colors">
+            <span className="text-primary font-bold" style={{ fontSize: 11 }}>Z</span>
           </div>
           <span className="text-white font-semibold text-base tracking-tight">OmniZeus</span>
         </Link>
@@ -57,16 +56,16 @@ export default function LoginPage() {
             &ldquo;Centralizamos toda a operação do escritório. O que antes tomava horas, agora leva minutos.&rdquo;
           </p>
           <div>
-            <p className="text-sm font-semibold text-gray-300">Patricia Fischer</p>
-            <p className="text-xs text-gray-500 mt-0.5">Gestora de BPO · Grupo Fischer Contábil</p>
+            <p className="text-sm font-semibold text-white/90">Patricia Fischer</p>
+            <p className="text-xs text-white/70 mt-0.5">Gestora de BPO · Grupo Fischer Contábil</p>
           </div>
         </div>
 
         <div>
-          <p className="text-[11px] text-gray-600 leading-relaxed">
+          <p className="text-[11px] text-white/60 leading-relaxed">
             Plataforma SaaS para Escritórios Contábeis<br />e Prestadores de BPO Financeiro no Brasil.
           </p>
-          <p className="text-[10px] text-gray-700 mt-3">© 2025 OmniZeus</p>
+          <p className="text-[10px] text-white/40 mt-3">© 2025 OmniZeus</p>
         </div>
       </div>
 
@@ -75,7 +74,7 @@ export default function LoginPage() {
         {/* Mobile logo */}
         <div className="lg:hidden mb-10">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-gray-900 rounded-md flex items-center justify-center">
+            <div className="w-7 h-7 bg-primary rounded-md flex items-center justify-center">
               <span className="text-white font-bold" style={{ fontSize: 11 }}>Z</span>
             </div>
             <span className="text-gray-900 font-semibold text-base tracking-tight">OmniZeus</span>
@@ -119,7 +118,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoFocus
-                  className="w-full h-11 pl-10 pr-4 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg placeholder:text-gray-400 focus:outline-none focus:border-gray-400 focus:ring-2 focus:ring-gray-100 transition-all"
+                  className="w-full h-11 pl-10 pr-4 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg placeholder:text-gray-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                 />
               </div>
             </div>
@@ -142,7 +141,7 @@ export default function LoginPage() {
                   placeholder="••••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full h-11 pl-10 pr-11 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg placeholder:text-gray-400 focus:outline-none focus:border-gray-400 focus:ring-2 focus:ring-gray-100 transition-all"
+                  className="w-full h-11 pl-10 pr-11 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg placeholder:text-gray-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                 />
                 <button
                   type="button"
@@ -161,7 +160,7 @@ export default function LoginPage() {
               id="login-submit"
               type="submit"
               disabled={isLoading}
-              className="w-full h-11 mt-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-11 mt-2 bg-primary text-white text-sm font-medium rounded-lg hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
             >
               {isLoading ? (
                 <>

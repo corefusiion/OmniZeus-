@@ -68,7 +68,7 @@ Setor: ${agentCategory}
       label: agentName.trim(),
       category: agentCategory,
       systemPrompt: agentPrompt.trim(),
-      color: "bg-blue-50 text-[#1E6FD9] border-blue-200/60",
+      color: "bg-primary/10 text-primary border-primary/20/60",
       isCustom: true
     });
 
@@ -143,7 +143,7 @@ Setor: ${agentCategory}
                   placeholder="Ex: Auditor SPED Reinf & DCTFWeb"
                   value={agentName}
                   onChange={(e) => setAgentName(e.target.value)}
-                  className="w-full h-9 px-4 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9] transition-all"
+                  className="w-full h-9 px-4 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary transition-all"
                 />
               </div>
               <div>
@@ -151,7 +151,7 @@ Setor: ${agentCategory}
                 <select
                   value={agentCategory}
                   onChange={(e) => setAgentCategory(e.target.value)}
-                  className="w-full h-9 px-4 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9] cursor-pointer"
+                  className="w-full h-9 px-4 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary cursor-pointer"
                 >
                   <option value="Fiscal">Fiscal & SPED</option>
                   <option value="Contábil">Contábil & Balancetes</option>
@@ -168,7 +168,7 @@ Setor: ${agentCategory}
                 placeholder="Insira as diretrizes do especialista ou clique no botão abaixo para treinar e aprimorar com IA..."
                 value={agentPrompt}
                 onChange={(e) => setAgentPrompt(e.target.value)}
-                className="w-full p-4 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono leading-relaxed focus:outline-none focus:border-[#1E6FD9] transition-all"
+                className="w-full p-4 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono leading-relaxed focus:outline-none focus:border-primary transition-all"
               />
             </div>
 
@@ -186,7 +186,7 @@ Setor: ${agentCategory}
               <button
                 type="button"
                 onClick={handleCreateAgent}
-                className="px-5 py-2.5 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition-all shadow-xs"
+                className="px-5 py-2.5 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition-all shadow-xs"
               >
                 <Plus className="w-4 h-4" />
                 <span>Salvar Agente</span>

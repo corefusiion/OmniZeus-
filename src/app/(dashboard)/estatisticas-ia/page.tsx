@@ -119,8 +119,8 @@ export default function EstatisticasIAPage() {
             Ranking de Uso dos Modelos
           </h4>
           <div className="space-y-2 text-xs">
-            <div className="flex items-center justify-between p-2 bg-blue-50/60 rounded-lg font-semibold">
-              <span className="text-blue-700 font-mono">deepseek-v4-pro</span>
+            <div className="flex items-center justify-between p-2 bg-primary/10/60 rounded-lg font-semibold">
+              <span className="text-primary font-mono">deepseek-v4-pro</span>
               <span className="text-slate-900 font-extrabold">81 msgs</span>
             </div>
             <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg text-slate-700">

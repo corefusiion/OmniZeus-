@@ -32,6 +32,7 @@ export default function SuperADMPage() {
   const [stripeSecretKey, setStripeSecretKey] = useState("sk_live_51M********************************");
   const [stripePublishableKey, setStripePublishableKey] = useState("pk_live_51M********************************");
   const [openRouterMasterKey, setOpenRouterMasterKey] = useState("");
+  const [openRouterEnabled, setOpenRouterEnabled] = useState(true);
   const [evolutionUrl, setEvolutionUrl] = useState("https://api.whatsapp.zenitus.com.br");
   const [evolutionApiKey, setEvolutionApiKey] = useState("evo_key_master_998877");
 
@@ -110,6 +111,7 @@ export default function SuperADMPage() {
     async function loadSqlSettings() {
       const s = await fetchServerSettings();
       if (s) {
+        if (s.openrouter_enabled !== undefined) setOpenRouterEnabled(s.openrouter_enabled);
         if (s.openrouter_api_key) setOpenRouterMasterKey(s.openrouter_api_key);
         if (s.lobehub_url) setLobeHubServerUrl(s.lobehub_url);
         if (s.lobehub_api_key) setLobeHubApiKey(s.lobehub_api_key);
@@ -197,6 +199,7 @@ export default function SuperADMPage() {
     }
     setSavingOpenRouter(true);
     const ok = await updateServerSettings({
+      openrouter_enabled: openRouterEnabled,
       openrouter_api_key: openRouterMasterKey.trim()
     });
     setSavingOpenRouter(false);
@@ -344,7 +347,7 @@ export default function SuperADMPage() {
           <div className="bg-white rounded-xl border border-slate-200 p-5 max-w-md w-full shadow-lg space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Briefcase className="w-4 h-4 text-[#1E6FD9]" />
+                <Briefcase className="w-4 h-4 text-primary" />
                 <span>Criar Novo Cargo / Departamento</span>
               </h3>
               <button onClick={() => setShowAddRoleModal(false)} className="text-slate-400 hover:text-slate-700">
@@ -362,7 +365,7 @@ export default function SuperADMPage() {
                 value={newRoleInput}
                 onChange={(e) => setNewRoleInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleCreateNewRole()}
-                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9]"
+                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary"
                 autoFocus
               />
             </div>
@@ -378,7 +381,7 @@ export default function SuperADMPage() {
               <button
                 type="button"
                 onClick={handleCreateNewRole}
-                className="px-4 py-1.5 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-semibold rounded-lg shadow-xs"
+                className="px-4 py-1.5 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg shadow-xs"
               >
                 Adicionar Cargo
               </button>
@@ -402,7 +405,7 @@ export default function SuperADMPage() {
       {/* Header Limpo */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 lg:p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-blue-50 text-[#1E6FD9] flex items-center justify-center">
+          <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
             <Crown className="w-5 h-5" />
           </div>
           <div>
@@ -430,7 +433,7 @@ export default function SuperADMPage() {
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2">
           <div className="flex items-center justify-between text-slate-500">
             <span className="text-xs font-bold uppercase tracking-wider">Status da API OpenRouter</span>
-            <Cpu className="w-4 h-4 text-[#1E6FD9]" />
+            <Cpu className="w-4 h-4 text-primary" />
           </div>
           <div className="flex items-center gap-2">
             <p className="text-lg font-bold text-slate-900">
@@ -448,7 +451,7 @@ export default function SuperADMPage() {
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2">
           <div className="flex items-center justify-between text-slate-500">
             <span className="text-xs font-bold uppercase tracking-wider">Escritórios Cadastrados</span>
-            <Building2 className="w-4 h-4 text-[#1E6FD9]" />
+            <Building2 className="w-4 h-4 text-primary" />
           </div>
           <p className="text-2xl font-bold text-slate-900">{companies.length} Empresa(s)</p>
           <p className="text-[10px] text-slate-400">Ambientes cadastrados e ativos</p>
@@ -463,7 +466,7 @@ export default function SuperADMPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#1E6FD9] flex items-center justify-center font-bold">
+                <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold">
                   <Cpu className="w-4 h-4" />
                 </div>
                 <div>
@@ -471,11 +474,23 @@ export default function SuperADMPage() {
                   <span className="text-[10px] text-slate-400 block">Acesso Global a 15 LLMs</span>
                 </div>
               </div>
-              <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase ${
-                openRouterMasterKey ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-              }`}>
-                {openRouterMasterKey ? 'Ativo' : 'Pendente'}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase ${
+                  openRouterMasterKey ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                }`}>
+                  {openRouterMasterKey ? 'Chave Ok' : 'Pendente'}
+                </span>
+                
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase text-slate-400">Motor:</span>
+                  <button
+                    onClick={() => setOpenRouterEnabled(!openRouterEnabled)}
+                    className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors ${openRouterEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                  >
+                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${openRouterEnabled ? 'translate-x-5' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div>
@@ -487,7 +502,7 @@ export default function SuperADMPage() {
                 placeholder="sk-or-v1-****************"
                 value={openRouterMasterKey}
                 onChange={(e) => setOpenRouterMasterKey(e.target.value)}
-                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-[#1E6FD9]"
+                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-primary"
               />
             </div>
 
@@ -496,7 +511,7 @@ export default function SuperADMPage() {
               disabled={isTestingOpenRouter}
               className="w-full py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all"
             >
-              {isTestingOpenRouter ? <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#1E6FD9]" /> : <Sparkles className="w-3.5 h-3.5 text-[#1E6FD9]" />}
+              {isTestingOpenRouter ? <RefreshCw className="w-3.5 h-3.5 animate-spin text-primary" /> : <Sparkles className="w-3.5 h-3.5 text-primary" />}
               <span>{isTestingOpenRouter ? "Testando..." : "Testar Conexão API"}</span>
             </button>
 
@@ -520,7 +535,7 @@ export default function SuperADMPage() {
             <button
               onClick={handleSaveOpenRouter}
               disabled={savingOpenRouter}
-              className="w-full py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
+              className="w-full py-2 bg-primary hover:opacity-90 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
             >
               {savingOpenRouter ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               <span>{savingOpenRouter ? "Salvando..." : "Salvar"}</span>
@@ -533,7 +548,7 @@ export default function SuperADMPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#1E6FD9] flex items-center justify-center font-bold">
+                <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold">
                   <Bot className="w-4 h-4" />
                 </div>
                 <div>
@@ -549,7 +564,7 @@ export default function SuperADMPage() {
                 type="text"
                 value={lobeHubServerUrl}
                 onChange={(e) => setLobeHubServerUrl(e.target.value)}
-                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-[#1E6FD9]"
+                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-primary"
               />
             </div>
 
@@ -559,7 +574,7 @@ export default function SuperADMPage() {
                 type="password"
                 value={lobeHubApiKey}
                 onChange={(e) => setLobeHubApiKey(e.target.value)}
-                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-[#1E6FD9]"
+                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-primary"
               />
             </div>
 
@@ -568,7 +583,7 @@ export default function SuperADMPage() {
               <select
                 value={lobeDefaultModel}
                 onChange={(e) => setLobeDefaultModel(e.target.value)}
-                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9] cursor-pointer"
+                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary cursor-pointer"
               >
                 <option value="lobe-gpt-4o-mini">Lobe GPT-4o Mini Agent</option>
                 <option value="lobe-claude-3.7-sonnet">Lobe Claude 3.7 Sonnet Agent</option>
@@ -587,7 +602,7 @@ export default function SuperADMPage() {
             <button
               onClick={handleSaveLobeHub}
               disabled={savingLobeHub}
-              className="w-full py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
+              className="w-full py-2 bg-primary hover:opacity-90 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
             >
               {savingLobeHub ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               <span>{savingLobeHub ? "Salvando..." : "Salvar"}</span>
@@ -619,7 +634,7 @@ export default function SuperADMPage() {
                 type="text"
                 value={evolutionUrl}
                 onChange={(e) => setEvolutionUrl(e.target.value)}
-                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-[#1E6FD9]"
+                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-primary"
               />
             </div>
 
@@ -629,7 +644,7 @@ export default function SuperADMPage() {
                 type="password"
                 value={evolutionApiKey}
                 onChange={(e) => setEvolutionApiKey(e.target.value)}
-                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-[#1E6FD9]"
+                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-primary"
               />
             </div>
           </div>
@@ -644,7 +659,7 @@ export default function SuperADMPage() {
             <button
               onClick={handleSaveEvolution}
               disabled={savingEvolution}
-              className="w-full py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
+              className="w-full py-2 bg-primary hover:opacity-90 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
             >
               {savingEvolution ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               <span>{savingEvolution ? "Salvando..." : "Salvar"}</span>
@@ -657,7 +672,7 @@ export default function SuperADMPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold">
                   <CreditCard className="w-4 h-4" />
                 </div>
                 <div>
@@ -698,7 +713,7 @@ export default function SuperADMPage() {
             <button
               onClick={handleSaveStripe}
               disabled={savingStripe}
-              className="w-full py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
+              className="w-full py-2 bg-primary hover:opacity-90 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
             >
               {savingStripe ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               <span>{savingStripe ? "Salvando..." : "Salvar"}</span>
@@ -711,7 +726,7 @@ export default function SuperADMPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#1E6FD9] flex items-center justify-center font-bold">
+                <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold">
                   <Server className="w-4 h-4" />
                 </div>
                 <div>
@@ -724,7 +739,7 @@ export default function SuperADMPage() {
                 <span className="text-[10px] font-bold uppercase text-slate-400">Status:</span>
                 <button
                   onClick={() => setCustomAiEnabled(!customAiEnabled)}
-                  className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors ${customAiEnabled ? 'bg-[#1E6FD9]' : 'bg-slate-300'}`}
+                  className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors ${customAiEnabled ? 'bg-primary' : 'bg-slate-300'}`}
                 >
                   <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${customAiEnabled ? 'translate-x-5' : 'translate-x-1'}`} />
                 </button>
@@ -742,7 +757,7 @@ export default function SuperADMPage() {
                   type="text"
                   value={customAiUrl}
                   onChange={(e) => setCustomAiUrl(e.target.value)}
-                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-[#1E6FD9]"
+                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-primary"
                 />
               </div>
               <div>
@@ -751,7 +766,7 @@ export default function SuperADMPage() {
                   type="text"
                   value={customAiKey}
                   onChange={(e) => setCustomAiKey(e.target.value)}
-                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-[#1E6FD9]"
+                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-primary"
                 />
               </div>
               <div>
@@ -760,7 +775,7 @@ export default function SuperADMPage() {
                   type="text"
                   value={customAiModel}
                   onChange={(e) => setCustomAiModel(e.target.value)}
-                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-[#1E6FD9]"
+                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono focus:outline-none focus:border-primary"
                   placeholder="auto"
                 />
               </div>
@@ -777,7 +792,7 @@ export default function SuperADMPage() {
             <button
               onClick={handleSaveCustomAi}
               disabled={savingCustomAi}
-              className="w-full py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
+              className="w-full py-2 bg-primary hover:opacity-90 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
             >
               {savingCustomAi ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               <span>{savingCustomAi ? "Salvando..." : "Salvar Endpoint Customizado"}</span>
@@ -790,7 +805,7 @@ export default function SuperADMPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#1E6FD9] flex items-center justify-center font-bold">
+                <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold">
                   <Building2 className="w-4 h-4" />
                 </div>
                 <div>
@@ -808,7 +823,7 @@ export default function SuperADMPage() {
                   placeholder="Ex: Alfa Contabilidade & BPO Eireli"
                   value={newCorpName}
                   onChange={(e) => setNewCorpName(e.target.value)}
-                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
+                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-primary"
                 />
               </div>
 
@@ -820,7 +835,7 @@ export default function SuperADMPage() {
                     placeholder="00.000.000/0001-00"
                     value={newCnpj}
                     onChange={(e) => setNewCnpj(e.target.value)}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-primary"
                   />
                 </div>
                 <div>
@@ -832,7 +847,7 @@ export default function SuperADMPage() {
                       setNewPlan(p);
                       setNewCoins(p === 'Profissional' ? 5000 : p === 'Premium' ? 15000 : 50000);
                     }}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9] cursor-pointer"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary cursor-pointer"
                   >
                     <option value="Profissional">Profissional (R$ 490 / 5k Coins)</option>
                     <option value="Premium">Premium (R$ 890 / 15k Coins)</option>
@@ -853,7 +868,7 @@ export default function SuperADMPage() {
             <button
               onClick={handleCreateCompany}
               disabled={savingCompany}
-              className="w-full py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
+              className="w-full py-2 bg-primary hover:opacity-90 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
             >
               {savingCompany ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Building2 className="w-3.5 h-3.5" />}
               <span>{savingCompany ? "Cadastrando..." : "Cadastrar Empresa"}</span>
@@ -866,7 +881,7 @@ export default function SuperADMPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#1E6FD9] flex items-center justify-center font-bold">
+                <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold">
                   <UserPlus className="w-4 h-4" />
                 </div>
                 <div>
@@ -882,7 +897,7 @@ export default function SuperADMPage() {
                 <select
                   value={targetCompanyId}
                   onChange={(e) => setTargetCompanyId(e.target.value)}
-                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9] cursor-pointer"
+                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary cursor-pointer"
                 >
                   {companies.map(c => (
                     <option key={c.id} value={c.id}>{c.tradeName || c.corporateName} ({c.cnpj})</option>
@@ -898,7 +913,7 @@ export default function SuperADMPage() {
                     placeholder="Ex: Carlos Mendes"
                     value={newUserName}
                     onChange={(e) => setNewUserName(e.target.value)}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary"
                   />
                 </div>
                 <div>
@@ -908,7 +923,7 @@ export default function SuperADMPage() {
                     placeholder="carlos@empresa.com.br"
                     value={newUserEmail}
                     onChange={(e) => setNewUserEmail(e.target.value)}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-primary"
                   />
                 </div>
               </div>
@@ -920,7 +935,7 @@ export default function SuperADMPage() {
                     type="date"
                     value={newUserBirthDate}
                     onChange={(e) => setNewUserBirthDate(e.target.value)}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-[#1E6FD9]"
+                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-primary"
                   />
                 </div>
 
@@ -930,7 +945,7 @@ export default function SuperADMPage() {
                     <select
                       value={newUserDept}
                       onChange={(e) => setNewUserDept(e.target.value)}
-                      className="flex-1 h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9] cursor-pointer truncate"
+                      className="flex-1 h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary cursor-pointer truncate"
                     >
                       {jobRoles.map(jr => (
                         <option key={jr} value={jr}>{jr}</option>
@@ -953,7 +968,7 @@ export default function SuperADMPage() {
                 <select
                   value={newUserRole}
                   onChange={(e) => setNewUserRole(e.target.value as any)}
-                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-[#1E6FD9] cursor-pointer"
+                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary cursor-pointer"
                 >
                   <option value="gestor">Gestor do Escritório</option>
                   <option value="funcionario">Funcionário Operacional</option>
@@ -969,7 +984,7 @@ export default function SuperADMPage() {
                     <button 
                       type="button" 
                       onClick={() => setSelectedUserModules(ALL_SYSTEM_MODULES.map(m => m.id))} 
-                      className="text-blue-600 hover:underline"
+                      className="text-primary hover:underline"
                     >
                       Todos
                     </button>
@@ -998,7 +1013,7 @@ export default function SuperADMPage() {
                         }}
                         className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${
                           isSelected
-                            ? 'bg-blue-50 text-[#1E6FD9] border-[#1E6FD9]/40'
+                            ? 'bg-primary/10 text-primary border-primary/40'
                             : 'bg-slate-50 text-slate-400 border-slate-200 hover:text-slate-700'
                         }`}
                       >
@@ -1021,7 +1036,7 @@ export default function SuperADMPage() {
             <button
               onClick={handleCreateUserForCompany}
               disabled={savingUser}
-              className="w-full py-2 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
+              className="w-full py-2 bg-primary hover:opacity-90 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
             >
               {savingUser ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
               <span>{savingUser ? "Vribculando..." : "Vincular Usuário à Empresa"}</span>
@@ -1032,7 +1047,7 @@ export default function SuperADMPage() {
         {/* FULL WIDTH TABLE: Registered Companies Dedicated Table (Spans all columns) */}
         <div className="col-span-1 md:col-span-2 lg:col-span-3 2xl:col-span-4 bg-white p-5 lg:p-6 rounded-xl border border-slate-200 shadow-xs space-y-3">
           <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-[#1E6FD9]" />
+            <Building2 className="w-4 h-4 text-primary" />
             <span>Empresas Contratantes Cadastradas ({companies.length})</span>
           </h4>
 
@@ -1058,7 +1073,7 @@ export default function SuperADMPage() {
                       </td>
                       <td className="py-3.5 px-4 font-medium">{c.cnpj} • {c.city}/{c.state}</td>
                       <td className="py-3.5 px-4">
-                        <span className="font-extrabold text-[#1E6FD9]">{c.plan}</span>
+                        <span className="font-extrabold text-primary">{c.plan}</span>
                         <span className="text-[10px] text-slate-500 block">{(c.coinsFranchise).toLocaleString('pt-BR')} Coins/mês</span>
                       </td>
                       <td className="py-3.5 px-4 font-bold text-slate-800">

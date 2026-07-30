@@ -372,7 +372,7 @@ export default function OmniIAPage() {
         <div className="w-72 border-r border-slate-200/80 bg-slate-50 flex flex-col z-20">
           <div className="p-3 border-b border-slate-200/80 flex items-center justify-between">
             <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-              <History className="w-3.5 h-3.5 text-[#1E6FD9]" />
+              <History className="w-3.5 h-3.5 text-primary" />
               Histórico (SQL Local)
             </span>
             <button
@@ -389,7 +389,7 @@ export default function OmniIAPage() {
               
               {/* Model Selector Dropdown Grouped by Provider */}
               <div className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200/80 text-[11px] font-medium hover:border-slate-300 transition-colors">
-                <Cpu className="w-3.5 h-3.5 text-[#1E6FD9] shrink-0" />
+                <Cpu className="w-3.5 h-3.5 text-primary shrink-0" />
                 <select
                   value={selectedModel}
                   onChange={(e) => setSelectedModel(e.target.value)}
@@ -424,7 +424,7 @@ export default function OmniIAPage() {
 
             <button
               onClick={handleNewConversation}
-              className="w-full py-2 px-3 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-2 shadow-xs transition-all"
+              className="w-full py-2 px-3 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-2 shadow-xs transition-all"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Iniciar Nova Consulta</span>
@@ -448,7 +448,7 @@ export default function OmniIAPage() {
                       type="text"
                       value={editingTitle}
                       onChange={(e) => setEditingTitle(e.target.value)}
-                      className="w-full px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs font-medium focus:outline-none focus:border-[#1E6FD9]"
+                      className="w-full px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs font-medium focus:outline-none focus:border-primary"
                       autoFocus
                       onKeyDown={(e) => e.key === 'Enter' && saveEditedTitle(c.id, e as any)}
                     />
@@ -472,13 +472,13 @@ export default function OmniIAPage() {
                     <div className="flex items-center justify-between gap-1">
                       <div className="truncate flex-1 pr-2 flex items-center gap-1.5">
                         {c.isPinned && (
-                          <Pin className="w-3 h-3 text-[#1E6FD9] fill-[#1E6FD9] shrink-0" strokeWidth={1.75} />
+                          <Pin className="w-3 h-3 text-primary fill-[#1E6FD9] shrink-0" strokeWidth={1.75} />
                         )}
                         <span className="truncate">{c.title}</span>
                         {loadingConvId === c.id && (
                           <span className="relative flex h-1.5 w-1.5 shrink-0 ml-1" title="Processando resposta...">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#1E6FD9] opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#1E6FD9]"></span>
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary"></span>
                           </span>
                         )}
                       </div>
@@ -489,7 +489,7 @@ export default function OmniIAPage() {
                     <div className="absolute right-2 top-2 hidden group-hover:flex items-center gap-1 bg-white/90 backdrop-blur-xs px-1 py-0.5 rounded border border-slate-200 shadow-xs">
                       <button
                         onClick={(e) => togglePinConversation(c.id, e)}
-                        className={`p-1 rounded hover:bg-slate-100 transition-colors ${c.isPinned ? 'text-[#1E6FD9]' : 'text-slate-400 hover:text-slate-700'}`}
+                        className={`p-1 rounded hover:bg-slate-100 transition-colors ${c.isPinned ? 'text-primary' : 'text-slate-400 hover:text-slate-700'}`}
                         title={c.isPinned ? "Desafixar" : "Fixar no Topo"}
                       >
                         <Pin className="w-3 h-3" strokeWidth={1.75} />
@@ -526,7 +526,7 @@ export default function OmniIAPage() {
               className="p-2 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors text-xs font-semibold flex items-center gap-1.5 shadow-xs"
               title="Alternar histórico de conversas"
             >
-              <History className="w-4 h-4 text-[#1E6FD9]" />
+              <History className="w-4 h-4 text-primary" />
               <span className="hidden sm:inline">Histórico</span>
             </button>
           </div>
@@ -548,7 +548,7 @@ export default function OmniIAPage() {
               className={`flex gap-3 max-w-2xl ${msg.sender === 'user' ? 'ml-auto flex-row-reverse' : ''}`}
             >
               <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs shrink-0 shadow-xs ${
-                msg.sender === 'user' ? 'bg-[#1E6FD9] text-white' : 'bg-slate-900 text-white'
+                msg.sender === 'user' ? 'bg-primary text-white' : 'bg-slate-900 text-white'
               }`}>
                 {msg.sender === 'user' ? <User className="w-3.5 h-3.5" /> : <Sparkles className="w-3.5 h-3.5" />}
               </div>
@@ -556,7 +556,7 @@ export default function OmniIAPage() {
               <div className="min-w-0 flex-1">
                 <div className={`p-4 rounded-xl text-sm leading-relaxed ${
                   msg.sender === 'user'
-                    ? 'bg-[#1E6FD9] text-white rounded-tr-sm'
+                    ? 'bg-primary text-white rounded-tr-sm'
                     : 'bg-white border border-slate-200/80 text-slate-800 rounded-tl-sm shadow-xs'
                 }`}>
                   <p className="whitespace-pre-wrap">{msg.text}</p>
@@ -587,9 +587,9 @@ export default function OmniIAPage() {
               </div>
               <div className="p-4 rounded-xl bg-white border border-slate-200/80 text-xs text-slate-500 flex items-center gap-2 shadow-xs rounded-tl-sm">
                 <span className="flex gap-1 items-center h-4">
-                  <span className="w-1.5 h-1.5 bg-[#1E6FD9] rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                  <span className="w-1.5 h-1.5 bg-[#1E6FD9] rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                  <span className="w-1.5 h-1.5 bg-[#1E6FD9] rounded-full animate-bounce"></span>
+                  <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                  <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                  <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"></span>
                 </span>
                 <span className="ml-1 text-slate-400 font-medium">Processando análise...</span>
               </div>
@@ -607,13 +607,13 @@ export default function OmniIAPage() {
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                 placeholder="Digite sua dúvida tributária, fiscal ou operacional..."
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-[#1E6FD9] focus:bg-white transition-all placeholder:text-slate-400"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-primary focus:bg-white transition-all placeholder:text-slate-400"
               />
             </div>
             <button
               onClick={handleSendMessage}
               disabled={loadingConvId === activeConvId || !inputMessage.trim()}
-              className="px-4 py-2.5 bg-[#1E6FD9] hover:bg-blue-600 text-white text-xs font-semibold rounded-lg flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-xs"
+              className="px-4 py-2.5 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-xs"
             >
               <span className="hidden sm:inline">Enviar</span>
               <Send className="w-3.5 h-3.5" />
