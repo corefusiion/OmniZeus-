@@ -12,12 +12,32 @@ export interface SystemSettings {
   evolution_api_key: string;
   stripe_pub_key: string;
   stripe_secret_key: string;
+  stripe_webhook_secret?: string;
+  grace_period_days?: number;
+  openrouter_enabled?: boolean;
   custom_ai_enabled?: boolean;
   custom_ai_url?: string;
   custom_ai_key?: string;
   custom_ai_model?: string;
+  super_admin_ai_provider?: 'openrouter_master' | 'custom_endpoint';
+  super_admin_auto_fallback?: boolean;
   coins_balance?: number;
   custom_job_roles?: string[];
+  platform_operational_costs?: {
+    fixed_monthly_cost_per_company: number;
+    detailed_costs?: {
+      server: number;
+      db: number;
+      storage: number;
+      whatsapp: number;
+      email: number;
+      monitoring: number;
+      support: number;
+      other: number;
+    };
+    allocation_method: 'fixed_per_company' | 'proportional_split';
+    updated_at?: string;
+  };
   updated_at: string;
 }
 
@@ -67,9 +87,21 @@ export async function updateServerSettings(settings: Partial<SystemSettings>): P
   }
 }
 
-export async function fetchServerTable<T = any>(table: string): Promise<T[]> {
+function getActiveCompanyIdForRequest(overrideCompId?: string): string {
+  if (overrideCompId) return overrideCompId;
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("omnizeus_active_company_id") || "global";
+  }
+  return "global";
+}
+
+export async function fetchServerTable<T = any>(table: string, companyId?: string): Promise<T[]> {
   try {
-    const res = await fetch(`/api/db?table=${table}`, { cache: "no-store" });
+    const compId = getActiveCompanyIdForRequest(companyId);
+    const res = await fetch(`/api/db?table=${table}&company_id=${encodeURIComponent(compId)}`, { 
+      cache: "no-store",
+      headers: { "x-company-id": compId }
+    });
     if (res.ok) {
       const json = await res.json();
       return Array.isArray(json.data) ? json.data : [];
@@ -80,15 +112,23 @@ export async function fetchServerTable<T = any>(table: string): Promise<T[]> {
   return [];
 }
 
-export async function insertServerTable<T = any>(table: string, record: T): Promise<boolean> {
+export async function insertServerTable<T = any>(table: string, record: T, companyId?: string): Promise<boolean> {
   try {
+    const compId = getActiveCompanyIdForRequest(companyId);
+    const recordWithCompany = {
+      ...(record as any),
+      company_id: (record as any).company_id || (record as any).companyId || compId
+    };
     const res = await fetch("/api/db", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "x-company-id": compId
+      },
       body: JSON.stringify({
         action: "insert",
         table,
-        record
+        record: recordWithCompany
       })
     });
     return res.ok;
@@ -98,11 +138,15 @@ export async function insertServerTable<T = any>(table: string, record: T): Prom
   }
 }
 
-export async function updateServerTableRecord<T = any>(table: string, record: T): Promise<boolean> {
+export async function updateServerTableRecord<T = any>(table: string, record: T, companyId?: string): Promise<boolean> {
   try {
+    const compId = getActiveCompanyIdForRequest(companyId);
     const res = await fetch("/api/db", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "x-company-id": compId
+      },
       body: JSON.stringify({
         action: "update",
         table,
@@ -111,7 +155,7 @@ export async function updateServerTableRecord<T = any>(table: string, record: T)
     });
     return res.ok;
   } catch (err) {
-    console.error(`Error updating ${table} in local SQL DB:`, err);
+    console.error(`Error updating record in ${table} in local SQL DB:`, err);
     return false;
   }
 }
@@ -261,13 +305,23 @@ export async function fetchCustomJobRoles(): Promise<string[]> {
     const res = await fetch("/api/db?table=custom_job_roles", { cache: "no-store" });
     if (res.ok) {
       const json = await res.json();
-      return Array.isArray(json.data) ? json.data : [];
+      if (Array.isArray(json.data) && json.data.length > 0) {
+        return json.data.map((roleStr: string) => {
+          if (typeof roleStr !== 'string') return roleStr;
+          return roleStr
+            .replace(/EscritÃ³rio/g, "Escritório")
+            .replace(/SÃªnior/g, "Sênior")
+            .replace(/ContÃ¡bil/g, "Contábil")
+            .replace(/TributÃ¡rio/g, "Tributário");
+        });
+      }
     }
   } catch (err) {
     console.error("Error fetching custom_job_roles:", err);
   }
   return [];
 }
+
 
 export async function saveCustomJobRoles(roles: string[]) {
   return setServerTable('custom_job_roles', roles);
@@ -282,24 +336,70 @@ export async function insertAIStressTestLog(log: any) { return insertServerTable
 export async function fetchAIUsageMetrics() { return fetchServerTable('ai_usage_metrics'); }
 export async function insertAIUsageMetric(metric: any) { return insertServerTable('ai_usage_metrics', metric); }
 
+export interface PurchaseOrder {
+  id: string; // e.g. "ORD-2026-894123"
+  order_number: string;
+  responsavel_nome: string;
+  responsavel_email: string;
+  responsavel_telefone: string;
+  empresa_nome: string;
+  empresa_cnpj: string;
+  empresa_segmento: string;
+  empresa_observacoes?: string;
+  plan_id: "profissional" | "premium" | "business";
+  plan_name: string;
+  plan_price_monthly: number;
+  coins_franchise: number;
+  incluir_conta_azul: boolean;
+  conta_azul_setup_fee: number;
+  total_initial_payment: number;
+  status: "PENDENTE_PAGAMENTO" | "PAGAMENTO_CONFIRMADO" | "PROVISIONADO" | "CANCELADO";
+  stripe_session_id?: string;
+  stripe_payment_intent_id?: string;
+  stripe_customer_id?: string;
+  stripe_subscription_id?: string;
+  processed_event_ids?: string[];
+  created_at: string;
+  paid_at?: string;
+  provisioned_at?: string;
+  provisioned_company_id?: string;
+  origin_source?: "landing_page" | "manual_super_admin";
+  created_by_user_id?: string;
+  created_by_user_name?: string;
+}
+
 export async function fetchAuditLogs() { return fetchServerTable('audit_logs'); }
+export async function fetchPurchaseOrders(): Promise<PurchaseOrder[]> { return fetchServerTable<PurchaseOrder>('purchase_orders'); }
+export async function insertPurchaseOrder(order: PurchaseOrder) { return insertServerTable('purchase_orders', order); }
+export async function updatePurchaseOrder(order: PurchaseOrder) { return updateServerTableRecord('purchase_orders', order); }
+export async function deletePurchaseOrder(id: string) { return deleteServerTableRecord('purchase_orders', id); }
+
 export async function insertAuditLog(log: {
-  companyId: string;
-  userId: string;
-  userName: string;
+  companyId?: string;
+  company_id?: string;
+  userId?: string;
+  user_id?: string;
+  userName?: string;
+  user_name?: string;
   action: string;
   resource: string;
   details?: string;
 }) {
+  const cid = log.companyId || log.company_id || 'global';
+  const uid = log.userId || log.user_id || 'usr_current';
+  const uname = log.userName || log.user_name || 'Usuário';
+
   return insertServerTable('audit_logs', {
     id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-    company_id: log.companyId,
-    user_id: log.userId,
-    user_name: log.userName,
+    company_id: cid,
+    user_id: uid,
+    user_name: uname,
     action: log.action,
     resource: log.resource,
     details: log.details || '',
     created_at: new Date().toISOString()
   });
 }
+
+
 

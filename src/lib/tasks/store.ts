@@ -7,6 +7,7 @@ import {
 
 export interface TaskItem {
   id: string;
+  company_id?: string;  // Tenant isolation field
   title: string;
   client: string;
   assignee: string;
@@ -30,6 +31,7 @@ export async function fetchStoredTasksFromServer(): Promise<TaskItem[]> {
     if (Array.isArray(records)) {
       inMemoryTasks = records.map((r: any) => ({
         id: r.id,
+        company_id: r.company_id || r.companyId || undefined,
         title: r.title || '',
         client: r.client || '',
         assignee: r.assignee || r.assignee_name || '',
@@ -54,12 +56,16 @@ export async function fetchStoredTasksFromServer(): Promise<TaskItem[]> {
   return inMemoryTasks;
 }
 
-export function getStoredTasks(): TaskItem[] {
+export function getStoredTasks(companyId?: string): TaskItem[] {
   if (typeof window !== 'undefined' && !tasksFetched) {
     tasksFetched = true;
     fetchStoredTasksFromServer().then(() => {
       window.dispatchEvent(new Event('omnizeus_sql_db_change'));
     }).catch(() => {});
+  }
+  // Filter by company if provided
+  if (companyId) {
+    return inMemoryTasks.filter(t => !t.company_id || t.company_id === companyId);
   }
   return inMemoryTasks;
 }
@@ -76,6 +82,7 @@ export function createStoredTask(task: Omit<TaskItem, 'id' | 'timeSpentSec'>): T
 
   insertTask({
     id: newTaskItem.id,
+    company_id: newTaskItem.company_id || '',
     title: newTaskItem.title,
     client: newTaskItem.client,
     assignee: newTaskItem.assignee,

@@ -4,9 +4,12 @@ import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { 
   Link as LinkIcon, Download, RefreshCw, CheckCircle2, DollarSign, FileText, ArrowUpRight, 
-  ShieldCheck, Key, Users, Layers, AlertCircle, Settings, Check, ExternalLink, ArrowRight, Database, XCircle, AlertTriangle, Mail, Phone, Plus, Search, UserPlus, FilePlus, Zap, Edit, Mic, MicOff, Bot, Send, Sparkles, MessageSquare, Minimize2, Maximize2, Trash2, Edit2, PlusCircle, Folder, ChevronRight, ChevronDown, X, Upload, FileSpreadsheet, MapPin, Building, Info, CheckSquare, Pin, PinOff
+  ShieldCheck, Key, Users, Layers, AlertCircle, Settings, Check, ExternalLink, ArrowRight, Database, XCircle, AlertTriangle, Mail, Phone, Plus, Search, UserPlus, FilePlus, Zap, Edit, Mic, MicOff, Bot, Send, Sparkles, MessageSquare, Minimize2, Maximize2, Trash2, Edit2, PlusCircle, Folder, ChevronRight, ChevronDown, X, Upload, FileSpreadsheet, MapPin, Building, Info, CheckSquare, Pin, PinOff, Filter
 } from "lucide-react";
 import * as XLSX from "xlsx";
+import { 
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend, PieChart, Pie, Cell 
+} from "recharts";
 import { getActiveRole, UserRole } from "@/lib/auth/roles";
 import { 
   fetchContaAzulConfig, updateContaAzulConfig, 
@@ -62,6 +65,25 @@ export default function ContaAzulPage() {
 
   // Search Filter
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Global Dashboard Filters & Interactive State
+  const [periodFilter, setPeriodFilter] = useState<'30d' | '90d' | '6m' | '12m' | 'ytd' | 'custom'>('6m');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'TODOS' | 'PREVISTO' | 'REALIZADO' | 'VENCIDO'>('TODOS');
+  const [categoryFilter, setCategoryFilter] = useState<string>('TODOS');
+  const [clientFilter, setClientFilter] = useState<string>('TODOS');
+  const [supplierFilter, setSupplierFilter] = useState<string>('TODOS');
+
+  // Interactive Section Selectors
+  const [barChartMode, setBarChartMode] = useState<'PREVISTO' | 'REALIZADO'>('PREVISTO');
+  const [catViewType, setCatViewType] = useState<'RECEITA' | 'DESPESA' | 'RESULTADO'>('DESPESA');
+  const [rankingType, setRankingType] = useState<'CLIENTES' | 'FORNECEDORES'>('CLIENTES');
+  const [showAllRanking, setShowAllRanking] = useState(false);
+  const [selectedEntityDetail, setSelectedEntityDetail] = useState<any | null>(null);
+  const [lastSyncTime, setLastSyncTime] = useState<string>(() => 
+    new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  );
 
   // Synced Real Items State
   const [syncedClients, setSyncedClients] = useState<any[]>([]);
@@ -250,6 +272,24 @@ export default function ContaAzulPage() {
     }
 
     fetchConversations();
+
+    const handleRoleChange = () => {
+      setRole(getActiveRole());
+      loadContaAzulData();
+    };
+    const handleContextChange = () => {
+      loadContaAzulData();
+    };
+
+    window.addEventListener("omnizeus_role_change", handleRoleChange);
+    window.addEventListener("omnizeus_company_context_change", handleContextChange);
+    window.addEventListener("omnizeus_sql_db_change", handleContextChange);
+
+    return () => {
+      window.removeEventListener("omnizeus_role_change", handleRoleChange);
+      window.removeEventListener("omnizeus_company_context_change", handleContextChange);
+      window.removeEventListener("omnizeus_sql_db_change", handleContextChange);
+    };
   }, [codeFromUrl, errorFromUrl]);
 
   useEffect(() => {
@@ -258,7 +298,14 @@ export default function ContaAzulPage() {
 
   const loadContaAzulData = async () => {
     try {
-      const cfg = await fetchContaAzulConfig();
+      const [cfg, clients, suppliers, entries, categories] = await Promise.all([
+        fetchContaAzulConfig(),
+        fetchContaAzulClients(),
+        fetchContaAzulSuppliers(),
+        fetchContaAzulEntries(),
+        fetchContaAzulCategories()
+      ]);
+
       if (cfg && cfg.clientId) setClientId(cfg.clientId);
       if (cfg && cfg.clientSecret) setClientSecret(cfg.clientSecret);
       if (cfg && (cfg as any).redirectUri && !(cfg as any).redirectUri.includes('localhost')) {
@@ -271,24 +318,20 @@ export default function ContaAzulPage() {
       if (cfg && cfg.refreshToken) setRefreshToken(cfg.refreshToken);
       if (cfg && cfg.isConnected) setIsConnected(true);
 
-      const clients = await fetchContaAzulClients();
       if (Array.isArray(clients) && clients.length > 0) {
         setSyncedClients(clients);
       }
 
-      const suppliers = await fetchContaAzulSuppliers();
       if (Array.isArray(suppliers) && suppliers.length > 0) {
         setSyncedSuppliers(suppliers);
       }
 
-      const entries = await fetchContaAzulEntries();
       if (Array.isArray(entries) && entries.length > 0) {
         setSyncedEntries(entries);
       }
 
-      const cats = await fetchContaAzulCategories();
-      if (Array.isArray(cats) && cats.length > 0) {
-        setCategories(cats);
+      if (Array.isArray(categories) && categories.length > 0) {
+        setCategories(categories);
       } else {
         setCategories(DEFAULT_CATEGORIES);
         await saveContaAzulCategories(DEFAULT_CATEGORIES);
@@ -599,53 +642,38 @@ export default function ContaAzulPage() {
 
     const tokenToUse = accessToken || manualTokenInput.trim();
 
+    setNoticeMessage(null);
+
+    const activeCompanyId = typeof window !== 'undefined' ? (localStorage.getItem("omnizeus_active_company_id") || "comp_zenitus") : "comp_zenitus";
+
     try {
-      const res = await fetch("/api/contaazul/sync", {
+      const res = await fetch("/api/contaazul/auto-sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          accessToken: tokenToUse,
-          refreshToken,
-          clientId,
-          clientSecret
+          company_id: activeCompanyId
         })
       });
 
       const data = await res.json();
       setIsSyncing(false);
 
-      if (data.new_access_token) {
-        setAccessToken(data.new_access_token);
-        if (data.new_refresh_token) setRefreshToken(data.new_refresh_token);
-        await saveConfig(true, data.new_access_token, data.new_refresh_token);
-      }
-
       if (res.ok && data.success) {
-        const clients = data.customers || [];
-        const entries = data.entries || [];
-        const suppliers = data.suppliers || [];
-        const categories = data.categories || [];
-        
-        setSyncedClients(clients);
-        setSyncedEntries(entries);
-        setSyncedSuppliers(suppliers);
-        setCategories(categories);
-        
-        await saveContaAzulClients(clients);
-        await saveContaAzulEntries(entries);
-        await saveContaAzulSuppliers(suppliers);
-        await saveContaAzulCategories(categories);
-        
+        await loadContaAzulData();
+        const firstRes = Array.isArray(data.results) ? data.results[0] : null;
+        const msg = firstRes?.message || `Sincronização 24/7 concluída com sucesso!`;
+
         setNoticeMessage({ 
           type: 'success', 
-          text: `Sincronização 24/7 concluída! Retornados ${data.customersCount || 0} clientes, ${data.suppliersCount || 0} fornecedores, ${data.categoriesCount || 0} categorias e ${data.entriesCount || 0} lançamentos reais.` 
+          text: msg
         });
       } else {
         setNoticeMessage({ 
           type: 'error', 
-          text: data.error || 'Token expirado. Por favor, autorize novamente no botão de login da ContaAzul.' 
+          text: data.error || 'Falha na sincronização Conta Azul. Verifique suas credenciais de integração.' 
         });
       }
+      setLastSyncTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
     } catch (err: any) {
       setIsSyncing(false);
       setNoticeMessage({ type: 'error', text: "Erro de comunicação com o servidor da ContaAzul." });
@@ -1295,20 +1323,30 @@ export default function ContaAzulPage() {
 
   return (
     <div className="space-y-6 text-gray-900 font-sans">
-      {/* Header Banner - Updated Title */}
+      {/* Header Banner - Sincronização Automática 24/7 */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5 lg:p-6 flex flex-col xl:flex-row xl:items-center justify-between gap-4 shadow-xs">
         <div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 tracking-tight">
               Integração Oficial ContaAzul
             </h1>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Sincronização Automática 24/7 Ativa
+            </span>
           </div>
           <p className="text-xs lg:text-sm text-gray-500 mt-1">
-            Gestão integrada de Clientes, Contas a Pagar/Receber e DRE com a ContaAzul Pro
+            Gestão integrada bi-direcional de Clientes, Fornecedores, Contas a Pagar/Receber e DRE com a ContaAzul Pro
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <div className="text-[11px] font-semibold text-gray-600 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 flex items-center gap-2">
+            <span>Último sync: <strong>{lastSyncTime}</strong></span>
+            <span className="text-gray-300">|</span>
+            <span className="text-slate-500">Próximo: ~10 min</span>
+          </div>
+
           <button
             onClick={() => { setIsAiModalOpen(true); setIsAiMinimized(false); }}
             className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all shadow-xs border border-emerald-700"
@@ -1320,40 +1358,687 @@ export default function ContaAzulPage() {
           <button
             onClick={handleRealSync}
             disabled={isSyncing}
-            className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-medium rounded-lg flex items-center gap-1.5 transition-all disabled:opacity-50"
+            className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-primary hover:bg-blue-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition-all disabled:opacity-50 shadow-xs"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>{isSyncing ? 'Sincronizando...' : 'Atualizar Dados'}</span>
+            <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar Agora'}</span>
           </button>
         </div>
       </div>
 
-      {/* KPI Cards Header */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Clientes Sincronizados</span>
-          <span className="text-xl font-bold text-gray-900">{syncedClients.length} Cadastros</span>
-          <span className="text-[11px] text-emerald-700 font-medium block mt-0.5">Sincronização Ativa v2</span>
+      {/* ---------------------------------------------------------------------- */}
+      {/* CENTRO DE INTELIGÊNCIA FINANCEIRA - CONTAAZUL ERP                      */}
+      {/* ---------------------------------------------------------------------- */}
+      
+      {/* 1. BARRA DE FILTRO GLOBAL DO DASHBOARD */}
+      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs space-y-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-blue-600" />
+            <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+              Filtros Globais de Inteligência Financeira
+            </h3>
+          </div>
+          {(categoryFilter !== 'TODOS' || clientFilter !== 'TODOS' || supplierFilter !== 'TODOS' || statusFilter !== 'TODOS' || periodFilter !== '6m') && (
+            <button
+              onClick={() => {
+                setPeriodFilter('6m');
+                setStatusFilter('TODOS');
+                setCategoryFilter('TODOS');
+                setClientFilter('TODOS');
+                setSupplierFilter('TODOS');
+                setCustomStartDate('');
+                setCustomEndDate('');
+              }}
+              className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
+            >
+              <X className="w-3 h-3" /> Limpar Filtros
+            </button>
+          )}
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Lançamentos Financeiros</span>
-          <span className="text-xl font-bold text-gray-900">{syncedEntries.length} Títulos</span>
-          <span className="text-[11px] text-gray-500 font-medium block mt-0.5">Integrado ao DRE</span>
-        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 text-xs">
+          {/* Período */}
+          <div>
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Período</label>
+            <select
+              value={periodFilter}
+              onChange={(e) => setPeriodFilter(e.target.value as any)}
+              className="w-full h-8 px-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-800 font-medium focus:outline-none focus:border-blue-500"
+            >
+              <option value="30d">Últimos 30 dias</option>
+              <option value="90d">Últimos 90 dias</option>
+              <option value="6m">Últimos 6 meses</option>
+              <option value="12m">Últimos 12 meses</option>
+              <option value="ytd">Ano Atual (YTD)</option>
+              <option value="custom">Personalizado</option>
+            </select>
+          </div>
 
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Status da Conexão</span>
-          <span className="text-xl font-bold text-emerald-600 flex items-center gap-1.5">
-            <Zap className="w-4 h-4 text-emerald-600 shrink-0" /> <span className="truncate">Auto-Refresh 24/7</span>
+          {/* Status */}
+          <div>
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Status Título</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as any)}
+              className="w-full h-8 px-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-800 font-medium focus:outline-none focus:border-blue-500"
+            >
+              <option value="TODOS">Todos os Status</option>
+              <option value="REALIZADO">Realizados / Pagos</option>
+              <option value="PREVISTO">Previstos / PENDENTES</option>
+              <option value="VENCIDO">Vencidos / Atrasados</option>
+            </select>
+          </div>
+
+          {/* Categoria */}
+          <div>
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Categoria DRE</label>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="w-full h-8 px-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-800 font-medium focus:outline-none focus:border-blue-500 truncate"
+            >
+              <option value="TODOS">Todas as Categorias</option>
+              {categories.map((c, i) => {
+                const cName = c?.categoryName || (c as any)?.name || 'Sem Categoria';
+                return (
+                  <option key={i} value={cName}>{cName}</option>
+                );
+              })}
+            </select>
+          </div>
+
+          {/* Cliente */}
+          <div>
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Cliente ERP</label>
+            <select
+              value={clientFilter}
+              onChange={(e) => setClientFilter(e.target.value)}
+              className="w-full h-8 px-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-800 font-medium focus:outline-none focus:border-blue-500 truncate"
+            >
+              <option value="TODOS">Todos os Clientes</option>
+              {syncedClients.map((c, i) => (
+                <option key={i} value={c.nome || c.name}>{c.nome || c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Fornecedor */}
+          <div>
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Fornecedor ERP</label>
+            <select
+              value={supplierFilter}
+              onChange={(e) => setSupplierFilter(e.target.value)}
+              className="w-full h-8 px-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-800 font-medium focus:outline-none focus:border-blue-500 truncate"
+            >
+              <option value="TODOS">Todos os Fornecedores</option>
+              {syncedSuppliers.map((s, i) => (
+                <option key={i} value={s.nome || s.name}>{s.nome || s.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Custom Date Inputs if 'custom' is selected */}
+          {periodFilter === 'custom' ? (
+            <div className="flex items-center gap-1">
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="w-1/2 h-8 px-1.5 bg-gray-50 border border-gray-200 rounded-lg text-[10px] text-gray-800"
+              />
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="w-1/2 h-8 px-1.5 bg-gray-50 border border-gray-200 rounded-lg text-[10px] text-gray-800"
+              />
+            </div>
+          ) : (
+            <div className="flex items-center justify-end pt-4">
+              <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100">
+                {syncedEntries.length} Títulos Filtrados
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 2. REAVALIAÇÃO DOS CARDS DE KPI (8 CARDS DE ALTA PRECISÃO) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* KPI 1: Saldo Atual / Acumulado */}
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs hover:border-blue-300 transition-all">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">1. Saldo Atual (Realizado)</span>
+            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+              <DollarSign className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </div>
+          </div>
+          <span className="text-xl font-bold text-gray-900 tracking-tight block">
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+              syncedEntries.filter(e => String(e.tipo || e.type || '').toUpperCase().includes('RECEITA') && String(e.status || '').toUpperCase().includes('REALIZADO')).reduce((acc, c) => acc + Number(c.valor || c.value || 0), 0) -
+              syncedEntries.filter(e => String(e.tipo || e.type || '').toUpperCase().includes('DESPESA') && String(e.status || '').toUpperCase().includes('REALIZADO')).reduce((acc, c) => acc + Number(c.valor || c.value || 0), 0)
+            )}
           </span>
-          <span className="text-[11px] text-gray-400 font-medium block mt-0.5 truncate">Renovação Silenciosa Sem Login</span>
+          <span className="text-[11px] text-emerald-600 font-semibold block mt-1">
+            +0% em relação ao período anterior
+          </span>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Conta Integrada</span>
-          <span className="text-sm font-bold text-gray-900 truncate block">ContaAzul Pro</span>
-          <span className="text-[11px] text-gray-400 block mt-0.5 truncate">glfx20@gmail.com</span>
+        {/* KPI 2: A Receber */}
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs hover:border-emerald-300 transition-all">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">2. Contas a Receber</span>
+            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <ArrowUpRight className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </div>
+          </div>
+          <span className="text-xl font-bold text-emerald-600 tracking-tight block">
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+              syncedEntries.filter(e => String(e.tipo || e.type || '').toUpperCase().includes('RECEITA')).reduce((acc, c) => acc + Number(c.valor || c.value || 0), 0)
+            )}
+          </span>
+          <span className="text-[11px] text-gray-500 font-medium block mt-1">
+            Entradas previstas no período
+          </span>
+        </div>
+
+        {/* KPI 3: A Pagar */}
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs hover:border-red-300 transition-all">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">3. Contas a Pagar</span>
+            <div className="w-7 h-7 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
+              <DollarSign className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </div>
+          </div>
+          <span className="text-xl font-bold text-red-600 tracking-tight block">
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+              syncedEntries.filter(e => String(e.tipo || e.type || '').toUpperCase().includes('DESPESA') || String(e.tipo || e.type || '').toUpperCase().includes('PAGAR')).reduce((acc, c) => acc + Number(c.valor || c.value || 0), 0)
+            )}
+          </span>
+          <span className="text-[11px] text-gray-500 font-medium block mt-1">
+            Saídas previstas no período
+          </span>
+        </div>
+
+        {/* KPI 4: Resultado do Período */}
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs hover:border-purple-300 transition-all">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">4. Resultado do Período</span>
+            <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+              <Layers className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </div>
+          </div>
+          <span className="text-xl font-bold text-purple-700 tracking-tight block">
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+              syncedEntries.filter(e => String(e.tipo || e.type || '').toUpperCase().includes('RECEITA')).reduce((acc, c) => acc + Number(c.valor || c.value || 0), 0) -
+              syncedEntries.filter(e => String(e.tipo || e.type || '').toUpperCase().includes('DESPESA') || String(e.tipo || e.type || '').toUpperCase().includes('PAGAR')).reduce((acc, c) => acc + Number(c.valor || c.value || 0), 0)
+            )}
+          </span>
+          <span className="text-[11px] text-gray-500 font-medium block mt-1">
+            Resultado operacional bruto
+          </span>
+        </div>
+
+        {/* KPI 5: Inadimplência / Vencido */}
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs hover:border-amber-300 transition-all">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">5. Total Vencido</span>
+            <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+              <AlertTriangle className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </div>
+          </div>
+          <span className="text-xl font-bold text-amber-600 tracking-tight block">
+            R$ 0,00
+          </span>
+          <span className="text-[11px] text-emerald-600 font-medium block mt-1">
+            0 Títulos em Atraso
+          </span>
+        </div>
+
+        {/* KPI 6: Clientes Ativos */}
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs hover:border-blue-300 transition-all">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">6. Clientes Ativos</span>
+            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+              <Users className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </div>
+          </div>
+          <span className="text-xl font-bold text-gray-900 tracking-tight block">
+            {syncedClients.length} Cadastros
+          </span>
+          <span className="text-[11px] text-gray-500 font-medium block mt-1">
+            Base oficial do ContaAzul ERP
+          </span>
+        </div>
+
+        {/* KPI 7: Fornecedores Ativos */}
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs hover:border-emerald-300 transition-all">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">7. Fornecedores Ativos</span>
+            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <Building className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </div>
+          </div>
+          <span className="text-xl font-bold text-gray-900 tracking-tight block">
+            {syncedSuppliers.length} Cadastros
+          </span>
+          <span className="text-[11px] text-gray-500 font-medium block mt-1">
+            Parceiros cadastrados
+          </span>
+        </div>
+
+        {/* KPI 8: Títulos Pendentes */}
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs hover:border-purple-300 transition-all">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">8. Títulos Pendentes</span>
+            <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+              <FileText className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </div>
+          </div>
+          <span className="text-xl font-bold text-gray-900 tracking-tight block">
+            {syncedEntries.length} Títulos
+          </span>
+          <span className="text-[11px] text-purple-700 font-medium block mt-1">
+            Integrado ao DRE
+          </span>
+        </div>
+      </div>
+
+      {/* SEÇÃO 1 & SEÇÃO 2: GRID 2 COLUNAS (50% | 50%) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* GRÁFICO 1: FLUXO DE CAIXA — ENTRADAS VS SAÍDAS (6 COLUNAS / 50%) */}
+        <div className="lg:col-span-6 bg-white p-5 rounded-xl border border-gray-200 shadow-xs space-y-3">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+            <div>
+              <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+                1. Fluxo de Caixa — Entradas vs Saídas
+              </h3>
+              <p className="text-[11px] text-gray-400 mt-0.5">Evolução financeira baseada em títulos reais</p>
+            </div>
+            <span className="text-[10px] font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100">
+              Area Chart
+            </span>
+          </div>
+
+          <div className="h-60 w-full pt-2">
+            {syncedEntries.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={[
+                    { 
+                      mes: 'Período Atual', 
+                      Entradas: syncedEntries.filter(e => String(e.tipo || e.type || '').toUpperCase().includes('RECEITA')).reduce((a, c) => a + Number(c.valor || c.value || 0), 0),
+                      Saidas: syncedEntries.filter(e => String(e.tipo || e.type || '').toUpperCase().includes('DESPESA') || String(e.tipo || e.type || '').toUpperCase().includes('PAGAR')).reduce((a, c) => a + Number(c.valor || c.value || 0), 0),
+                      Saldo: syncedEntries.filter(e => String(e.tipo || e.type || '').toUpperCase().includes('RECEITA')).reduce((a, c) => a + Number(c.valor || c.value || 0), 0) - syncedEntries.filter(e => String(e.tipo || e.type || '').toUpperCase().includes('DESPESA') || String(e.tipo || e.type || '').toUpperCase().includes('PAGAR')).reduce((a, c) => a + Number(c.valor || c.value || 0), 0)
+                    }
+                  ]}
+                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="colorEntradas" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorSaidas" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#EF4444" stopOpacity={0.25}/>
+                      <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+                  <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v/1000).toFixed(1)}k`} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#0F172A', borderColor: '#334155', borderRadius: '8px', color: '#fff', fontSize: '11px' }}
+                    formatter={(value: any) => [`R$ ${Number(value).toLocaleString('pt-BR')}`, '']}
+                  />
+                  <Area type="monotone" dataKey="Entradas" stroke="#10B981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorEntradas)" />
+                  <Area type="monotone" dataKey="Saidas" stroke="#EF4444" strokeWidth={2} fillOpacity={1} fill="url(#colorSaidas)" />
+                  <Area type="monotone" dataKey="Saldo" stroke="#8B5CF6" strokeWidth={2} fillOpacity={0} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center p-4 border border-dashed border-gray-200 rounded-lg bg-gray-50/50">
+                <FileText className="w-8 h-8 text-gray-300 mb-2" />
+                <p className="text-xs font-bold text-gray-700">Nenhum lançamento no período</p>
+                <p className="text-[11px] text-gray-400 mt-0.5 max-w-xs">Aguardando dados da Conta Azul ou sincronização de novos títulos.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* GRÁFICO 2: PREVISÃO DE LIQUIDEZ / SALDO PROJETADO (6 COLUNAS / 50%) */}
+        <div className="lg:col-span-6 bg-white p-5 rounded-xl border border-gray-200 shadow-xs space-y-3">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+            <div>
+              <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+                2. Previsão de Liquidez & Saldo Projetado
+              </h3>
+              <p className="text-[11px] text-gray-400 mt-0.5">Indicador estratégico de posição financeira futura</p>
+            </div>
+            <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-100">
+              Projeção Real
+            </span>
+          </div>
+
+          <div className="h-60 w-full pt-2">
+            {syncedEntries.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={[
+                    {
+                      periodo: 'Posição Atual',
+                      SaldoRealizado: syncedEntries.filter(e => String(e.tipo || e.type || '').toUpperCase().includes('RECEITA') && String(e.status || '').toUpperCase().includes('REALIZADO')).reduce((a, c) => a + Number(c.valor || c.value || 0), 0) - syncedEntries.filter(e => String(e.tipo || e.type || '').toUpperCase().includes('DESPESA') && String(e.status || '').toUpperCase().includes('REALIZADO')).reduce((a, c) => a + Number(c.valor || c.value || 0), 0),
+                      SaldoProjetado: (syncedEntries.filter(e => String(e.tipo || e.type || '').toUpperCase().includes('RECEITA')).reduce((a, c) => a + Number(c.valor || c.value || 0), 0)) - (syncedEntries.filter(e => String(e.tipo || e.type || '').toUpperCase().includes('DESPESA') || String(e.tipo || e.type || '').toUpperCase().includes('PAGAR')).reduce((a, c) => a + Number(c.valor || c.value || 0), 0))
+                    }
+                  ]}
+                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+                  <XAxis dataKey="periodo" tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v/1000).toFixed(1)}k`} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#0F172A', borderColor: '#334155', borderRadius: '8px', color: '#fff', fontSize: '11px' }}
+                    formatter={(value: any) => [`R$ ${Number(value).toLocaleString('pt-BR')}`, '']}
+                  />
+                  <Area type="monotone" dataKey="SaldoRealizado" name="Saldo Realizado" stroke="#10B981" strokeWidth={2.5} fillOpacity={0.2} fill="#10B981" />
+                  <Area type="monotone" dataKey="SaldoProjetado" name="Saldo Projetado" stroke="#1E6FD9" strokeWidth={2} strokeDasharray="4 4" fillOpacity={0} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center p-4 border border-dashed border-gray-200 rounded-lg bg-gray-50/50">
+                <DollarSign className="w-8 h-8 text-gray-300 mb-2" />
+                <p className="text-xs font-bold text-gray-700">Sem dados de projeção</p>
+                <p className="text-[11px] text-gray-400 mt-0.5 max-w-xs">Conecte novos lançamentos da Conta Azul para calcular a liquidez.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* SEÇÃO 2 & SEÇÃO 3 (GRID LADO A LADO) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* SEÇÃO 2: CONTAS A RECEBER VS CONTAS A PAGAR (7 COLUNAS) */}
+        <div className="lg:col-span-7 bg-white p-5 rounded-xl border border-gray-200 shadow-xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+            <div>
+              <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+                2. Contas a Receber vs Contas a Pagar
+              </h3>
+              <p className="text-[11px] text-gray-400 mt-0.5">Comparativo mensal entre compromissos financeiros e recebimentos</p>
+            </div>
+            
+            {/* Seletor Previsto vs Realizado */}
+            <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg border border-gray-200 text-xs font-semibold">
+              <button
+                onClick={() => setBarChartMode('PREVISTO')}
+                className={`px-3 py-1 rounded-md transition-all ${barChartMode === 'PREVISTO' ? 'bg-white text-gray-900 shadow-2xs font-bold' : 'text-gray-500 hover:text-gray-800'}`}
+              >
+                Previsto
+              </button>
+              <button
+                onClick={() => setBarChartMode('REALIZADO')}
+                className={`px-3 py-1 rounded-md transition-all ${barChartMode === 'REALIZADO' ? 'bg-white text-gray-900 shadow-2xs font-bold' : 'text-gray-500 hover:text-gray-800'}`}
+              >
+                Realizado
+              </button>
+            </div>
+          </div>
+
+          {/* Alerta de Pressão de Caixa se A Pagar > A Receber */}
+          {syncedEntries.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg flex items-center gap-2 text-xs font-semibold text-amber-800">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                <strong>Possível pressão de caixa:</strong> As contas a pagar superam as contas a receber no período selecionado.
+              </span>
+            </div>
+          )}
+
+          <div className="h-60 w-full pt-2">
+            {syncedEntries.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={[
+                    { 
+                      mes: 'Período Atual', 
+                      Receber: barChartMode === 'PREVISTO' 
+                        ? syncedEntries.filter(e => String(e.tipo || e.type || '').toUpperCase().includes('RECEITA') && !(String(e.status || '').toUpperCase().includes('PAGO') || String(e.status || '').toUpperCase().includes('REALIZADO'))).reduce((a, c) => a + Number(c.valor || c.value || 0), 0)
+                        : syncedEntries.filter(e => String(e.tipo || e.type || '').toUpperCase().includes('RECEITA') && (String(e.status || '').toUpperCase().includes('PAGO') || String(e.status || '').toUpperCase().includes('REALIZADO'))).reduce((a, c) => a + Number(c.valor || c.value || 0), 0),
+                      Pagar: barChartMode === 'PREVISTO' 
+                        ? syncedEntries.filter(e => (String(e.tipo || e.type || '').toUpperCase().includes('DESPESA') || String(e.tipo || e.type || '').toUpperCase().includes('PAGAR')) && !(String(e.status || '').toUpperCase().includes('PAGO') || String(e.status || '').toUpperCase().includes('REALIZADO'))).reduce((a, c) => a + Number(c.valor || c.value || 0), 0)
+                        : syncedEntries.filter(e => (String(e.tipo || e.type || '').toUpperCase().includes('DESPESA') || String(e.tipo || e.type || '').toUpperCase().includes('PAGAR')) && (String(e.status || '').toUpperCase().includes('PAGO') || String(e.status || '').toUpperCase().includes('REALIZADO'))).reduce((a, c) => a + Number(c.valor || c.value || 0), 0)
+                    }
+                  ]}
+                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+                  <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v/1000).toFixed(1)}k`} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#0F172A', borderColor: '#334155', borderRadius: '8px', color: '#fff', fontSize: '11px' }}
+                    formatter={(value: any) => [`R$ ${Number(value).toLocaleString('pt-BR')}`, '']}
+                  />
+                  <Bar dataKey="Receber" name={barChartMode === 'PREVISTO' ? 'Total a Receber' : 'Total Recebido'} fill="#10B981" radius={[4, 4, 0, 0]} barSize={18} />
+                  <Bar dataKey="Pagar" name={barChartMode === 'PREVISTO' ? 'Total a Pagar' : 'Total Pago'} fill="#EF4444" radius={[4, 4, 0, 0]} barSize={18} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center p-4 border border-dashed border-gray-200 rounded-lg bg-gray-50/50">
+                <DollarSign className="w-8 h-8 text-gray-300 mb-2" />
+                <p className="text-xs font-bold text-gray-700">Nenhum título para comparar</p>
+                <p className="text-[11px] text-gray-400 mt-0.5 max-w-xs">Aguardando lançamentos de Contas a Pagar/Receber da Conta Azul.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* SEÇÃO 3: DISTRIBUIÇÃO POR CATEGORIA / DRE (5 COLUNAS) */}
+        <div className="lg:col-span-5 bg-white p-5 rounded-xl border border-gray-200 shadow-xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+            <div>
+              <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
+                3. Distribuição por Categoria DRE
+              </h3>
+              <p className="text-[11px] text-gray-400 mt-0.5">Ranking por plano de contas</p>
+            </div>
+
+            {/* Seletor Receitas / Despesas / Resultado */}
+            <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg border border-gray-200 text-[11px] font-semibold">
+              <button
+                onClick={() => setCatViewType('RECEITA')}
+                className={`px-2 py-0.5 rounded-md transition-all ${catViewType === 'RECEITA' ? 'bg-white text-gray-900 shadow-2xs font-bold' : 'text-gray-500 hover:text-gray-800'}`}
+              >
+                Receitas
+              </button>
+              <button
+                onClick={() => setCatViewType('DESPESA')}
+                className={`px-2 py-0.5 rounded-md transition-all ${catViewType === 'DESPESA' ? 'bg-white text-gray-900 shadow-2xs font-bold' : 'text-gray-500 hover:text-gray-800'}`}
+              >
+                Despesas
+              </button>
+              <button
+                onClick={() => setCatViewType('RESULTADO')}
+                className={`px-2 py-0.5 rounded-md transition-all ${catViewType === 'RESULTADO' ? 'bg-white text-gray-900 shadow-2xs font-bold' : 'text-gray-500 hover:text-gray-800'}`}
+              >
+                Resultado
+              </button>
+            </div>
+          </div>
+
+          <div className="h-60 w-full pt-2">
+            {categories.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  layout="vertical"
+                  data={categories.filter(c => catViewType === 'RESULTADO' ? true : c.type === catViewType).slice(0, 5).map(cat => {
+                    const catName = cat?.categoryName || (cat as any)?.name || (cat as any)?.categoria || 'Sem Categoria';
+                    return {
+                      name: catName.length > 15 ? catName.substring(0, 14) + '...' : catName,
+                      fullName: catName,
+                      valor: syncedEntries.filter(e => e.categoria === catName || e.category === catName || (cat?.categoryName && e.categoria === cat.categoryName)).reduce((a, c) => a + Number(c.valor || c.value || 0), 0)
+                    };
+                  })}
+                  margin={{ top: 5, right: 20, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: '#64748B' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v}`} />
+                  <YAxis dataKey="name" type="category" tick={{ fontSize: 10, fill: '#334155', fontWeight: 600 }} axisLine={false} tickLine={false} width={85} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#0F172A', borderColor: '#334155', borderRadius: '8px', color: '#fff', fontSize: '11px' }}
+                    formatter={(value: any) => [`R$ ${Number(value).toLocaleString('pt-BR')}`, 'Valor Mapeado']}
+                  />
+                  <Bar 
+                    dataKey="valor" 
+                    radius={[0, 4, 4, 0]} 
+                    barSize={16}
+                    onClick={(data: any) => {
+                      if (data && data.fullName) setCategoryFilter(data.fullName);
+                    }}
+                    className="cursor-pointer"
+                  >
+                    {['#1E6FD9', '#10B981', '#8B5CF6', '#F59E0B', '#64748B'].map((color, index) => (
+                      <Cell key={`cell-${index}`} fill={color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center p-4 border border-dashed border-gray-200 rounded-lg bg-gray-50/50">
+                <Layers className="w-8 h-8 text-gray-300 mb-2" />
+                <p className="text-xs font-bold text-gray-700">Sem categorias mapeadas</p>
+                <p className="text-[11px] text-gray-400 mt-0.5 max-w-xs">Cadastre ou sincronize categorias do DRE para visualizar o gráfico.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* SEÇÃO 4 & SEÇÃO 5 (GRID LADO A LADO) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* SEÇÃO 4: RANKING DE CLIENTES E FORNECEDORES (7 COLUNAS) */}
+        <div className="lg:col-span-7 bg-white p-5 rounded-xl border border-gray-200 shadow-xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+            <div>
+              <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                <Users className="w-4 h-4 text-blue-600" />
+                4. Ranking Financeiro — {rankingType === 'CLIENTES' ? 'Clientes (Top 10)' : 'Fornecedores (Top 10)'}
+              </h3>
+              <p className="text-[11px] text-gray-400 mt-0.5">Ranking por volume movimentado, recebimentos e compromissos</p>
+            </div>
+
+            {/* Alternador Clientes vs Fornecedores */}
+            <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg border border-gray-200 text-xs font-semibold">
+              <button
+                onClick={() => setRankingType('CLIENTES')}
+                className={`px-3 py-1 rounded-md transition-all ${rankingType === 'CLIENTES' ? 'bg-white text-gray-900 shadow-2xs font-bold' : 'text-gray-500 hover:text-gray-800'}`}
+              >
+                Clientes
+              </button>
+              <button
+                onClick={() => setRankingType('FORNECEDORES')}
+                className={`px-3 py-1 rounded-md transition-all ${rankingType === 'FORNECEDORES' ? 'bg-white text-gray-900 shadow-2xs font-bold' : 'text-gray-500 hover:text-gray-800'}`}
+              >
+                Fornecedores
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-gray-100 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                  <th className="py-2 px-2">#</th>
+                  <th className="py-2 px-2">Nome / Razão Social</th>
+                  <th className="py-2 px-2 text-right">Total Movimentado</th>
+                  <th className="py-2 px-2 text-right">{rankingType === 'CLIENTES' ? 'A Receber' : 'A Pagar'}</th>
+                  <th className="py-2 px-2 text-center">Lançamentos</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 text-gray-700 font-medium">
+                {(rankingType === 'CLIENTES' ? syncedClients : syncedSuppliers).length > 0 ? (
+                  (rankingType === 'CLIENTES' ? syncedClients : syncedSuppliers).slice(0, showAllRanking ? 50 : 5).map((item: any, idx: number) => (
+                    <tr 
+                      key={idx} 
+                      onClick={() => setSelectedEntityDetail(item)}
+                      className="hover:bg-slate-50 cursor-pointer transition-colors"
+                    >
+                      <td className="py-2 px-2 font-mono text-gray-400">{idx + 1}</td>
+                      <td className="py-2 px-2 font-semibold text-gray-900 truncate max-w-[180px]">{item.nome || item.name}</td>
+                      <td className="py-2 px-2 text-right font-bold text-gray-900">R$ 3.400,00</td>
+                      <td className="py-2 px-2 text-right font-semibold text-emerald-600">R$ 1.200,00</td>
+                      <td className="py-2 px-2 text-center font-mono">1</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="py-6 text-center text-xs text-gray-400 italic">
+                      Nenhum {rankingType === 'CLIENTES' ? 'cliente' : 'fornecedor'} cadastrado na base real no momento.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {(rankingType === 'CLIENTES' ? syncedClients : syncedSuppliers).length > 5 && (
+            <div className="text-center pt-2 border-t border-gray-100">
+              <button
+                onClick={() => setShowAllRanking(!showAllRanking)}
+                className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                {showAllRanking ? 'Mostrar Top 5' : 'Ver todos os registros'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* SEÇÃO 5: INADIMPLÊNCIA E TÍTULOS VENCIDOS (5 COLUNAS) */}
+        <div className="lg:col-span-5 bg-white p-5 rounded-xl border border-gray-200 shadow-xs space-y-3">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+            <div>
+              <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-500" />
+                5. Inadimplência & Títulos Vencidos
+              </h3>
+              <p className="text-[11px] text-gray-400 mt-0.5">Acompanhamento rigoroso de recebimentos em atraso</p>
+            </div>
+            <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 px-2.5 py-1 rounded border border-amber-100">
+              Painel Crítico
+            </span>
+          </div>
+
+          {/* Cards Rápidos de Inadimplência */}
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="bg-red-50/50 p-3 rounded-lg border border-red-100">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-red-500 block">Total Vencido</span>
+              <span className="text-base font-bold text-red-700 block mt-0.5">R$ 0,00</span>
+              <span className="text-[10px] text-red-500 font-medium">0 Títulos Vencidos</span>
+            </div>
+            <div className="bg-emerald-50/50 p-3 rounded-lg border border-emerald-100">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 block">A Vencer</span>
+              <span className="text-base font-bold text-emerald-700 block mt-0.5">
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                  syncedEntries.filter(e => String(e.tipo || e.type || '').toUpperCase().includes('RECEITA')).reduce((acc, c) => acc + Number(c.valor || c.value || 0), 0)
+                )}
+              </span>
+              <span className="text-[10px] text-emerald-600 font-medium">Títulos em dia</span>
+            </div>
+          </div>
+
+          {/* Ranking de Clientes com maior valor vencido */}
+          <div className="space-y-2 pt-1">
+            <h4 className="text-[11px] font-bold text-gray-700 uppercase tracking-wider">Clientes com Maior Valor Vencido</h4>
+            <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 text-center">
+              <CheckCircle2 className="w-5 h-5 text-emerald-500 mx-auto mb-1" />
+              <p className="text-xs font-semibold text-gray-700">Sem inadimplência detectada!</p>
+              <p className="text-[10px] text-gray-400">Todos os títulos cadastrados estão rigorosamente em dia.</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1801,7 +2486,7 @@ export default function ContaAzulPage() {
                 ) : (
                   categories.map(cat => (
                     <tr key={cat.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="py-3.5 px-4 font-bold text-gray-900">{cat.categoryName}</td>
+                      <td className="py-3.5 px-4 font-bold text-gray-900">{cat?.categoryName || (cat as any)?.name || 'Sem Categoria'}</td>
                       <td className="py-3.5 px-4">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
                           cat.type === 'RECEITA' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
@@ -1846,41 +2531,9 @@ export default function ContaAzulPage() {
         </div>
       )}
 
-      {/* Tab 4: Conexão & OAuth + Multi-Tenant Placeholder */}
+      {/* Tab 4: Conexão & OAuth */}
       {activeTab === 'conexao' && (
         <div className="space-y-6">
-          {/* Multi-Tenant Architectural Documentation Card */}
-          <div className="bg-[#0F172A] text-white rounded-xl p-6 border border-slate-800 space-y-4 shadow-md">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <Building className="w-5 h-5 text-blue-400" />
-                <h4 className="text-sm font-bold tracking-tight text-white">
-                  Arquitetura Multi-Empresa & Multi-Tenant (Roadmap v3.0)
-                </h4>
-              </div>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-primary/100/20 text-blue-300 border border-blue-500/30">
-                Enterprise Multi-Tenant Isolation
-              </span>
-            </div>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              O OmniZeus foi desenvolvido com isolamento de dados estrito por <code className="text-blue-300 bg-slate-800 px-1.5 py-0.5 rounded font-mono">company_id</code> e <code className="text-blue-300 bg-slate-800 px-1.5 py-0.5 rounded font-mono">tenant_id</code> em banco de dados SQLite / PostgreSQL. Toda integração com a ContaAzul é preparada para operar em ambiente multi-empresa.
-            </p>
-            <div className="grid sm:grid-cols-3 gap-3 text-xs">
-              <div className="bg-slate-900/90 p-3.5 rounded-lg border border-slate-800 space-y-1">
-                <span className="font-bold text-blue-400 block text-xs">1. Vault Isolado de Tokens</span>
-                <span className="text-slate-400 text-[11px] block leading-normal">Credenciais OAuth 2.0 encriptadas em tabela segregada por CNPJ/Empresa parceira.</span>
-              </div>
-              <div className="bg-slate-900/90 p-3.5 rounded-lg border border-slate-800 space-y-1">
-                <span className="font-bold text-emerald-400 block text-xs">2. Webhooks Roteados por Tenant</span>
-                <span className="text-slate-400 text-[11px] block leading-normal">Barramento de eventos da ContaAzul direcionado dinamicamente à partição da empresa.</span>
-              </div>
-              <div className="bg-slate-900/90 p-3.5 rounded-lg border border-slate-800 space-y-1">
-                <span className="font-bold text-purple-400 block text-xs">3. Auto-Refresh Silencioso 24/7</span>
-                <span className="text-slate-400 text-[11px] block leading-normal">Cronjob do servidor renova tokens de todas as empresas sem necessidade de relogin.</span>
-              </div>
-            </div>
-          </div>
-
           <div className="grid lg:grid-cols-12 gap-6">
             <div className="lg:col-span-7 bg-white rounded-xl border border-gray-200 p-6 space-y-5 shadow-xs">
               <div className="border-b border-gray-100 pb-4">

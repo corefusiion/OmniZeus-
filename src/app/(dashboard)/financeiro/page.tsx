@@ -205,19 +205,20 @@ export default function FinanceiroPage() {
   // Dynamic contracts revenue for DRE calculation
   const [contractsTotalMonthlyRevenue, setContractsTotalMonthlyRevenue] = useState<number>(28450);
 
-  // Load payables and contracts from SQLite via serverDb
   const loadPayablesFromDb = async () => {
     setIsLoading(true);
     try {
-      const data = await fetchPayables();
+      const [data, contractsData] = await Promise.all([
+        fetchPayables(),
+        fetchContracts()
+      ]);
+
       if (Array.isArray(data)) {
         setPayables(data.map(normalizePayable));
       } else {
         setPayables([]);
       }
 
-      // Calculate real total monthly contract revenue from SQLite
-      const contractsData = await fetchContracts();
       if (Array.isArray(contractsData) && contractsData.length > 0) {
         const sum = contractsData.reduce((acc: number, c: any) => {
           const fee = Number(c.monthlyFeeBrl ?? c.monthly_fee_brl ?? 0);
@@ -243,13 +244,26 @@ export default function FinanceiroPage() {
 
     loadPayablesFromDb();
 
-    const handleRoleChange = () => setRole(getActiveRole());
+    // Event listeners para atualização reativa do banco SQLite
     const handleCoinsChange = () => setBalance(getCoinBalance());
-    window.addEventListener("omnizeus_role_change", handleRoleChange);
+    const handleRoleChange = () => {
+      setRole(getActiveRole());
+      loadPayablesFromDb();
+    };
+    const handleCompanyContextChange = () => {
+      loadPayablesFromDb();
+    };
+
     window.addEventListener("omnizeus_coins_change", handleCoinsChange);
+    window.addEventListener("omnizeus_role_change", handleRoleChange);
+    window.addEventListener("omnizeus_company_context_change", handleCompanyContextChange);
+    window.addEventListener("omnizeus_sql_db_change", handleCompanyContextChange);
+
     return () => {
-      window.removeEventListener("omnizeus_role_change", handleRoleChange);
       window.removeEventListener("omnizeus_coins_change", handleCoinsChange);
+      window.removeEventListener("omnizeus_role_change", handleRoleChange);
+      window.removeEventListener("omnizeus_company_context_change", handleCompanyContextChange);
+      window.removeEventListener("omnizeus_sql_db_change", handleCompanyContextChange);
     };
   }, []);
 

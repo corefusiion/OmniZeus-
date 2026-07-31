@@ -14,64 +14,126 @@ export interface ContaAzulTokenData {
   updatedAt: string;
 }
 
+// Structure in omnizeus_contaazul_tokens.json:
+// { "comp_zenitus": { ...ContaAzulTokenData }, "comp_other": { ... } }
+
 const DEFAULT_TOKENS: ContaAzulTokenData = {
-  clientId: "1mbtg7ok5lp46p0j9oir48fda0",
-  clientSecret: "m3mgshckslvubnraqf0d50hcggm4tn6mnlpa7ancvo3m8t5f93l",
+  clientId: "",
+  clientSecret: "",
   accessToken: "",
   refreshToken: "",
   updatedAt: new Date().toISOString()
 };
 
-export function getContaAzulTokens(): ContaAzulTokenData {
+// ─── Read tokens for a specific company ──────────────────────────────────────
+
+export function getContaAzulTokens(companyId: string = 'comp_zenitus'): ContaAzulTokenData {
   try {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    
-    let tokens: ContaAzulTokenData = { ...DEFAULT_TOKENS };
+
+    // New per-company format
     if (fs.existsSync(TOKENS_FILE)) {
       const raw = fs.readFileSync(TOKENS_FILE, "utf-8");
-      tokens = { ...DEFAULT_TOKENS, ...JSON.parse(raw) };
+      const parsed = JSON.parse(raw);
+
+      // If it's the old flat format (has clientId at root), migrate on the fly
+      if (parsed && typeof parsed.clientId === 'string') {
+        const migrated: Record<string, ContaAzulTokenData> = { 'comp_zenitus': { ...DEFAULT_TOKENS, ...parsed } };
+        fs.writeFileSync(TOKENS_FILE, JSON.stringify(migrated, null, 2), "utf-8");
+        return companyId === 'comp_zenitus' ? migrated['comp_zenitus'] : { ...DEFAULT_TOKENS };
+      }
+
+      // New format: object keyed by companyId
+      if (parsed && typeof parsed === 'object') {
+        return { ...DEFAULT_TOKENS, ...(parsed[companyId] || {}) };
+      }
     }
 
-    // Fallback de segurança: se os tokens em TOKENS_FILE estiverem vazios, lê do banco local SQL
-    if ((!tokens.accessToken || !tokens.refreshToken) && fs.existsSync(DB_FILE)) {
-      try {
-        const dbRaw = fs.readFileSync(DB_FILE, "utf-8");
-        const dbJson = JSON.parse(dbRaw);
-        const cfg = dbJson.contaazul_config;
-        if (cfg) {
-          if (cfg.access_token) tokens.accessToken = cfg.access_token;
-          if (cfg.refresh_token) tokens.refreshToken = cfg.refresh_token;
-          if (cfg.client_id) tokens.clientId = cfg.client_id;
-          if (cfg.client_secret) tokens.clientSecret = cfg.client_secret;
-        }
-      } catch (e) {}
+    // Fallback: read from main DB contaazul_config (only for backward compat)
+    if (fs.existsSync(DB_FILE)) {
+      const dbRaw = fs.readFileSync(DB_FILE, "utf-8");
+      const dbJson = JSON.parse(dbRaw);
+      const cfg = Array.isArray(dbJson.contaazul_config)
+        ? dbJson.contaazul_config.find((c: any) => c.company_id === companyId)
+        : (companyId === 'comp_zenitus' ? dbJson.contaazul_config : null);
+      if (cfg) {
+        return {
+          ...DEFAULT_TOKENS,
+          clientId: cfg.client_id || '',
+          clientSecret: cfg.client_secret || '',
+          accessToken: cfg.access_token || '',
+          refreshToken: cfg.refresh_token || '',
+          updatedAt: cfg.updated_at || new Date().toISOString()
+        };
+      }
     }
 
-    return tokens;
+    return { ...DEFAULT_TOKENS };
   } catch (e) {
-    return DEFAULT_TOKENS;
+    return { ...DEFAULT_TOKENS };
   }
 }
 
-export function saveContaAzulTokens(tokens: Partial<ContaAzulTokenData>): ContaAzulTokenData {
+// ─── Save tokens for a specific company ──────────────────────────────────────
+
+export function saveContaAzulTokens(
+  tokensOrCompanyId: Partial<ContaAzulTokenData> | string,
+  tokensArg?: Partial<ContaAzulTokenData>
+): ContaAzulTokenData {
+  // Overloaded: saveContaAzulTokens(companyId, tokens) OR saveContaAzulTokens(tokens) [legacy]
+  let companyId: string;
+  let tokens: Partial<ContaAzulTokenData>;
+
+  if (typeof tokensOrCompanyId === 'string') {
+    companyId = tokensOrCompanyId;
+    tokens = tokensArg || {};
+  } else {
+    companyId = 'comp_zenitus';
+    tokens = tokensOrCompanyId;
+  }
+
   try {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    const current = getContaAzulTokens();
-    const updated = {
+
+    // Read current per-company map
+    let tokenMap: Record<string, ContaAzulTokenData> = {};
+    if (fs.existsSync(TOKENS_FILE)) {
+      const raw = fs.readFileSync(TOKENS_FILE, "utf-8");
+      const parsed = JSON.parse(raw);
+      // Handle old flat format
+      if (parsed && typeof parsed.clientId === 'string') {
+        tokenMap = { 'comp_zenitus': { ...DEFAULT_TOKENS, ...parsed } };
+      } else {
+        tokenMap = parsed || {};
+      }
+    }
+
+    const current = tokenMap[companyId] || { ...DEFAULT_TOKENS };
+    const updated: ContaAzulTokenData = {
       ...current,
       ...tokens,
       updatedAt: new Date().toISOString()
     };
-    
-    // 1. Salva em omnizeus_contaazul_tokens.json
-    fs.writeFileSync(TOKENS_FILE, JSON.stringify(updated, null, 2), "utf-8");
 
-    // 2. Sincroniza em segundo plano com omnizeus_local_sql_database.json (contaazul_config)
+    tokenMap[companyId] = updated;
+    fs.writeFileSync(TOKENS_FILE, JSON.stringify(tokenMap, null, 2), "utf-8");
+
+    // Sync to main DB contaazul_config array
     if (fs.existsSync(DB_FILE)) {
       try {
         const dbRaw = fs.readFileSync(DB_FILE, "utf-8");
         const dbJson = JSON.parse(dbRaw);
-        dbJson.contaazul_config = {
+
+        // Migrate contaazul_config to array format if needed
+        if (!Array.isArray(dbJson.contaazul_config)) {
+          dbJson.contaazul_config = dbJson.contaazul_config
+            ? [{ company_id: 'comp_zenitus', ...dbJson.contaazul_config }]
+            : [];
+        }
+
+        const cfgIndex = dbJson.contaazul_config.findIndex((c: any) => c.company_id === companyId);
+        const cfgEntry = {
+          company_id: companyId,
           client_id: updated.clientId,
           client_secret: updated.clientSecret,
           access_token: updated.accessToken,
@@ -79,30 +141,40 @@ export function saveContaAzulTokens(tokens: Partial<ContaAzulTokenData>): ContaA
           is_connected: !!(updated.accessToken && updated.refreshToken),
           updated_at: updated.updatedAt
         };
+
+        if (cfgIndex >= 0) {
+          dbJson.contaazul_config[cfgIndex] = cfgEntry;
+        } else {
+          dbJson.contaazul_config.push(cfgEntry);
+        }
+
         fs.writeFileSync(DB_FILE, JSON.stringify(dbJson, null, 2), "utf-8");
       } catch (e) {}
     }
 
     return updated;
   } catch (e) {
-    return DEFAULT_TOKENS;
+    return { ...DEFAULT_TOKENS };
   }
 }
+
 
 /**
  * Executes a fetch request to ContaAzul API v2 with automatic silent background token renewal.
  * If HTTP 401 is received, it transparently refreshes the OAuth token and retries the request.
+ * companyId scopes the token lookup to the correct tenant.
  */
 export async function fetchWithAutoRefresh(
   url: string,
   options: RequestInit = {},
-  passedTokens?: { accessToken?: string; refreshToken?: string; clientId?: string; clientSecret?: string }
+  passedTokens?: { accessToken?: string; refreshToken?: string; clientId?: string; clientSecret?: string },
+  companyId: string = 'comp_zenitus'
 ): Promise<{ res: Response; newAccessToken?: string; newRefreshToken?: string }> {
-  let stored = getContaAzulTokens();
+  let stored = getContaAzulTokens(companyId);
 
   // Se o disco não possuir accessToken mas o frontend enviou, atualiza
   if (!stored.accessToken && passedTokens?.accessToken) {
-    stored = saveContaAzulTokens({
+    stored = saveContaAzulTokens(companyId, {
       accessToken: passedTokens.accessToken,
       refreshToken: passedTokens.refreshToken || stored.refreshToken,
       clientId: passedTokens.clientId || stored.clientId,
@@ -113,8 +185,9 @@ export async function fetchWithAutoRefresh(
   // Prioriza SEMPRE os tokens mais recentes gerenciados no disco
   let activeAccessToken = stored.accessToken || passedTokens?.accessToken;
   let activeRefreshToken = stored.refreshToken || passedTokens?.refreshToken;
-  let activeClientId = stored.clientId || passedTokens?.clientId || "1mbtg7ok5lp46p0j9oir48fda0";
-  let activeClientSecret = stored.clientSecret || passedTokens?.clientSecret || "m3mgshckslvubnraqf0d50hcggm4tn6mnlpa7ancvo3m8t5f93l";
+  let activeClientId = stored.clientId || passedTokens?.clientId || "";
+  let activeClientSecret = stored.clientSecret || passedTokens?.clientSecret || "";
+
 
   const buildHeaders = (token: string) => {
     const origHeaders = { ...((options.headers as Record<string, string>) || {}) };
@@ -177,7 +250,7 @@ export async function fetchWithAutoRefresh(
       if (refreshData.refresh_token) activeRefreshToken = refreshData.refresh_token;
 
       // Grava permanentemente as novas chaves renovadas
-      saveContaAzulTokens({
+      saveContaAzulTokens(companyId, {
         accessToken: activeAccessToken,
         refreshToken: activeRefreshToken,
         clientId: activeClientId,

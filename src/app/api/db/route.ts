@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { getSession } from "@/lib/auth/session";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
@@ -16,6 +17,7 @@ export interface DatabaseSchema {
     evolution_api_key: string;
     stripe_pub_key: string;
     stripe_secret_key: string;
+    stripe_webhook_secret?: string;
     custom_ai_enabled?: boolean;
     custom_ai_url?: string;
     custom_ai_key?: string;
@@ -37,6 +39,8 @@ export interface DatabaseSchema {
     created_at: string;
     tradeName?: string;
     activeClientsCount?: number;
+    company_context?: string;
+    ai_notes?: string;
   }[];
   employees: {
     id: string;
@@ -49,8 +53,10 @@ export interface DatabaseSchema {
     status: string;
     created_at: string;
   }[];
+
   purchase_requests: {
     id: string;
+    company_id?: string;
     req_number: string;
     requester_name: string;
     department: string;
@@ -67,6 +73,7 @@ export interface DatabaseSchema {
   }[];
   contracts: {
     id: string;
+    company_id?: string;
     contract_number: string;
     client_name: string;
     cnpj: string;
@@ -85,6 +92,7 @@ export interface DatabaseSchema {
   }[];
   tasks: {
     id: string;
+    company_id?: string;
     title: string;
     client: string;
     assignee: string;
@@ -93,7 +101,6 @@ export interface DatabaseSchema {
     time_spent_sec: number;
     gemini_suggestion?: string;
     created_at: string;
-    company_id?: string;
     started_at?: string | null;
     completed_at?: string | null;
     duration_sec?: number | null;
@@ -102,6 +109,7 @@ export interface DatabaseSchema {
   }[];
   payables: {
     id: string;
+    company_id?: string;
     description: string;
     vendor: string;
     value_brl: number;
@@ -111,7 +119,6 @@ export interface DatabaseSchema {
     fornecedor?: string;
     valor?: number;
     vencimento?: string;
-    company_id?: string;
     vendor_cnpj?: string | null;
     category?: string;
     cost_center?: string;
@@ -127,6 +134,7 @@ export interface DatabaseSchema {
   contaazul_customers: any[];
   custom_agents: {
     id: string;
+    company_id?: string;
     label: string;
     category: string;
     systemPrompt?: string;
@@ -137,14 +145,7 @@ export interface DatabaseSchema {
     createdAt?: string;
     created_at?: string;
   }[];
-  contaazul_config: {
-    client_id?: string;
-    client_secret?: string;
-    access_token?: string;
-    refresh_token?: string;
-    is_connected?: boolean;
-    updated_at?: string;
-  };
+  contaazul_config: any;
   contaazul_clients: any[];
   contaazul_suppliers: any[];
   contaazul_entries: any[];
@@ -152,8 +153,10 @@ export interface DatabaseSchema {
   dashboard_metrics: any[];
   ai_stress_test_logs: any[];
   ai_usage_metrics: any[];
-  audit_logs: any[];
+  ai_usage_logs: any[];
+  audit_logs?: any[];
   contaazul_categories: any[];
+  purchase_orders?: any[];
 }
 
 const DEFAULT_DB: DatabaseSchema = {
@@ -180,79 +183,10 @@ const DEFAULT_DB: DatabaseSchema = {
     ],
     updated_at: new Date().toISOString()
   },
-  companies: [
-    {
-      id: "comp_zenitus",
-      corporate_name: "Zenitus Inteligência Contábil Ltda",
-      cnpj: "42.189.902/0001-55",
-      city: "Salvador",
-      state: "BA",
-      plan: "Business",
-      coins_franchise: 50000,
-      monthly_revenue_brl: 184500.00,
-      status: "Ativo",
-      created_at: new Date().toISOString()
-    },
-    {
-      id: "comp_alpha",
-      corporate_name: "Alpha BPO Financeiro Ltda",
-      cnpj: "18.420.910/0001-88",
-      city: "São Paulo",
-      state: "SP",
-      plan: "Premium",
-      coins_franchise: 15000,
-      monthly_revenue_brl: 92400.00,
-      status: "Ativo",
-      created_at: new Date().toISOString()
-    },
-    {
-      id: "comp_beta",
-      corporate_name: "Beta Tax Consultoria Tributária Ltda",
-      cnpj: "33.918.402/0001-12",
-      city: "Curitiba",
-      state: "PR",
-      plan: "Profissional",
-      coins_franchise: 5000,
-      monthly_revenue_brl: 48000.00,
-      status: "Ativo",
-      created_at: new Date().toISOString()
-    }
-  ],
-  employees: [
-    {
-      id: "emp_1",
-      company_id: "comp_zenitus",
-      name: "Carlos Mendes",
-      email: "carlos@zenitus.com.br",
-      department: "Diretoria Contábil & Master",
-      role: "gestor",
-      allowed_modules: ["omni-ia", "financeiro", "contaazul", "whatsapp-bot", "tarefas", "documentos", "apresentacoes"],
-      status: "Ativo",
-      created_at: new Date().toISOString()
-    },
-    {
-      id: "emp_alpha_1",
-      company_id: "comp_alpha",
-      name: "Roberto Santos",
-      email: "roberto@alphabpo.com.br",
-      department: "Gerência Operacional",
-      role: "gestor",
-      allowed_modules: ["omni-ia", "financeiro", "tarefas", "documentos"],
-      status: "Ativo",
-      created_at: new Date().toISOString()
-    },
-    {
-      id: "emp_beta_1",
-      company_id: "comp_beta",
-      name: "Fernanda Lima",
-      email: "fernanda@betatax.com.br",
-      department: "Consultoria Tributária",
-      role: "gestor",
-      allowed_modules: ["omni-ia", "tarefas", "apresentacoes"],
-      status: "Ativo",
-      created_at: new Date().toISOString()
-    }
-  ],
+  companies: [],
+  employees: [],
+  purchase_orders: [],
+
   purchase_requests: [],
   contracts: [],
   tasks: [],
@@ -281,6 +215,7 @@ const DEFAULT_DB: DatabaseSchema = {
   dashboard_metrics: [],
   ai_stress_test_logs: [],
   ai_usage_metrics: [],
+  ai_usage_logs: [],
   contaazul_categories: []
 };
 
@@ -293,7 +228,8 @@ function getLocalDbFile(): DatabaseSchema {
       fs.writeFileSync(DB_FILE_PATH, JSON.stringify(DEFAULT_DB, null, 2), "utf-8");
       return DEFAULT_DB;
     }
-    const raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
+    let raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
+    if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
     const db = JSON.parse(raw);
     
     let modified = false;
@@ -323,13 +259,65 @@ function saveLocalDbFile(db: DatabaseSchema): void {
   }
 }
 
+// Global tables that are NOT scoped to a single tenant
+const GLOBAL_TABLES = ["settings", "companies", "custom_job_roles", "audit_logs", "purchase_orders"];
+
 export async function GET(req: NextRequest) {
   const db = getLocalDbFile();
   const url = new URL(req.url);
   const table = url.searchParams.get("table");
 
+  // Read authenticated session from HttpOnly cookie
+  const session = getSession(req);
+  if (!session) {
+    return NextResponse.json(
+      { error: "Acesso negado. Faça login para continuar.", code: "UNAUTHORIZED" },
+      { status: 401 }
+    );
+  }
+
+  const isSuperAdmin = session.role === "super_adm";
+  const requestedCompanyId = url.searchParams.get("company_id") || url.searchParams.get("companyId") || req.headers.get("x-company-id");
+
+  // Strict tenant security check for non-Super Admin users
+  if (!isSuperAdmin && requestedCompanyId && requestedCompanyId !== "global" && requestedCompanyId !== session.companyId) {
+    return NextResponse.json(
+      { error: "Acesso negado. Você não possui permissão para consultar dados de outra empresa.", code: "FORBIDDEN" },
+      { status: 403 }
+    );
+  }
+
+  const effectiveCompanyId = isSuperAdmin
+    ? (requestedCompanyId || "global")
+    : session.companyId;
+
   if (table) {
-    const val = (db as any)[table];
+    let val = (db as any)[table];
+
+    // Payables alias fallback
+    if (val === undefined && table === "payables_list") {
+      val = (db as any)["omnizeus_payables_list"] || (db as any)["payables"] || [];
+    }
+
+    // Special scoping for companies table: Non-super_adm only sees their assigned company
+    if (table === "companies" && Array.isArray(val) && !isSuperAdmin) {
+      const myCompany = val.filter((c: any) => c.id === session.companyId);
+      return NextResponse.json({ data: myCompany });
+    }
+
+    if (Array.isArray(val) && !GLOBAL_TABLES.includes(table)) {
+      if (isSuperAdmin && (effectiveCompanyId === "global" || !effectiveCompanyId)) {
+        return NextResponse.json({ data: val });
+      }
+
+      // Filter strictly by company_id when a specific company is selected
+      const filtered = val.filter((item: any) => {
+        const itemCompany = item.company_id || item.companyId;
+        return itemCompany === effectiveCompanyId;
+      });
+      return NextResponse.json({ data: filtered });
+    }
+
     return NextResponse.json({ data: val !== undefined ? val : [] });
   }
 
@@ -341,7 +329,33 @@ export async function POST(req: NextRequest) {
     const { action, table, record, settings, contaazul_config } = await req.json();
     const db = getLocalDbFile();
 
+    const session = getSession(req);
+    if (!session) {
+      return NextResponse.json(
+        { error: "Acesso negado. Faça login para continuar.", code: "UNAUTHORIZED" },
+        { status: 401 }
+      );
+    }
+
+    const isSuperAdmin = session.role === "super_adm";
+    const requestedCompanyId = req.headers.get("x-company-id");
+
+    // Non-Super Admins cannot override tenant context
+    if (!isSuperAdmin && requestedCompanyId && requestedCompanyId !== session.companyId) {
+      return NextResponse.json(
+        { error: "Acesso negado. Operação não permitida para outra empresa.", code: "FORBIDDEN" },
+        { status: 403 }
+      );
+    }
+
+    const effectiveCompanyId = isSuperAdmin
+      ? (requestedCompanyId || session.companyId || "comp_zenitus")
+      : session.companyId;
+
     if (action === "update_settings" && settings) {
+      if (!isSuperAdmin) {
+        return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+      }
       db.settings = {
         ...db.settings,
         ...settings,
@@ -362,6 +376,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "set_table" && table && record !== undefined) {
+      if (!isSuperAdmin) {
+        return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+      }
       (db as any)[table] = record;
       saveLocalDbFile(db);
       return NextResponse.json({ success: true, record });
@@ -371,6 +388,11 @@ export async function POST(req: NextRequest) {
       if (!Array.isArray((db as any)[table])) {
         (db as any)[table] = [];
       }
+      // Ensure company_id is attached to inserted records
+      if (!GLOBAL_TABLES.includes(table)) {
+        record.company_id = effectiveCompanyId;
+      }
+
       (db as any)[table].unshift(record);
       saveLocalDbFile(db);
       return NextResponse.json({ success: true, record });
@@ -379,7 +401,16 @@ export async function POST(req: NextRequest) {
     if (action === "update" && table && record && record.id) {
       const list = (db as any)[table];
       if (Array.isArray(list)) {
-        (db as any)[table] = list.map((item: any) => item.id === record.id ? { ...item, ...record } : item);
+        (db as any)[table] = list.map((item: any) => {
+          if (item.id === record.id) {
+            // Assert tenant ownership unless Super Admin
+            if (!isSuperAdmin && item.company_id && item.company_id !== effectiveCompanyId) {
+              return item; // Do not modify
+            }
+            return { ...item, ...record };
+          }
+          return item;
+        });
       }
       saveLocalDbFile(db);
       return NextResponse.json({ success: true, record });
@@ -388,7 +419,16 @@ export async function POST(req: NextRequest) {
     if (action === "delete" && table && record && record.id) {
       const list = (db as any)[table];
       if (Array.isArray(list)) {
-        (db as any)[table] = list.filter((item: any) => item.id !== record.id);
+        (db as any)[table] = list.filter((item: any) => {
+          if (item.id === record.id) {
+            // Assert tenant ownership unless Super Admin
+            if (!isSuperAdmin && item.company_id && item.company_id !== effectiveCompanyId) {
+              return true; // Keep record (unauthorized delete attempt)
+            }
+            return false; // Remove
+          }
+          return true;
+        });
       }
       saveLocalDbFile(db);
       return NextResponse.json({ success: true });

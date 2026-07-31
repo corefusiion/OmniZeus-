@@ -89,13 +89,15 @@ export default function DashboardPage() {
     async function loadDashboardData() {
       setIsLoading(true);
       try {
-        let payables = await fetchPayables();
-        let contracts = await fetchContracts();
-        let requests = await fetchPurchaseRequests();
-        let tasks = await fetchTasks();
-        let metrics = await fetchDashboardMetrics();
-        let caClients = await fetchContaAzulClients();
-        let caEntries = await fetchContaAzulEntries();
+        let [payables, contracts, requests, tasks, metrics, caClients, caEntries] = await Promise.all([
+          fetchPayables(),
+          fetchContracts(),
+          fetchPurchaseRequests(),
+          fetchTasks(),
+          fetchDashboardMetrics(),
+          fetchContaAzulClients(),
+          fetchContaAzulEntries()
+        ]);
 
         setContaAzulClients(caClients || []);
         setContaAzulEntries(caEntries || []);
@@ -163,7 +165,7 @@ export default function DashboardPage() {
 
         setMonthlyData(dynamicTrend);
       } catch (err) {
-        console.error("Error loading dashboard data:", err);
+        console.error("Erro ao carregar dados analíticos do SQLite:", err);
       } finally {
         setIsLoading(false);
       }
@@ -171,9 +173,23 @@ export default function DashboardPage() {
 
     loadDashboardData();
 
-    const handleRoleChange = () => setRole(getActiveRole());
+    const handleRoleChange = () => {
+      setRole(getActiveRole());
+      loadDashboardData();
+    };
+    const handleContextChange = () => {
+      loadDashboardData();
+    };
+
     window.addEventListener("omnizeus_role_change", handleRoleChange);
-    return () => window.removeEventListener("omnizeus_role_change", handleRoleChange);
+    window.addEventListener("omnizeus_company_context_change", handleContextChange);
+    window.addEventListener("omnizeus_sql_db_change", handleContextChange);
+
+    return () => {
+      window.removeEventListener("omnizeus_role_change", handleRoleChange);
+      window.removeEventListener("omnizeus_company_context_change", handleContextChange);
+      window.removeEventListener("omnizeus_sql_db_change", handleContextChange);
+    };
   }, []);
 
   const handleExportPDF = () => {

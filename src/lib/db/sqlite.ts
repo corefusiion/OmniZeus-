@@ -53,52 +53,7 @@ export interface DbSchema {
 const defaultSeedDb: DbSchema = {
   conversations: [],
   messages: [],
-  tasks: [
-    {
-      id: "t_501",
-      title: "Apurar DAS Simples Nacional e enviar ao cliente",
-      client: "Atacadão das Tintas Salvador Ltda",
-      assignee: "Juliana Lima",
-      priority: "alta",
-      status: "em_andamento",
-      time_spent_sec: 1420,
-      gemini_suggestion: "Resolução Automática Gemini 2.5 Pro: Parâmetros conferidos no e-CAC e SPED.",
-      created_at: "2026-07-29T08:30:00.000Z"
-    },
-    {
-      id: "t_502",
-      title: "Conciliação Bancária Extrato OFX vs ContaAzul",
-      client: "Supermercado Nova Era Eireli",
-      assignee: "Carlos Mendes",
-      priority: "alta",
-      status: "pendente",
-      time_spent_sec: 0,
-      gemini_suggestion: "Resolução Automática Gemini 2.5 Pro: Importação de arquivo OFX pronta.",
-      created_at: "2026-07-29T09:00:00.000Z"
-    },
-    {
-      id: "t_503",
-      title: "Envio da EFD-Reinf e DCTFWeb referente mês anterior",
-      client: "Clínica Médica Vida & Saúde S/S",
-      assignee: "Juliana Lima",
-      priority: "media",
-      status: "concluido",
-      time_spent_sec: 2850,
-      gemini_suggestion: "Resolução Automática Gemini 2.5 Pro: Transmissão da DCTFWeb validada.",
-      created_at: "2026-07-28T10:00:00.000Z"
-    },
-    {
-      id: "t_504",
-      title: "Elaboração de DRE Gerencial e Balancete Mensal",
-      client: "Construtora Horizonte Azul S.A.",
-      assignee: "Carlos Mendes",
-      priority: "baixa",
-      status: "pendente",
-      time_spent_sec: 0,
-      gemini_suggestion: "Resolução Automática Gemini 2.5 Pro: Estrutura da DRE pronta.",
-      created_at: "2026-07-29T09:45:00.000Z"
-    }
-  ],
+  tasks: [], // No mock data — tasks come exclusively from the server DB
   whatsapp_logs: [],
   coin_transactions: []
 };
@@ -109,7 +64,8 @@ let dbFetched = false;
 export async function syncSqlDbWithServer(): Promise<DbSchema> {
   try {
     const tasks = await fetchServerTable<any>('tasks');
-    if (tasks && tasks.length > 0) {
+    // Always replace from DB — even if DB is empty (fixes stale-mock bug)
+    if (Array.isArray(tasks)) {
       inMemoryDb.tasks = tasks.map((r: any) => ({
         id: r.id,
         title: r.title || '',
@@ -123,11 +79,11 @@ export async function syncSqlDbWithServer(): Promise<DbSchema> {
       }));
     }
     const conversations = await fetchServerTable<any>('conversations');
-    if (conversations && conversations.length > 0) {
+    if (Array.isArray(conversations)) {
       inMemoryDb.conversations = conversations;
     }
     const messages = await fetchServerTable<any>('messages');
-    if (messages && messages.length > 0) {
+    if (Array.isArray(messages)) {
       inMemoryDb.messages = messages;
     }
     dbFetched = true;

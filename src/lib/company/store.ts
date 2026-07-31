@@ -17,8 +17,22 @@ export interface CompanyProfile {
   activeClientsCount: number;
   monthlyRevenueBrl: number;
   status: 'Ativo' | 'Suspenso';
+  subscription_status?: 'active' | 'past_due' | 'unpaid' | 'canceled' | 'incomplete' | 'trialing';
+  stripe_customer_id?: string;
+  stripe_subscription_id?: string;
+  subscription_current_period_start?: string;
+  subscription_current_period_end?: string;
+  grace_period_ends_at?: string;
+  suspension_reason?: string;
+  companyContext?: string;
+  aiNotes?: string;
+  openrouterApiKey?: string;
+  openrouterKeyMasked?: string;
+  openrouterKeyStatus?: 'connected' | 'not_configured' | 'error' | 'master_fallback';
+  openrouterKeyTestedAt?: string;
   createdAt: string;
 }
+
 
 export interface EmployeeUser {
   id: string;
@@ -29,7 +43,11 @@ export interface EmployeeUser {
   role: 'gestor' | 'funcionario';
   allowedModules: string[]; // ['omni-ia', 'financeiro', 'whatsapp-bot', 'tarefas', 'documentos', 'apresentacoes', 'contaazul']
   birthDate?: string;
-  status: 'Ativo' | 'Inativo';
+  status: 'Ativo' | 'Inativo' | 'Convite pendente' | 'Primeiro acesso pendente' | 'Bloqueado';
+  mustChangePassword?: boolean;
+  passwordHash?: string;
+  passwordChangedAt?: string;
+  lastLoginAt?: string;
   createdAt: string;
 }
 
@@ -43,86 +61,11 @@ export const ALL_SYSTEM_MODULES = [
   { id: 'apresentacoes', label: 'Apresentações Decks' },
 ];
 
-export const INITIAL_COMPANIES: CompanyProfile[] = [
-  {
-    id: 'comp_zenitus',
-    corporateName: 'Zenitus Inteligência Contábil Ltda',
-    tradeName: 'Zenitus Contábil',
-    cnpj: '42.189.902/0001-55',
-    city: 'Salvador',
-    state: 'BA',
-    plan: 'Business',
-    coinsFranchise: 50000,
-    activeClientsCount: 142,
-    monthlyRevenueBrl: 1990.00,
-    status: 'Ativo',
-    createdAt: '2026-01-15T10:00:00.000Z'
-  },
-  {
-    id: 'comp_alpha',
-    corporateName: 'Alpha BPO Financeiro Ltda',
-    tradeName: 'Alpha BPO',
-    cnpj: '18.420.910/0001-88',
-    city: 'São Paulo',
-    state: 'SP',
-    plan: 'Premium',
-    coinsFranchise: 15000,
-    activeClientsCount: 86,
-    monthlyRevenueBrl: 890.00,
-    status: 'Ativo',
-    createdAt: '2026-02-01T14:30:00.000Z'
-  },
-  {
-    id: 'comp_beta',
-    corporateName: 'Beta Tax Consultoria Tributária Ltda',
-    tradeName: 'Beta Tax',
-    cnpj: '33.918.402/0001-12',
-    city: 'Curitiba',
-    state: 'PR',
-    plan: 'Profissional',
-    coinsFranchise: 5000,
-    activeClientsCount: 42,
-    monthlyRevenueBrl: 490.00,
-    status: 'Ativo',
-    createdAt: '2026-02-10T09:15:00.000Z'
-  }
-];
+// No mock companies. Real data comes exclusively from the local DB.
+export const INITIAL_COMPANIES: CompanyProfile[] = [];
 
-export const INITIAL_EMPLOYEES: EmployeeUser[] = [
-  {
-    id: 'emp_1',
-    companyId: 'comp_zenitus',
-    name: 'Carlos Mendes',
-    email: 'carlos@zenitus.com.br',
-    department: 'Diretoria Contábil & Master',
-    role: 'gestor',
-    allowedModules: ['omni-ia', 'financeiro', 'contaazul', 'whatsapp-bot', 'tarefas', 'documentos', 'apresentacoes'],
-    status: 'Ativo',
-    createdAt: '2026-01-15T10:00:00.000Z'
-  },
-  {
-    id: 'emp_alpha_1',
-    companyId: 'comp_alpha',
-    name: 'Roberto Santos',
-    email: 'roberto@alphabpo.com.br',
-    department: 'Gerência Operacional',
-    role: 'gestor',
-    allowedModules: ['omni-ia', 'financeiro', 'tarefas', 'documentos'],
-    status: 'Ativo',
-    createdAt: '2026-02-01T14:30:00.000Z'
-  },
-  {
-    id: 'emp_beta_1',
-    companyId: 'comp_beta',
-    name: 'Fernanda Lima',
-    email: 'fernanda@betatax.com.br',
-    department: 'Consultoria Tributária',
-    role: 'gestor',
-    allowedModules: ['omni-ia', 'tarefas', 'apresentacoes'],
-    status: 'Ativo',
-    createdAt: '2026-02-10T09:15:00.000Z'
-  }
-];
+// No mock employees. Real data comes exclusively from the local DB.
+export const INITIAL_EMPLOYEES: EmployeeUser[] = [];
 
 let inMemoryCompanies: CompanyProfile[] = [...INITIAL_COMPANIES];
 let inMemoryEmployees: EmployeeUser[] = [...INITIAL_EMPLOYEES];
@@ -132,21 +75,60 @@ let employeesFetched = false;
 export async function fetchCompaniesFromServer(): Promise<CompanyProfile[]> {
   try {
     const records = await fetchServerTable<any>('companies');
-    if (records && records.length > 0) {
-      inMemoryCompanies = records.map((r: any) => ({
-        id: r.id,
-        corporateName: r.corporateName || r.corporate_name || '',
-        tradeName: r.tradeName || r.trade_name || r.corporate_name || '',
-        cnpj: r.cnpj || '',
-        city: r.city || '',
-        state: r.state || '',
-        plan: r.plan || 'Premium',
-        coinsFranchise: r.coinsFranchise || r.coins_franchise || 15000,
-        activeClientsCount: r.activeClientsCount || r.active_clients_count || 142,
-        monthlyRevenueBrl: r.monthlyRevenueBrl || r.monthly_revenue_brl || 0,
-        status: r.status || 'Ativo',
-        createdAt: r.createdAt || r.created_at || new Date().toISOString()
-      }));
+    // Always replace inMemory from DB — even if DB returns empty array
+    if (Array.isArray(records)) {
+      inMemoryCompanies = records.map((r: any) => {
+        const planName = r.plan || 'Premium';
+        const defaultPlanPrice = planName === 'Business' ? 1990 : planName === 'Premium' ? 890 : 490;
+        const rawRev = r.monthlyRevenueBrl || r.monthly_revenue_brl;
+        const realRevenue = (rawRev && rawRev <= 5000) ? rawRev : defaultPlanPrice;
+
+        const rawKey = r.openrouterApiKey || r.openrouter_api_key || "";
+        const maskedKey = rawKey ? `${rawKey.substring(0, 8)}-••••••••${rawKey.substring(rawKey.length - 4)}` : "";
+        const keyStatus = rawKey ? (r.openrouterKeyStatus || r.openrouter_key_status || 'connected') : 'master_fallback';
+
+        // Grace Period Auto-Suspension Evaluation
+        let opStatus: 'Ativo' | 'Suspenso' = r.status || 'Ativo';
+        const subStatus = r.subscription_status || 'active';
+        const graceEnds = r.grace_period_ends_at;
+
+        if (subStatus === 'past_due' && graceEnds) {
+          const graceEndMs = new Date(graceEnds).getTime();
+          if (!isNaN(graceEndMs) && Date.now() > graceEndMs) {
+            opStatus = 'Suspenso';
+          }
+        } else if (subStatus === 'unpaid' || subStatus === 'canceled') {
+          opStatus = 'Suspenso';
+        }
+
+        return {
+          id: r.id,
+          corporateName: r.corporateName || r.corporate_name || '',
+          tradeName: r.tradeName || r.trade_name || r.corporate_name || '',
+          cnpj: r.cnpj || '',
+          city: r.city || '',
+          state: r.state || '',
+          plan: planName,
+          coinsFranchise: r.coinsFranchise || r.coins_franchise || (planName === 'Business' ? 50000 : planName === 'Premium' ? 15000 : 5000),
+          activeClientsCount: r.activeClientsCount || r.active_clients_count || 1,
+          monthlyRevenueBrl: realRevenue,
+          status: opStatus,
+          subscription_status: subStatus,
+          stripe_customer_id: r.stripe_customer_id || r.stripeCustomerId,
+          stripe_subscription_id: r.stripe_subscription_id || r.stripeSubscriptionId,
+          subscription_current_period_start: r.subscription_current_period_start,
+          subscription_current_period_end: r.subscription_current_period_end,
+          grace_period_ends_at: r.grace_period_ends_at,
+          suspension_reason: r.suspension_reason,
+          companyContext: r.companyContext || r.company_context || '',
+          aiNotes: r.aiNotes || r.ai_notes || '',
+          openrouterApiKey: rawKey,
+          openrouterKeyMasked: maskedKey,
+          openrouterKeyStatus: keyStatus,
+          openrouterKeyTestedAt: r.openrouterKeyTestedAt || r.openrouter_key_tested_at,
+          createdAt: r.createdAt || r.created_at || new Date().toISOString()
+        };
+      });
     }
     companiesFetched = true;
   } catch (err) {
@@ -158,16 +140,21 @@ export async function fetchCompaniesFromServer(): Promise<CompanyProfile[]> {
 export async function fetchEmployeesFromServer(): Promise<EmployeeUser[]> {
   try {
     const records = await fetchServerTable<any>('employees');
-    if (records && records.length > 0) {
+    if (Array.isArray(records)) {
       inMemoryEmployees = records.map((r: any) => ({
         id: r.id,
-        companyId: r.companyId || r.company_id || 'comp_zenitus',
+        companyId: r.companyId || r.company_id || '',
         name: r.name || '',
         email: r.email || '',
         department: r.department || '',
         role: r.role || 'funcionario',
         allowedModules: r.allowedModules || r.allowed_modules || [],
+        birthDate: r.birthDate || r.birth_date,
         status: r.status || 'Ativo',
+        mustChangePassword: typeof r.mustChangePassword === 'boolean' ? r.mustChangePassword : (typeof r.must_change_password === 'boolean' ? r.must_change_password : false),
+        passwordHash: r.passwordHash || r.password_hash || r.password || '',
+        passwordChangedAt: r.passwordChangedAt || r.password_changed_at,
+        lastLoginAt: r.lastLoginAt || r.last_login_at,
         createdAt: r.createdAt || r.created_at || new Date().toISOString()
       }));
     }
@@ -177,6 +164,7 @@ export async function fetchEmployeesFromServer(): Promise<EmployeeUser[]> {
   }
   return inMemoryEmployees;
 }
+
 
 // Company Operations
 export function getCompanies(): CompanyProfile[] {
@@ -209,7 +197,9 @@ export function saveCompany(companyData: Partial<CompanyProfile> & Omit<CompanyP
       plan: updated.plan,
       coins_franchise: updated.coinsFranchise,
       monthly_revenue_brl: updated.monthlyRevenueBrl,
-      status: updated.status
+      status: updated.status,
+      company_context: updated.companyContext || '',
+      ai_notes: updated.aiNotes || ''
     }).catch(() => {});
 
     if (typeof window !== 'undefined') {
@@ -229,6 +219,8 @@ export function saveCompany(companyData: Partial<CompanyProfile> & Omit<CompanyP
       activeClientsCount: companyData.activeClientsCount || 1,
       monthlyRevenueBrl: companyData.monthlyRevenueBrl || (companyData.plan === 'Business' ? 1990 : companyData.plan === 'Premium' ? 890 : 490),
       status: companyData.status || 'Ativo',
+      companyContext: companyData.companyContext || '',
+      aiNotes: companyData.aiNotes || '',
       createdAt: new Date().toISOString()
     };
 
@@ -246,8 +238,11 @@ export function saveCompany(companyData: Partial<CompanyProfile> & Omit<CompanyP
       monthly_revenue_brl: newComp.monthlyRevenueBrl,
       activeClientsCount: newComp.activeClientsCount,
       status: newComp.status,
+      company_context: newComp.companyContext || '',
+      ai_notes: newComp.aiNotes || '',
       created_at: newComp.createdAt
     }).catch(() => {});
+
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('omnizeus_companies_change'));
@@ -285,6 +280,11 @@ export function saveEmployee(empData: Omit<EmployeeUser, 'id' | 'createdAt'>): E
     role: newEmp.role,
     allowed_modules: newEmp.allowedModules,
     status: newEmp.status,
+    must_change_password: newEmp.mustChangePassword ?? false,
+    password_hash: newEmp.passwordHash || '',
+    password_changed_at: newEmp.passwordChangedAt || '',
+    last_login_at: newEmp.lastLoginAt || '',
+    birth_date: newEmp.birthDate || '',
     created_at: newEmp.createdAt
   }).catch(() => {});
 
@@ -308,7 +308,11 @@ export function updateEmployee(employeeData: Partial<EmployeeUser> & { id: strin
       role: target.role,
       allowed_modules: target.allowedModules,
       birth_date: target.birthDate,
-      status: target.status
+      status: target.status,
+      must_change_password: target.mustChangePassword,
+      password_hash: target.passwordHash,
+      password_changed_at: target.passwordChangedAt,
+      last_login_at: target.lastLoginAt
     }).catch(() => {});
   }
 
@@ -316,6 +320,7 @@ export function updateEmployee(employeeData: Partial<EmployeeUser> & { id: strin
     window.dispatchEvent(new Event('omnizeus_employees_change'));
   }
 }
+
 
 export function updateEmployeePermissions(employeeId: string, allowedModules: string[]): void {
   updateEmployee({ id: employeeId, allowedModules });

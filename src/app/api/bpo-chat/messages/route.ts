@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import fs from "fs";
 import path from "path";
+import { getSession } from "@/lib/auth/session";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
@@ -13,7 +14,8 @@ function getDbData() {
       fs.writeFileSync(DB_FILE_PATH, JSON.stringify(defaultDb, null, 2), "utf-8");
       return defaultDb;
     }
-    const raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
+    let raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
+    if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
     const parsed = JSON.parse(raw);
     if (!parsed.conversations) parsed.conversations = [];
     if (!parsed.messages) parsed.messages = [];
@@ -32,8 +34,9 @@ function saveDbData(data: any) {
   }
 }
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
+    const session = getSession(req);
     const { searchParams } = new URL(req.url);
     const conversationId = searchParams.get("conversationId");
 
@@ -42,6 +45,15 @@ export async function GET(req: Request) {
     }
 
     const db = getDbData();
+
+    // Verify conversation tenant ownership if session is present
+    if (session && session.role !== "super_adm") {
+      const conv = (db.conversations || []).find((c: any) => c.id === conversationId);
+      if (conv && conv.company_id && conv.company_id !== session.companyId) {
+        return NextResponse.json({ success: false, error: "Acesso não autorizado a esta conversa." }, { status: 403 });
+      }
+    }
+
     const filteredMsgs = (db.messages || []).filter((m: any) => m.conversation_id === conversationId)
       .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
@@ -51,13 +63,19 @@ export async function GET(req: Request) {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const { conversationId, content, model, provider, accessToken, refreshToken, clientId, clientSecret } = await req.json();
+    const session = getSession(req);
+    const { conversationId, content, model, provider, accessToken, refreshToken, clientId, clientSecret, companyId } = await req.json();
 
     if (!conversationId || !content) {
       return NextResponse.json({ success: false, error: "ID da conversa e conteúdo são obrigatórios." }, { status: 400 });
     }
+
+    const activeTenantId = session
+      ? (session.role === "super_adm" && companyId ? companyId : session.companyId)
+      : (companyId || req.headers.get("x-company-id") || "comp_zenitus");
+
 
     const db = getDbData();
     const now = new Date().toISOString();
@@ -153,39 +171,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // Configurações dinâmicas baseadas no painel Super ADM
-    const dbSettings = db.settings || {};
-    const useCustomEndpoint = dbSettings.custom_ai_enabled === true;
-    const aiEndpoint = useCustomEndpoint && dbSettings.custom_ai_url 
-      ? `${dbSettings.custom_ai_url}/chat/completions` 
-      : "https://openrouter.ai/api/v1/chat/completions";
-      
-    const apiKey = useCustomEndpoint && dbSettings.custom_ai_key
-      ? dbSettings.custom_ai_key
-      : process.env.OPENROUTER_API_KEY || dbSettings.openrouter_api_key || "sk-or-v1-mock-key";
-
-    if (!apiKey || apiKey === "sk-or-v1-mock-key") {
-      const errText = "Nenhum provedor de IA está configurado ou chave inválida no momento";
-      const aiErrObj = {
-        id: `msg_${Date.now()}_ai_err`,
-        conversation_id: conversationId,
-        role: "assistant",
-        content: errText,
-        model: model || "google/gemini-2.5-pro",
-        provider: provider || "openrouter",
-        created_at: new Date().toISOString(),
-        isError: true
-      };
-      db.messages.push(aiErrObj);
-      saveDbData(db);
-
-      return NextResponse.json({
-        success: true,
-        message: errText,
-        isConfigError: true
-      });
-    }
-
     // Fetch conversation history for LLM
     const historyMsgs = (db.messages || [])
       .filter((m: any) => m.conversation_id === conversationId)
@@ -210,23 +195,22 @@ Você possui autonomia e autoridade para responder dúvidas contábeis, orientar
 - Data: ${dateStrBr} | Horário de Brasília: ${timeStrBr} | Período: ${periodBr}
 - Se o usuário cumprimentar, responda de forma cordial, profissional e direta ao ponto, apenas dando o ${greetingBr} correspondente ao horário. NUNCA seja sarcástico.`;
 
-    const openRouterRes = await fetch(aiEndpoint, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: (useCustomEndpoint ? dbSettings.custom_ai_model : undefined) || model || "google/gemini-2.5-pro",
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...historyMsgs
-        ]
-      })
+    const { executeAIRequest } = await import("@/lib/ai/openRouterClient");
+
+    const aiRes = await executeAIRequest({
+      companyId: activeTenantId,
+      userRole: 'gestor',
+
+      requestedModel: model || "google/gemini-2.5-pro",
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...historyMsgs
+      ],
+      featureContext: "BPO Chat"
     });
 
-    if (!openRouterRes.ok) {
-      const errText = "Não foi possível obter resposta do servidor da IA (OpenRouter indisponível).";
+    if (aiRes.isError) {
+      const errText = aiRes.content || "Não foi possível obter resposta do servidor da IA.";
       const aiErrObj = {
         id: `msg_${Date.now()}_ai_err`,
         conversation_id: conversationId,
@@ -243,27 +227,7 @@ Você possui autonomia e autoridade para responder dúvidas contábeis, orientar
       return NextResponse.json({ success: true, message: errText, isConfigError: true });
     }
 
-    const rawText = await openRouterRes.text();
-    let aiResponseText = "Entendido! Como posso ajudar você na operação?";
-    try {
-      const aiData = JSON.parse(rawText);
-      aiResponseText = aiData.choices?.[0]?.message?.content || aiResponseText;
-    } catch (parseErr) {
-      // Reconstruir o Stream SSE caso o proxy ignore a ausência do stream: true
-      const lines = rawText.split('\\n');
-      let hasData = false;
-      let streamContent = "";
-      for (const line of lines) {
-        if (line.trim().startsWith('data: ') && !line.includes('[DONE]')) {
-          try {
-            const chunk = JSON.parse(line.replace('data: ', '').trim());
-            streamContent += chunk.choices?.[0]?.delta?.content || chunk.choices?.[0]?.message?.content || "";
-            hasData = true;
-          } catch (e) {}
-        }
-      }
-      if (hasData) aiResponseText = streamContent;
-    }
+    let aiResponseText = aiRes.content;
 
     const aiMsgObj = {
       id: `msg_${Date.now()}_ai`,

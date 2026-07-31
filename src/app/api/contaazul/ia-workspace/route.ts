@@ -139,23 +139,28 @@ DADOS REAIS SINCRONIZADOS DA CONTAAZUL:
 DIRETRIZES DE RESPOSTA (OBRIGATÓRIO):
 1. NÃO imprima blocos de código JSON brutos como \`\`\`json na mensagem. Responda em JSON puro na raiz do corpo HTTP.
 2. NÃO use negrito com asteriscos duplos (**texto**) no meio de frases.
-3. Apenas retorne objetos de criação dentro da array "actions" se a intenção for clara E você tiver os dados. Se for apenas uma intenção genérica, mantenha "actions": [].
-   - Para cadastro de clientes use "type": "CREATE_CLIENT" e passe em "data": {"nome": "...", "nomeFantasia": "...", "tipoPessoa": "Jurídica ou Física", "documento": "...", "email": "...", "telefone": "...", "papel": "Cliente, Fornecedor ou Transportadora", "optanteSimples": "Sim ou Não"}
-   - Para lançamentos financeiros use "type": "CREATE_ENTRY" e passe em "data": {"descricao": "...", "valor": "...", "vencimento": "..."}
-4. Estrutura do JSON base de resposta:
+3. PROIBIDO GERAÇÃO DE LINKS DE IMAGEM MARRKDOWN DO TIPO ![...](sandbox://...) OU ![...](file://...). NUNCA INVENTE CAMINHOS DE SANDBOX!
+4. QUANDO O USUÁRIO SOLICITAR UM GRÁFICO (linha, barras, evolução, despesas, vencimentos), RETORNE O OBJETO JSON "chart" PREENCHIDO com o tipo "line" ou "bar", totais e itens (cada item contendo "label" e "value").
+5. Apenas retorne objetos de criação dentro da array "actions" se a intenção for clara E você tiver os dados.
+6. Estrutura do JSON base de resposta:
 {
   "message": "Sua resposta conversacional em texto limpo e legível.",
+  "chart": {
+    "title": "Gráfico de Linhas — Evolução de Lançamentos",
+    "chartType": "line",
+    "totalPayable": 11500,
+    "totalReceivable": 15400,
+    "netBalance": 3900,
+    "items": [
+      { "label": "02/08", "value": 1100 },
+      { "label": "06/08", "value": 1700 },
+      { "label": "10/08", "value": 2300 },
+      { "label": "14/08", "value": 2900 },
+      { "label": "18/08", "value": 3500 }
+    ]
+  },
   "table": null,
-  "actions": [
-    {
-      "id": "action_123",
-      "type": "CREATE_CLIENT",
-      "label": "Novo Cliente ERP",
-      "description": "Sincronização de cliente para a base do ContaAzul",
-      "data": { "nome": "...", "documento": "...", "email": "..." },
-      "requiresConfirmation": true
-    }
-  ]
+  "actions": []
 }`;
 
           const response = await fetch(apiUrl, {
@@ -195,6 +200,61 @@ DIRETRIZES DE RESPOSTA (OBRIGATÓRIO):
             } else if (rawContent) {
               const cleanMsg = rawContent.replace(/```json/g, '').replace(/```/g, '').replace(/\*\*([^*]+)\*\*/g, '$1').trim();
               parsedResponse = { message: cleanMsg, table: null, actions: [] };
+            }
+
+            // Automatic Table Synthesizer for Client/Supplier/Entry Table Queries
+            const promptLower = prompt.toLowerCase();
+            const db = getLocalDbFile();
+            const clients = db.contaazul_clients || [];
+            const suppliers = db.contaazul_suppliers || [];
+            const entries = db.contaazul_entries || [];
+
+            if (!parsedResponse.table && (promptLower.includes("tabela") || promptLower.includes("liste") || promptLower.includes("quantos") || promptLower.includes("mostrar"))) {
+              if (promptLower.includes("cliente")) {
+                parsedResponse.table = {
+                  columns: [
+                    { key: "name", label: "Nome / Razão Social" },
+                    { key: "document", label: "Documento (CNPJ/CPF)" },
+                    { key: "email", label: "E-mail de Contato" }
+                  ],
+                  rows: clients.map((c: any) => ({
+                    id: c.id,
+                    name: c.name || c.nome || c.company_name || c.razao_social || "Cliente CA",
+                    document: c.document || c.cnpj || c.cpf || c.documento || "Não informado",
+                    email: c.email || "Sem e-mail"
+                  }))
+                };
+              } else if (promptLower.includes("fornecedor")) {
+                parsedResponse.table = {
+                  columns: [
+                    { key: "name", label: "Razão Social / Fornecedor" },
+                    { key: "document", label: "CNPJ / Documento" },
+                    { key: "email", label: "E-mail de Contato" }
+                  ],
+                  rows: suppliers.map((s: any) => ({
+                    id: s.id,
+                    name: s.name || s.nome || "Fornecedor ERP",
+                    document: s.document || s.cnpj || s.documento || "Não informado",
+                    email: s.email || "Sem e-mail"
+                  }))
+                };
+              } else if (promptLower.includes("lançamento") || promptLower.includes("despesa") || promptLower.includes("conta")) {
+                parsedResponse.table = {
+                  columns: [
+                    { key: "description", label: "Descrição do Título" },
+                    { key: "nome_pessoa", label: "Favorecido" },
+                    { key: "valor", label: "Valor (R$)", type: "currency" },
+                    { key: "situacao", label: "Situação", type: "status" }
+                  ],
+                  rows: entries.map((e: any) => ({
+                    id: e.id || e.id_evento,
+                    description: e.description || e.desc || "Lançamento Financeiro",
+                    nome_pessoa: e.nome_pessoa || e.cliente || e.fornecedor || "-",
+                    valor: Number(e.valor || 0),
+                    situacao: e.situacao || e.status || "PENDENTE"
+                  }))
+                };
+              }
             }
           }
         } catch (e) {

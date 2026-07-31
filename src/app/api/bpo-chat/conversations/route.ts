@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import fs from "fs";
 import path from "path";
+import { getSession } from "@/lib/auth/session";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
@@ -13,7 +14,8 @@ function getDbData() {
       fs.writeFileSync(DB_FILE_PATH, JSON.stringify(defaultDb, null, 2), "utf-8");
       return defaultDb;
     }
-    const raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
+    let raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
+    if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
     const parsed = JSON.parse(raw);
     if (!parsed.conversations) parsed.conversations = [];
     if (!parsed.messages) parsed.messages = [];
@@ -32,16 +34,23 @@ function saveDbData(data: any) {
   }
 }
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
+    const session = getSession(req);
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId") || "super_adm";
-    const companyId = searchParams.get("companyId") || "default_company";
+    const superAdminOverride = searchParams.get("companyId") || req.headers.get("x-company-id");
+
+    const userId = session?.userId || searchParams.get("userId") || "super_adm";
+    const companyId = (session?.role === "super_adm" && superAdminOverride)
+      ? superAdminOverride
+      : (session?.companyId || superAdminOverride || "comp_zenitus");
 
     const db = getDbData();
 
     const filtered = (db.conversations || []).filter((c: any) => 
-      c.user_id === userId && (c.company_id === companyId || !c.company_id) && !c.deleted
+      (c.user_id === userId || session?.role === "super_adm") && 
+      (c.company_id === companyId || !c.company_id) && 
+      !c.deleted
     ).sort((a: any, b: any) => {
       if ((b.pinned ? 1 : 0) !== (a.pinned ? 1 : 0)) {
         return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
@@ -55,9 +64,16 @@ export async function GET(req: Request) {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const { userId, companyId, tenantId, title, model, provider } = await req.json();
+    const session = getSession(req);
+    const body = await req.json();
+    const { title, model, provider } = body;
+    
+    const userId = session?.userId || body.userId || "super_adm";
+    const companyId = session?.companyId || body.companyId || "comp_zenitus";
+    const tenantId = body.tenantId || companyId;
+
     const db = getDbData();
 
     const convId = `conv_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -65,9 +81,9 @@ export async function POST(req: Request) {
 
     const newConv = {
       id: convId,
-      tenant_id: tenantId || "default_tenant",
-      company_id: companyId || "default_company",
-      user_id: userId || "super_adm",
+      tenant_id: tenantId,
+      company_id: companyId,
+      user_id: userId,
       title: title || "Nova Conversa BPO",
       model: model || "google/gemini-2.5-pro",
       provider: provider || "openrouter",
@@ -88,7 +104,7 @@ export async function POST(req: Request) {
   }
 }
 
-export async function PATCH(req: Request) {
+export async function PATCH(req: NextRequest) {
   try {
     const { id, pinned } = await req.json();
     const db = getDbData();
@@ -104,18 +120,27 @@ export async function PATCH(req: Request) {
   }
 }
 
-export async function DELETE(req: Request) {
+export async function DELETE(req: NextRequest) {
   try {
+    const session = getSession(req);
     const { searchParams } = new URL(req.url);
     const convId = searchParams.get("id");
-    const userId = searchParams.get("userId") || "super_adm";
 
     if (!convId) {
       return NextResponse.json({ success: false, error: "ID da conversa ausente." }, { status: 400 });
     }
 
     const db = getDbData();
-    db.conversations = (db.conversations || []).map((c: any) => c.id === convId && c.user_id === userId ? { ...c, deleted: 1 } : c);
+    db.conversations = (db.conversations || []).map((c: any) => {
+      if (c.id === convId) {
+        // Only allow delete if owner or super_adm
+        if (session && session.role !== "super_adm" && c.company_id && c.company_id !== session.companyId) {
+          return c;
+        }
+        return { ...c, deleted: 1 };
+      }
+      return c;
+    });
     db.messages = (db.messages || []).filter((m: any) => m.conversation_id !== convId);
     saveDbData(db);
 
@@ -124,3 +149,4 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
+

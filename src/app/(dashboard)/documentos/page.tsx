@@ -50,16 +50,43 @@ export default function DocumentosPage() {
   const [docContent, setDocContent] = useState("");
   const [copiedNotice, setCopiedNotice] = useState(false);
   const [showNoCoinsModal, setShowNoCoinsModal] = useState(false);
+  const [coinBalance, setCoinBalance] = useState<number>(14250);
+
+  // Dynamic cost per document template
+  const estimatedCoins = template === 'notificacao' ? 80 : template === 'contrato' ? 50 : template === 'procuracao' ? 40 : 30;
+
+  useEffect(() => {
+    import("@/lib/coins/store").then(m => setCoinBalance(m.getCoinBalance()));
+    const handleCoins = () => import("@/lib/coins/store").then(m => setCoinBalance(m.getCoinBalance()));
+    window.addEventListener("omnizeus_coins_change", handleCoins);
+    return () => window.removeEventListener("omnizeus_coins_change", handleCoins);
+  }, []);
 
   // History state for last 4 generated documents
   const [history, setHistory] = useState<{ id: string; title: string; date: string; content: string }[]>([]);
 
   const handleGenerateDoc = async () => {
-    // Deduct 30 OmniCoins
-    const success = deductCoins(30, "Geração Documento PDF A4");
-    if (!success) {
-      setShowNoCoinsModal(true);
-      return;
+    // 1. Consume Coins in backend first
+    try {
+      const consumeRes = await fetch("/api/coins/consume", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agente_id: "gerador_documentos",
+          agente_nome: "Gerador de Documentos A4",
+          modelo: "google/gemini-2.5-pro",
+          funcionalidade: `Geração ${template === 'contrato' ? 'Contrato BPO' : template === 'proposta' ? 'Proposta Comercial' : 'Parecer Notificação'}`,
+          tipo_operacao: "DOCUMENT_A4",
+          coins_consumed: estimatedCoins
+        })
+      });
+
+      if (consumeRes.status === 402) {
+        setShowNoCoinsModal(true);
+        return;
+      }
+    } catch (e) {
+      console.error("Erro ao validar saldo de Coins no backend:", e);
     }
 
     setIsGenerating(true);
@@ -273,13 +300,27 @@ ${clientName.toUpperCase()}`);
             />
           </div>
 
+          {/* Encarte de Estimativa de Consumo de Coins */}
+          <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl space-y-1.5 text-xs">
+            <div className="flex items-center justify-between font-bold text-amber-900">
+              <span className="flex items-center gap-1.5">
+                <span>🪙</span> Custo Estimado da Geração:
+              </span>
+              <span className="text-sm font-extrabold text-amber-800">🪙 {estimatedCoins} OMNICoins</span>
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-slate-600">
+              <span>Saldo Atual: <strong>{coinBalance.toLocaleString('pt-BR')} Coins</strong></span>
+              <span>Saldo Após Geração: <strong>{Math.max(0, coinBalance - estimatedCoins).toLocaleString('pt-BR')} Coins</strong></span>
+            </div>
+          </div>
+
           <button
             onClick={handleGenerateDoc}
             disabled={isGenerating}
             className="w-full py-2.5 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition-all shadow-xs disabled:opacity-50"
           >
             {isGenerating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            <span>{isGenerating ? "Redigindo Minuta com IA..." : "Gerar Documento com IA"}</span>
+            <span>{isGenerating ? "Redigindo Minuta com IA..." : `Gerar documento — ${estimatedCoins} Coins`}</span>
           </button>
         </div>
 

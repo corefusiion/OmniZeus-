@@ -104,17 +104,29 @@ export default function EmpresasPage() {
   // Franchise Coins Edit State inside Tenant
   const [editingFranchise, setEditingFranchise] = useState(false);
   const [newFranchiseValue, setNewFranchiseValue] = useState<number>(15000);
-
-  // New Company Modal State
-  const [showAddCompanyModal, setShowAddCompanyModal] = useState(false);
-  const [newCorpName, setNewCorpName] = useState("");
-  const [newTradeName, setNewTradeName] = useState("");
-  const [newCnpj, setNewCnpj] = useState("");
-  const [newCity, setNewCity] = useState("");
-  const [newState, setNewState] = useState("SP");
-  const [newPlan, setNewPlan] = useState<'Profissional' | 'Premium' | 'Business'>('Premium');
-  const [newFranchise, setNewFranchise] = useState(15000);
   
+  // Manual Sale & Stripe Link Generator Modal State
+  const [showAddCompanyModal, setShowAddCompanyModal] = useState(false);
+  const [responsavelNome, setResponsavelNome] = useState("");
+  const [responsavelEmail, setResponsavelEmail] = useState("");
+  const [responsavelTelefone, setResponsavelTelefone] = useState("");
+  const [responsavelCargo, setResponsavelCargo] = useState("");
+  const [empresaNome, setEmpresaNome] = useState("");
+  const [empresaCnpj, setEmpresaCnpj] = useState("");
+  const [empresaSegmento, setEmpresaSegmento] = useState("Escritório de Contabilidade");
+  const [empresaObservacoes, setEmpresaObservacoes] = useState("");
+  const [selectedPlan, setSelectedPlan] = useState<"test_1_real" | "profissional" | "premium" | "business">("premium");
+  const [incluirContaAzul, setIncluirContaAzul] = useState(false);
+  const [generatingLink, setGeneratingLink] = useState(false);
+  const [generatedLinkData, setGeneratedLinkData] = useState<{
+    orderId: string;
+    checkoutUrl: string;
+    total: number;
+    planName: string;
+    empresa: string;
+  } | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -125,7 +137,7 @@ export default function EmpresasPage() {
     setCompanies(comps);
     setEmployees(getEmployees());
 
-    fetchAuditLogs().then((logs) => {
+    fetchAuditLogs().then((logs: any[]) => {
       if (logs) setAuditLogs(logs);
     }).catch(() => {});
 
@@ -158,7 +170,10 @@ export default function EmpresasPage() {
         console.error("Erro ao carregar chats no empresas/page.tsx", err);
       }
     };
-    loadChatData();
+    
+    if (activeTab === 'chats' && selectedTenant) {
+      loadChatData();
+    }
   }, [activeTab, selectedTenant]);
 
   const isMasterAdmin = user.role === "super_adm" || user.email === "jsgleisson@gmail.com";
@@ -216,32 +231,65 @@ export default function EmpresasPage() {
     setTimeout(() => setSuccessMessage(null), 3500);
   };
 
-  const handleCreateNewTenant = () => {
-    if (!newCorpName.trim() || !newCnpj.trim()) {
-      alert("Por favor, preencha Razão Social e CNPJ da nova empresa.");
+  const handleCreateManualSale = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!responsavelNome.trim() || !responsavelEmail.trim() || !empresaNome.trim() || !empresaCnpj.trim()) {
+      alert("Por favor, preencha todos os campos obrigatórios (*).");
       return;
     }
 
-    const price = newPlan === 'Profissional' ? 490 : newPlan === 'Premium' ? 890 : 1990;
-    saveCompany({
-      corporateName: newCorpName.trim(),
-      tradeName: newTradeName.trim() || newCorpName.trim().split(" ")[0] + " Contábil",
-      cnpj: newCnpj.trim(),
-      city: newCity || "Salvador",
-      state: newState || "BA",
-      plan: newPlan,
-      coinsFranchise: newFranchise,
-      activeClientsCount: 0,
-      monthlyRevenueBrl: price,
-      status: 'Ativo'
-    });
+    setGeneratingLink(true);
+    try {
+      const res = await fetch("/api/checkout/create-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          responsavel_nome: responsavelNome,
+          responsavel_email: responsavelEmail,
+          responsavel_telefone: responsavelTelefone,
+          empresa_nome: empresaNome,
+          empresa_cnpj: empresaCnpj,
+          empresa_segmento: empresaSegmento,
+          empresa_observacoes: empresaObservacoes,
+          plan_id: selectedPlan,
+          incluir_conta_azul: incluirContaAzul,
+          origin_source: "manual_super_admin",
+          created_by_user_id: user?.id || "super_adm",
+          created_by_user_name: user?.name || "Super Admin"
+        })
+      });
 
+      const data = await res.json();
+      if (res.ok && data.checkout_url) {
+        setGeneratedLinkData({
+          orderId: data.order.id,
+          checkoutUrl: data.checkout_url,
+          total: data.order.total_initial_payment,
+          planName: data.order.plan_name,
+          empresa: empresaNome
+        });
+      } else {
+        alert(data.error || "Erro ao gerar link de pagamento.");
+      }
+    } catch (err: any) {
+      alert("Falha na conexão ao gerar link de pagamento.");
+    } finally {
+      setGeneratingLink(false);
+    }
+  };
+
+  const handleResetManualSaleModal = () => {
     setShowAddCompanyModal(false);
-    setNewCorpName("");
-    setNewTradeName("");
-    setNewCnpj("");
-    setSuccessMessage("Nova Empresa cadastrada e provisionada no Master SaaS!");
-    setTimeout(() => setSuccessMessage(null), 3500);
+    setGeneratedLinkData(null);
+    setResponsavelNome("");
+    setResponsavelEmail("");
+    setResponsavelTelefone("");
+    setResponsavelCargo("");
+    setEmpresaNome("");
+    setEmpresaCnpj("");
+    setEmpresaObservacoes("");
+    setSelectedPlan("premium");
+    setIncluirContaAzul(false);
   };
 
   if (!isMasterAdmin) {
@@ -265,121 +313,256 @@ export default function EmpresasPage() {
 
   return (
     <div className="space-y-6 text-slate-900 font-sans pb-12">
-      {/* Modal Cadastrar Nova Empresa */}
+      {/* Modal Nova Venda Manual & Gerador de Link de Pagamento */}
       {showAddCompanyModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl border border-slate-200 p-6 max-w-lg w-full shadow-xl space-y-4">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 md:p-7 max-w-xl w-full shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-primary" />
-                <span>Cadastrar Nova Empresa Contratante</span>
-              </h3>
-              <button onClick={() => setShowAddCompanyModal(false)} className="text-slate-400 hover:text-slate-700">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Fluxo Comercial Super Admin</span>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-emerald-600" />
+                  <span>Nova Venda Manual / Gerar Link de Pagamento</span>
+                </h3>
+              </div>
+              <button onClick={handleResetManualSaleModal} className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3">
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Razão Social:</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Alfa Contabilidade & BPO Eireli"
-                  value={newCorpName}
-                  onChange={(e) => setNewCorpName(e.target.value)}
-                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Nome Fantasia:</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Alfa Contábil"
-                  value={newTradeName}
-                  onChange={(e) => setNewTradeName(e.target.value)}
-                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">CNPJ:</label>
-                  <input
-                    type="text"
-                    placeholder="00.000.000/0001-00"
-                    value={newCnpj}
-                    onChange={(e) => setNewCnpj(e.target.value)}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-primary"
-                  />
+            {!generatedLinkData ? (
+              <form onSubmit={handleCreateManualSale} className="space-y-4 text-xs">
+                {/* 1. Dados do Responsável */}
+                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                    1. Dados do Responsável / Contratante
+                  </span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-600 block mb-1">Nome Completo *:</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: Carlos Eduardo Silva"
+                        value={responsavelNome}
+                        onChange={(e) => setResponsavelNome(e.target.value)}
+                        className="w-full h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 font-medium outline-none focus:border-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-600 block mb-1">E-mail *:</label>
+                      <input
+                        type="email"
+                        required
+                        placeholder="carlos@empresa.com.br"
+                        value={responsavelEmail}
+                        onChange={(e) => setResponsavelEmail(e.target.value)}
+                        className="w-full h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 font-mono outline-none focus:border-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-600 block mb-1">Telefone / WhatsApp *:</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="(11) 98888-7777"
+                        value={responsavelTelefone}
+                        onChange={(e) => setResponsavelTelefone(e.target.value)}
+                        className="w-full h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 font-mono outline-none focus:border-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-600 block mb-1">Cargo / Função:</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Sócio-Diretor / CFO"
+                        value={responsavelCargo}
+                        onChange={(e) => setResponsavelCargo(e.target.value)}
+                        className="w-full h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 font-medium outline-none focus:border-slate-900"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Cidade / UF:</label>
-                  <div className="flex gap-1.5">
+
+                {/* 2. Dados da Empresa */}
+                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                    2. Dados da Empresa Contratante
+                  </span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-600 block mb-1">Razão Social *:</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: Alfa Contabilidade Eireli"
+                        value={empresaNome}
+                        onChange={(e) => setEmpresaNome(e.target.value)}
+                        className="w-full h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 font-bold outline-none focus:border-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-600 block mb-1">CNPJ *:</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="00.000.000/0001-00"
+                        value={empresaCnpj}
+                        onChange={(e) => setEmpresaCnpj(e.target.value)}
+                        className="w-full h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 font-mono font-bold outline-none focus:border-slate-900"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-[10px] font-semibold text-slate-600 block mb-1">Segmento / Ramo:</label>
+                      <select
+                        value={empresaSegmento}
+                        onChange={(e) => setEmpresaSegmento(e.target.value)}
+                        className="w-full h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 font-medium outline-none focus:border-slate-900 cursor-pointer"
+                      >
+                        <option value="Escritório de Contabilidade">Escritório de Contabilidade</option>
+                        <option value="Prestador de BPO Financeiro">Prestador de BPO Financeiro</option>
+                        <option value="Consultoria Tributária & Gestão">Consultoria Tributária & Gestão</option>
+                        <option value="Outro Segmento">Outro Segmento</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Seleção do Plano & Adicionais */}
+                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                    3. Plano Comercial & Adicionais
+                  </span>
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-600 block mb-1">Selecione o Plano:</label>
+                    <select
+                      value={selectedPlan}
+                      onChange={(e) => setSelectedPlan(e.target.value as any)}
+                      className="w-full h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 font-bold outline-none focus:border-slate-900 cursor-pointer"
+                    >
+                      <option value="test_1_real">🧪 Plano Teste — R$ 1,00 (100 Coins/mês)</option>
+                      <option value="profissional">Plano Profissional — R$ 490/mês (5.000 Coins/mês)</option>
+                      <option value="premium">Plano Premium — R$ 890/mês (15.000 Coins/mês)</option>
+                      <option value="business">Plano Business — R$ 1.990/mês (50.000 Coins/mês)</option>
+                    </select>
+                  </div>
+
+                  <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-lg flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-slate-900 block text-xs">Setup & Configuração Guiada Conta Azul</span>
+                      <span className="text-[10px] text-slate-500">Taxa única de integração e onboarding (+ R$ 39,90)</span>
+                    </div>
                     <input
-                      type="text"
-                      placeholder="Salvador"
-                      value={newCity}
-                      onChange={(e) => setNewCity(e.target.value)}
-                      className="w-full h-9 px-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:outline-none focus:border-primary"
-                    />
-                    <input
-                      type="text"
-                      placeholder="BA"
-                      value={newState}
-                      onChange={(e) => setNewState(e.target.value)}
-                      className="w-12 h-9 px-2 text-xs uppercase bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold text-center focus:outline-none focus:border-primary"
+                      type="checkbox"
+                      checked={incluirContaAzul}
+                      onChange={(e) => setIncluirContaAzul(e.target.checked)}
+                      className="w-4 h-4 rounded text-slate-900 accent-slate-900 cursor-pointer"
                     />
                   </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Plano SaaS:</label>
-                  <select
-                    value={newPlan}
-                    onChange={(e) => {
-                      const p = e.target.value as any;
-                      setNewPlan(p);
-                      setNewFranchise(p === 'Profissional' ? 5000 : p === 'Premium' ? 15000 : 50000);
-                    }}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary cursor-pointer"
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={handleResetManualSaleModal}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg"
                   >
-                    <option value="Profissional">Profissional (R$ 490 / 5k Coins)</option>
-                    <option value="Premium">Premium (R$ 890 / 15k Coins)</option>
-                    <option value="Business">Business (R$ 1.990 / 50k Coins)</option>
-                  </select>
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={generatingLink}
+                    className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg shadow-xs flex items-center gap-1.5 disabled:opacity-50 transition-all"
+                  >
+                    {generatingLink ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Gerando Link Stripe...</span>
+                      </>
+                    ) : (
+                      <>
+                        <DollarSign className="w-4 h-4 text-emerald-400" />
+                        <span>Gerar Link de Pagamento</span>
+                      </>
+                    )}
+                  </button>
                 </div>
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Franquia Coins/Mês:</label>
-                  <input
-                    type="number"
-                    value={newFranchise}
-                    onChange={(e) => setNewFranchise(Number(e.target.value))}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:border-primary"
-                  />
+              </form>
+            ) : (
+              /* Link de Pagamento Gerado com Sucesso */
+              <div className="space-y-4 animate-in fade-in zoom-in-95 text-xs">
+                <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl space-y-1">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                    <strong className="text-sm">Link de Pagamento Stripe Gerado com Sucesso!</strong>
+                  </div>
+                  <p className="text-[11px] text-emerald-700">
+                    O pedido de compra foi criado com origem <code className="font-bold">manual_super_admin</code> e aguarda pagamento do cliente.
+                  </p>
+                </div>
+
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2.5">
+                  <div className="flex justify-between border-b border-slate-200 pb-2 font-mono">
+                    <span className="text-slate-400">Número do Pedido:</span>
+                    <strong className="text-slate-900">{generatedLinkData.orderId}</strong>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-200 pb-2">
+                    <span className="text-slate-400">Cliente / Empresa:</span>
+                    <strong className="text-slate-900">{generatedLinkData.empresa}</strong>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-200 pb-2">
+                    <span className="text-slate-400">Plano Selecionado:</span>
+                    <strong className="text-slate-900">{generatedLinkData.planName}</strong>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-200 pb-2 font-mono">
+                    <span className="text-slate-400">Valor Total Inicial:</span>
+                    <strong className="text-emerald-700 text-sm font-extrabold">R$ {generatedLinkData.total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
+                  </div>
+                  <div className="flex justify-between font-mono">
+                    <span className="text-slate-400">Status do Pedido:</span>
+                    <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 font-sans text-[10px] font-bold">
+                      Aguardando Pagamento
+                    </span>
+                  </div>
+                </div>
+
+                {/* Container URL Checkout */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                    Link de Pagamento Stripe Checkout (Envie ao Cliente):
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={generatedLinkData.checkoutUrl}
+                      className="w-full h-10 px-3 text-xs bg-slate-100 border border-slate-200 rounded-lg text-slate-900 font-mono select-all outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(generatedLinkData.checkoutUrl);
+                        setCopiedLink(true);
+                        setTimeout(() => setCopiedLink(false), 2500);
+                      }}
+                      className="h-10 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-all shrink-0"
+                    >
+                      {copiedLink ? "Copiado!" : "Copiar Link"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleResetManualSaleModal}
+                    className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all"
+                  >
+                    Concluir e Fechar
+                  </button>
                 </div>
               </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setShowAddCompanyModal(false)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleCreateNewTenant}
-                className="px-5 py-2 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg shadow-xs flex items-center gap-1.5"
-              >
-                <Building2 className="w-4 h-4" />
-                <span>Cadastrar Empresa</span>
-              </button>
-            </div>
+            )}
           </div>
         </div>
       )}
@@ -408,14 +591,14 @@ export default function EmpresasPage() {
 
             <button
               onClick={() => setShowAddCompanyModal(true)}
-              className="px-4 py-2 bg-primary hover:opacity-90 text-white text-xs font-bold rounded-lg flex items-center gap-2 transition-all shadow-xs shrink-0"
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg flex items-center gap-2 transition-all shadow-xs shrink-0"
             >
               <Plus className="w-4 h-4" />
-              <span>Cadastrar Nova Empresa</span>
+              <span>Nova Venda Manual / Gerar Pagamento</span>
             </button>
           </div>
 
-          {/* Aggregated Platform KPIs (Dynamic MRR Calculation) */}
+          {/* Aggregated Platform KPIs (Dynamic MRR Calculation Real) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2">
               <div className="flex items-center justify-between text-slate-500">
@@ -423,7 +606,7 @@ export default function EmpresasPage() {
                 <Building2 className="w-4 h-4 text-primary" />
               </div>
               <p className="text-2xl font-bold text-slate-900">{totalActiveCompanies} Tenants</p>
-              <p className="text-[10px] text-slate-400">Ambientes totalmente isolados</p>
+              <p className="text-[10px] text-slate-400">Ambientes isolados e provisionados</p>
             </div>
 
             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2">
@@ -431,40 +614,45 @@ export default function EmpresasPage() {
                 <span className="text-xs font-bold uppercase tracking-wider">Receita MRR SaaS</span>
                 <TrendingUp className="w-4 h-4 text-emerald-600" />
               </div>
-              <p className="text-2xl font-bold text-slate-900">
+              <p className="text-2xl font-bold text-emerald-700">
                 R$ {totalMrrSaaS.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
-              <p className="text-[10px] text-emerald-600 font-semibold">Faturamento mensal recorrente real</p>
+              <p className="text-[10px] text-emerald-600 font-semibold">Faturamento mensal recorrente dos planos</p>
             </div>
 
             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2">
               <div className="flex items-center justify-between text-slate-500">
-                <span className="text-xs font-bold uppercase tracking-wider">Total de Colaboradores</span>
-                <Users className="w-4 h-4 text-primary" />
+                <span className="text-xs font-bold uppercase tracking-wider">Receita ARR Anualizada</span>
+                <BarChart3 className="w-4 h-4 text-emerald-600" />
               </div>
-              <p className="text-2xl font-bold text-slate-900">{totalPlatformEmployees} Usuários</p>
-              <p className="text-[10px] text-slate-400">Vinculados nos escritórios</p>
+              <p className="text-2xl font-bold text-slate-900">
+                R$ {(totalMrrSaaS * 12).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-[10px] text-slate-400">Projeção de receita anual recorrente</p>
             </div>
 
             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2">
               <div className="flex items-center justify-between text-slate-500">
                 <span className="text-xs font-bold uppercase tracking-wider">Franquia Coins Global</span>
-                <DollarSign className="w-4 h-4 text-purple-600" />
+                <DollarSign className="w-4 h-4 text-amber-600" />
               </div>
-              <p className="text-2xl font-bold text-slate-900">
-                {totalPlatformCoinsAllocated.toLocaleString('pt-BR')}
+              <p className="text-2xl font-bold text-amber-700">
+                🪙 {totalPlatformCoinsAllocated.toLocaleString('pt-BR')}
               </p>
-              <p className="text-[10px] text-slate-400">Moedas de IA mensais alocadas</p>
+              <p className="text-[10px] text-slate-400">Moedas de IA alocadas nos planos</p>
             </div>
           </div>
 
           {/* Platform Companies List / Master Table */}
           <div className="bg-white p-5 lg:p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-primary" />
-                <span>Empresas Cadastradas na Plataforma ({companies.length})</span>
-              </h3>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-primary" />
+                  <span>Empresas Cadastradas na Plataforma ({companies.length})</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">Gestão master de assinaturas e planos contratuais</p>
+              </div>
 
               <div className="relative w-full sm:w-64">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
@@ -480,13 +668,14 @@ export default function EmpresasPage() {
 
             {/* Companies Minimalist Table */}
             <div className="overflow-x-auto border border-slate-200 rounded-xl">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[10px] bg-slate-50">
                     <th className="py-3 px-4">Empresa Contratante</th>
                     <th className="py-3 px-4">CNPJ & Localização</th>
-                    <th className="py-3 px-4">Plano SaaS</th>
+                    <th className="py-3 px-4">Plano SaaS & Assinatura</th>
                     <th className="py-3 px-4">Franquia Coins</th>
+                    <th className="py-3 px-4">OpenRouter IA</th>
                     <th className="py-3 px-4">Usuários</th>
                     <th className="py-3 px-4 text-center">Status</th>
                     <th className="py-3 px-4 text-right">Ação Master</th>
@@ -495,6 +684,9 @@ export default function EmpresasPage() {
                 <tbody className="divide-y divide-slate-100 text-slate-700">
                   {filteredCompanies.map(comp => {
                     const empCount = employees.filter(e => e.companyId === comp.id).length;
+                    const realPlanPrice = comp.monthlyRevenueBrl || (comp.plan === 'Profissional' ? 490 : comp.plan === 'Premium' ? 890 : 1990);
+                    const hasOwnKey = comp.openrouterApiKey && comp.openrouterApiKey.trim().length > 5;
+
                     return (
                       <tr key={comp.id} className="hover:bg-slate-50 transition-colors">
                         <td className="py-3.5 px-4 font-bold text-slate-900">
@@ -506,20 +698,46 @@ export default function EmpresasPage() {
                           <span className="text-[10px] text-slate-400 block">{comp.city}/{comp.state}</span>
                         </td>
                         <td className="py-3.5 px-4">
-                          <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
-                            {comp.plan}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
+                              {comp.plan}
+                            </span>
+                            <span className="font-extrabold text-emerald-700 text-xs">
+                              R$ {realPlanPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                            </span>
+                          </div>
                         </td>
-                        <td className="py-3.5 px-4 font-extrabold text-slate-900">
-                          {(comp.coinsFranchise).toLocaleString('pt-BR')} Coins
+                        <td className="py-3.5 px-4 font-extrabold text-amber-700">
+                          🪙 {(comp.coinsFranchise).toLocaleString('pt-BR')} Coins
+                        </td>
+                        <td className="py-3.5 px-4 font-bold">
+                          {hasOwnKey ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 w-max">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> API Própria
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1 w-max">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> API Master
+                            </span>
+                          )}
                         </td>
                         <td className="py-3.5 px-4 font-bold text-slate-800">
                           {empCount} Colaboradores
                         </td>
                         <td className="py-3.5 px-4 text-center">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            {comp.status}
-                          </span>
+                          {comp.status === "Suspenso" ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 inline-block">
+                              ● Suspensa por Inadimplência
+                            </span>
+                          ) : comp.subscription_status === "past_due" ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 inline-block">
+                              ● Pagamento Pendente (Tolerância)
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-block">
+                              ● Assinatura Ativa
+                            </span>
+                          )}
                         </td>
                         <td className="py-3.5 px-4 text-right">
                           <button
@@ -613,9 +831,11 @@ export default function EmpresasPage() {
                     <Users className="w-4 h-4 text-primary" />
                   </div>
                   <p className="text-2xl font-bold text-slate-900">
-                    {tenantEmployees.length || 1}
+                    {tenantEmployees.length}
                   </p>
-                  <p className="text-[10px] text-slate-400">Integrantes com acesso cadastrado</p>
+                  <p className="text-[10px] text-slate-400">
+                    {tenantEmployees.length === 0 ? 'Nenhum usuário cadastrado' : 'Integrantes com acesso cadastrado'}
+                  </p>
                 </div>
 
                 <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2">
@@ -623,7 +843,7 @@ export default function EmpresasPage() {
                     <span className="text-xs font-bold uppercase tracking-wider">Agentes IA Ativos</span>
                     <Bot className="w-4 h-4 text-primary" />
                   </div>
-                  <p className="text-2xl font-bold text-slate-900">8 Agentes</p>
+                  <p className="text-2xl font-bold text-slate-900">{TENANT_DEFAULT_AGENTS.length} Agentes</p>
                   <p className="text-[10px] text-slate-400">Especialistas fiscais e financeiros</p>
                 </div>
 
@@ -668,13 +888,55 @@ export default function EmpresasPage() {
                     <span className="text-xs font-bold uppercase tracking-wider">Health Score</span>
                     <HeartPulse className="w-4 h-4 text-rose-600" />
                   </div>
-                  <p className="text-2xl font-bold text-emerald-600">96% (Saudável)</p>
+                  <p className="text-2xl font-bold text-emerald-600">
+                    {tenantEmployees.length > 0 ? '96% (Saudável)' : '74% (Atenção)'}
+                  </p>
                   <p className="text-[10px] text-slate-400">Diagnóstico real operacional</p>
+                </div>
+              </div>
+
+              {/* Company AI Context & Rules Panel */}
+              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-3">
+
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-primary" />
+                    <span>Contexto da Empresa & Observações para IA</span>
+                  </h3>
+                  <button
+                    onClick={() => {
+                      const newCtx = prompt("Editar Contexto da Empresa / Observações para IA:", selectedTenant.companyContext || "");
+                      if (newCtx !== null) {
+                        saveCompany({
+                          ...selectedTenant,
+                          companyContext: newCtx.trim()
+                        });
+                        setSelectedTenant(prev => prev ? { ...prev, companyContext: newCtx.trim() } : null);
+                        setSuccessMessage("Contexto da empresa atualizado com sucesso!");
+                        setTimeout(() => setSuccessMessage(null), 3000);
+                      }
+                    }}
+                    className="px-2.5 py-1 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors flex items-center gap-1"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Editar Contexto IA</span>
+                  </button>
+                </div>
+
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 leading-relaxed font-medium">
+                  {selectedTenant.companyContext ? (
+                    <p className="whitespace-pre-wrap">{selectedTenant.companyContext}</p>
+                  ) : (
+                    <p className="text-slate-400 italic">
+                      Nenhum contexto específico cadastrado para esta empresa. Clique em &quot;Editar Contexto IA&quot; para definir o segmento, particularidades e regras operacionais que contextualizam os 9 agentes de IA.
+                    </p>
+                  )}
                 </div>
               </div>
 
               {/* Real Health Score Diagnostic Panel */}
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
+
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <HeartPulse className="w-4 h-4 text-primary" />
                   <span>Diagnóstico de Isolamento & Saúde (Multi-Finance)</span>

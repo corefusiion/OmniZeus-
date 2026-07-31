@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
+import { getCurrentUser, getActiveCompanyId, rehydrateSession } from "@/lib/auth/roles";
+import { getCompanies, CompanyProfile } from "@/lib/company/store";
+import { AlertTriangle, Lock, ExternalLink, ShieldAlert, CreditCard } from "lucide-react";
 
 export default function DashboardLayout({
   children,
@@ -11,9 +14,117 @@ export default function DashboardLayout({
 }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [activeCompany, setActiveCompany] = useState<CompanyProfile | null>(null);
+  const [currentUser, setCurrentUser] = useState(getCurrentUser());
+  const [openingPortal, setOpeningPortal] = useState(false);
+
+  const checkCompanyStatus = () => {
+    setCurrentUser(getCurrentUser());
+    const compId = getActiveCompanyId();
+    const allComp = getCompanies();
+    const found = allComp.find(c => c.id === compId);
+    setActiveCompany(found || null);
+  };
+
+  useEffect(() => {
+    // Rehydrate real user session from server HttpOnly cookie on mount
+    rehydrateSession().then((user) => {
+      if (user) {
+        setCurrentUser(user);
+        checkCompanyStatus();
+      } else {
+        checkCompanyStatus();
+      }
+    });
+
+    window.addEventListener("omnizeus_company_context_change", checkCompanyStatus);
+    window.addEventListener("omnizeus_companies_change", checkCompanyStatus);
+    window.addEventListener("omnizeus_role_change", checkCompanyStatus);
+    return () => {
+      window.removeEventListener("omnizeus_company_context_change", checkCompanyStatus);
+      window.removeEventListener("omnizeus_companies_change", checkCompanyStatus);
+      window.removeEventListener("omnizeus_role_change", checkCompanyStatus);
+    };
+  }, []);
+
+  const handleOpenStripePortal = async () => {
+    if (!activeCompany) return;
+    setOpeningPortal(true);
+    try {
+      const res = await fetch("/api/checkout/customer-portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company_id: activeCompany.id })
+      });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+      } else {
+        alert(data.error || "Não foi possível abrir o portal Stripe.");
+        setOpeningPortal(false);
+      }
+    } catch (err) {
+      alert("Falha de conexão com o servidor.");
+      setOpeningPortal(false);
+    }
+  };
+
+  const isSuperAdmin = currentUser.role === "super_adm" || currentUser.email === "jsgleisson@gmail.com";
+  const isCompanySuspended = activeCompany && activeCompany.status === "Suspenso" && !isSuperAdmin;
+  const isPastDueGrace = activeCompany && activeCompany.subscription_status === "past_due" && !isCompanySuspended;
+
+  // Render Suspended Access Screen for non-super_adm users
+  if (isCompanySuspended) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] antialiased flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl border border-red-200 shadow-2xl p-8 max-w-lg w-full text-center space-y-6 animate-in fade-in zoom-in-95">
+          <div className="w-14 h-14 bg-rose-50 text-rose-600 rounded-2xl border border-rose-200/80 flex items-center justify-center mx-auto shadow-2xs">
+            <Lock className="w-7 h-7" strokeWidth={1.5} />
+          </div>
+
+          <div className="space-y-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-200">
+              Acesso Temporariamente Suspenso
+            </span>
+            <h2 className="text-xl font-bold text-slate-900 pt-1">
+              Assinatura com Pagamento Pendente
+            </h2>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              O acesso às funcionalidades da empresa <strong className="font-bold text-slate-900">{activeCompany.tradeName || activeCompany.corporateName}</strong> foi suspenso por pendência financeira no Stripe.
+            </p>
+          </div>
+
+          <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl text-left text-xs space-y-2">
+            <span className="font-bold text-slate-800 flex items-center gap-1.5">
+              <ShieldAlert className="w-4 h-4 text-emerald-600" />
+              Seus Dados Estão 100% Preservados:
+            </span>
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+              Todos os seus saldos de OmniCoins, relatórios fiscais, minutas de documentos, tarefas da equipe e configurações da API Conta Azul permanecem salvos em segurança no banco de dados.
+            </p>
+          </div>
+
+          <div className="space-y-3 pt-2">
+            <button
+              onClick={handleOpenStripePortal}
+              disabled={openingPortal}
+              className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <CreditCard className="w-4 h-4 text-emerald-400" />
+              <span>{openingPortal ? "Abrindo Stripe Portal..." : "Regularizar Assinatura no Stripe"}</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </button>
+            <p className="text-[10px] text-slate-400">
+              Dúvidas? Entre em contato com o suporte do Super Admin.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] antialiased selection:bg-primary selection:text-white">
+    <div className="min-h-screen bg-[#F8FAFC] antialiased selection:bg-primary selection:text-white overflow-x-hidden">
       <Sidebar 
         isCollapsed={isCollapsed} 
         setIsCollapsed={setIsCollapsed}
@@ -31,6 +142,29 @@ export default function DashboardLayout({
         }`}
       >
         <div className="p-4 sm:p-6 lg:p-8 max-w-[1920px] w-full mx-auto space-y-6">
+          {/* Grace Period Warning Banner */}
+          {isPastDueGrace && (
+            <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-xl text-amber-900 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs animate-in fade-in">
+              <div className="flex items-center gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>
+                  <strong>Aviso de Pagamento Pendente:</strong> Identificamos um problema no pagamento da sua assinatura. Sua conta está no período de tolerância
+                  {activeCompany.grace_period_ends_at && (
+                    <> até <strong className="font-bold">{new Date(activeCompany.grace_period_ends_at).toLocaleDateString('pt-BR')}</strong></>
+                  )}.
+                </span>
+              </div>
+              <button
+                onClick={handleOpenStripePortal}
+                disabled={openingPortal}
+                className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] rounded-lg transition-colors shrink-0 flex items-center gap-1.5 shadow-2xs self-start sm:self-auto"
+              >
+                <span>Atualizar Cartão no Stripe</span>
+                <ExternalLink className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+
           {children}
         </div>
       </main>

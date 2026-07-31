@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { resolveAIProvider } from "@/lib/ai/providerResolver";
+import { executeAIRequest } from "@/lib/ai/openRouterClient";
 
 export const runtime = "nodejs";
 
@@ -40,32 +42,70 @@ function recordChatMetrics(
   promptLength: number,
   responseLength: number,
   messageCount: number,
-  latencyMs: number
+  latencyMs: number,
+  usageData?: { input_tokens?: number; output_tokens?: number; reasoning_tokens?: number; total_tokens?: number },
+  credentialSource?: string
 ) {
   try {
     const db = getLocalDbFile();
     const now = new Date().toISOString();
 
-    const stressLog = {
-      id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+    const inputTokens = usageData?.input_tokens || Math.round(promptLength / 4);
+    const outputTokens = usageData?.output_tokens || Math.round(responseLength / 4);
+    const reasoningTokens = usageData?.reasoning_tokens || 0;
+    const totalTokens = usageData?.total_tokens || (inputTokens + outputTokens);
+
+    const isCustom = credentialSource === 'superadmin_custom_endpoint';
+    const costUsd = isCustom ? 0 : parseFloat(((inputTokens * 0.0000025) + (outputTokens * 0.000010)).toFixed(6));
+    const costBrl = isCustom ? 0 : parseFloat((costUsd * 5.80).toFixed(4));
+
+    const omnicoinsConsumed = 5;
+
+    // ── Deduzir Coins da carteira da empresa específica ─────────────────────
+    if (Array.isArray(db.companies)) {
+      const companyIndex = db.companies.findIndex((c: any) => c.id === (companyId || "comp_zenitus"));
+      if (companyIndex >= 0) {
+        const currentFranchise: number =
+          typeof db.companies[companyIndex].coins_franchise === 'number'
+            ? db.companies[companyIndex].coins_franchise
+            : (typeof db.companies[companyIndex].coinsFranchise === 'number'
+                ? db.companies[companyIndex].coinsFranchise : 0);
+        const newFranchise = Math.max(0, currentFranchise - omnicoinsConsumed);
+        db.companies[companyIndex].coins_franchise = newFranchise;
+        db.companies[companyIndex].coinsFranchise = newFranchise;
+        db.companies[companyIndex].consumed_coins = (db.companies[companyIndex].consumed_coins || 0) + omnicoinsConsumed;
+      }
+    }
+
+
+    const usageLog = {
+      id: `log_ai_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       company_id: companyId || "comp_zenitus",
-      timestamp: now,
-      model: model || "google/gemini-2.5-pro",
-      persona: persona || "geral",
-      status: "success",
-      latency_ms: latencyMs,
-      prompt_length: promptLength,
-      response_length: responseLength,
-      message_count: messageCount,
+      usuario_id: "usr_gestor",
+      agente_id: persona || "omni_ia_hub",
+      agente_nome: persona === "sped" ? "Especialista SPED & Fiscal" : persona === "contaazul" ? "Agente ContaAzul ERP" : "Especialista Fiscal BPO",
+      modelo: model || "google/gemini-2.5-pro",
+      funcionalidade: "Consulta IA Chat",
+      tipo_operacao: "STANDARD",
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      reasoning_tokens: reasoningTokens,
+      total_tokens: totalTokens,
+      custo_openrouter_usd: costUsd,
+      custo_openrouter_brl: costBrl,
+      omnicoins_consumed: omnicoinsConsumed,
+      credential_source: credentialSource || 'master_fallback',
+      duracao_ms: latencyMs,
+      status: "SUCCESS",
       created_at: now
     };
 
-    const tokensEst = Math.round((promptLength + responseLength) / 4);
-    const respTokens = Math.round(responseLength / 4);
-    const tps = latencyMs > 0 ? parseFloat((respTokens / (latencyMs / 1000)).toFixed(2)) : 0;
-    const contextKb = parseFloat((promptLength / 1024).toFixed(2));
+    if (!Array.isArray(db.ai_stress_test_logs)) db.ai_stress_test_logs = [];
+    if (!Array.isArray(db.ai_usage_metrics)) db.ai_usage_metrics = [];
+    if (!Array.isArray(db.ai_usage_logs)) db.ai_usage_logs = [];
 
-    const usageMetric = {
+    db.ai_usage_logs.unshift(usageLog);
+    db.ai_usage_metrics.unshift({
       id: `metric_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       company_id: companyId || "comp_zenitus",
       model: model || "google/gemini-2.5-pro",
@@ -73,21 +113,15 @@ function recordChatMetrics(
       prompt_length: promptLength,
       response_length: responseLength,
       latency_ms: latencyMs,
-      tokens_est: tokensEst,
-      token_throughput_tps: tps,
-      context_memory_kb: contextKb,
+      tokens_est: totalTokens,
+      token_throughput_tps: latencyMs > 0 ? parseFloat((outputTokens / (latencyMs / 1000)).toFixed(2)) : 0,
+      context_memory_kb: parseFloat((promptLength / 1024).toFixed(2)),
       created_at: now
-    };
-
-    if (!Array.isArray(db.ai_stress_test_logs)) db.ai_stress_test_logs = [];
-    if (!Array.isArray(db.ai_usage_metrics)) db.ai_usage_metrics = [];
-
-    db.ai_stress_test_logs.unshift(stressLog);
-    db.ai_usage_metrics.unshift(usageMetric);
+    });
 
     saveLocalDbFile(db);
   } catch (err) {
-    console.error("Error recording AI metrics to SQLite:", err);
+    console.error("Error recording AI usage metrics to SQLite:", err);
   }
 }
 
@@ -95,23 +129,41 @@ export async function POST(req: NextRequest) {
   const startTime = Date.now();
   try {
     const body = await req.json();
-    const { messages, personaPrompt, persona, clientApiKey, companyId } = body;
+    const { messages, personaPrompt, persona } = body;
     let { model } = body;
-    const activeTenantId = companyId || req.headers.get("x-company-id") || "comp_zenitus";
 
-    const headerKey = req.headers.get("x-openrouter-key");
-    const dbSettings = getSavedSettings();
-    
-    let apiUrl = "https://openrouter.ai/api/v1/chat/completions";
-    let activeApiKey = headerKey || clientApiKey || dbSettings.openrouter_api_key || process.env.OPENROUTER_API_KEY;
-    
-    if (dbSettings.custom_ai_enabled && dbSettings.custom_ai_url && dbSettings.custom_ai_key) {
-      apiUrl = `${dbSettings.custom_ai_url.replace(/\/$/, "")}/chat/completions`;
-      activeApiKey = dbSettings.custom_ai_key;
-      // O usuário relatou que o proxy dele auto-roteia para as melhores LLMs independente do que for enviado aqui
-      // Sempre forçamos o modelo que estiver configurado no painel (ex: kimicode) ou "auto" como padrão
-      model = dbSettings.custom_ai_model || "auto";
+    // ── Tenant Isolation: companyId ALWAYS from session, never from body ────────
+    let activeTenantId = "comp_zenitus";
+    let userRole: string | undefined;
+    let userEmail: string | undefined;
+
+    const sessionCookie = req.cookies.get("omnizeus_session")?.value;
+    if (sessionCookie) {
+      try {
+        const [encoded] = sessionCookie.split(".");
+        const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf-8"));
+        if (payload?.companyId) activeTenantId = payload.companyId;
+        if (payload?.role) userRole = payload.role;
+        if (payload?.email) userEmail = payload.email;
+      } catch {}
+    } else {
+      // Fallback during transition: trust x-user-role header only (not companyId)
+      userRole = req.headers.get("x-user-role") || undefined;
+      userEmail = req.headers.get("x-user-email") || undefined;
     }
+
+
+    const resolved = resolveAIProvider({
+      companyId: activeTenantId,
+      userRole,
+      userEmail,
+      requestedModel: model
+    });
+
+    const apiUrl = resolved.apiUrl;
+    const activeApiKey = resolved.apiKey;
+    model = resolved.model;
+    const credentialSource = resolved.credentialSource;
 
     // Calculate current time & date in Brazil (America/Sao_Paulo)
     const nowBrazil = new Date();
@@ -151,7 +203,7 @@ export async function POST(req: NextRequest) {
 
       const durationMs = Date.now() - startTime;
       const promptLen = JSON.stringify(messages || []).length;
-      recordChatMetrics(activeTenantId, model, persona || "geral", promptLen, responseText.length, (messages || []).length, durationMs);
+      recordChatMetrics(activeTenantId, model, persona || "geral", promptLen, responseText.length, (messages || []).length, durationMs, undefined, credentialSource);
 
       return new NextResponse(responseText, {
         headers: { "Content-Type": "text/plain; charset=utf-8" },
@@ -228,7 +280,7 @@ export async function POST(req: NextRequest) {
     systemContextAddon += "1. VOCÊ É UM AGENTE CONVERSACIONAL. Seu primeiro objetivo é compreender a intenção do usuário. Nunca execute uma ação (como criar tabelas, arquivos, cadastros) apenas porque encontrou uma palavra-chave.\n";
     systemContextAddon += "2. DIFERENCIE PERGUNTAS DE COMANDOS. Se o usuário diz 'pode cadastrar cliente?', isso NÃO significa que ele quer cadastrar imediatamente. É apenas uma pergunta. Você deve responder: 'Claro, posso cadastrar. Me informe Nome, CPF, Email'. Não inicie o cadastro sem ter os dados.\n";
     systemContextAddon += "3. NUNCA INVENTE OU ASSUMA DADOS (nome, email, telefone, cnpj, valor, etc.). Se faltar informação obrigatória para um comando, NÃO gere a saída final. Apenas PERGUNTE ao usuário o que falta.\n";
-    systemContextAddon += "4. CONVERSA EM MÚLTIPLAS ETAPAS: Você deve conseguir conduzir um cadastro naturalmente. Peça um dado de cada vez ou todos os faltantes, lembrando-se do estado da conversa anterior.\n";
+    systemContextAddon += "4. CONVERSA EM MÚLTIPLAS ETAPAS: Você deve conseguir conduzir um cadastro naturally. Peça um dado de cada vez ou todos os faltantes, lembrando-se do estado da conversa anterior.\n";
     systemContextAddon += "5. SÓ EXECUTE QUANDO POSSUIR TUDO. Antes de tomar a decisão final de acionar uma ação, responda internamente: A intenção está clara? Tenho os dados obrigatórios? Se não, apenas faça perguntas de esclarecimento.\n";
 
     const finalSystemPrompt = (personaPrompt || "Você é o assistente inteligente de ponta da Zenitus Inteligência Contábil.") + systemContextAddon;
@@ -236,32 +288,21 @@ export async function POST(req: NextRequest) {
 
     const apiMessages = [systemMessage, ...(messages || [])];
 
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${activeApiKey}`,
-        "HTTP-Referer": "https://omnizeus.zenitus.com.br",
-        "X-Title": "OmniZeus Accounting BPO",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: model || "anthropic/claude-3.7-sonnet",
-        messages: apiMessages,
-        stream: false,
-      }),
+    const aiRes = await executeAIRequest({
+      companyId: activeTenantId,
+      userRole,
+      userEmail,
+      requestedModel: model || "anthropic/claude-3.7-sonnet",
+      messages: apiMessages,
+      persona: persona,
+      featureContext: "Omni IA Hub Chat"
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      return NextResponse.json({ error: errorText }, { status: response.status });
+    if (aiRes.isError) {
+      return NextResponse.json({ error: aiRes.content }, { status: 500 });
     }
 
-    const data = await response.json();
-    const textContent = data.choices?.[0]?.message?.content || "";
-
-    const durationMs = Date.now() - startTime;
-    const promptLen = JSON.stringify(apiMessages).length;
-    recordChatMetrics(activeTenantId, model, persona || "geral", promptLen, textContent.length, apiMessages.length, durationMs);
+    const textContent = aiRes.content;
 
     // Save directly to DB for true persistence across browser refreshes
     if (body.conversationId) {

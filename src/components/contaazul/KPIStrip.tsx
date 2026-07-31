@@ -7,7 +7,7 @@ export type MetricDef = {
   key: string;
   label: string;
   value: number | string;
-  icon: React.ReactNode;
+  icon: React.ElementType | React.ReactNode;
   trend?: 'up' | 'down' | 'neutral';
   color?: string;
 };
@@ -26,7 +26,7 @@ export function KPIStrip({ metrics, onMetricClick }: KPIStripProps) {
             key={metric.key}
             onClick={() => onMetricClick?.(metric.key)}
             className={`flex items-center justify-between py-2.5 px-3.5 bg-white border border-[#E2E8F0] rounded-lg transition-all duration-150 ${
-              onMetricClick ? 'cursor-pointer hover:border-blue-400 hover:bg-blue-50/20 active:scale-[0.99]' : ''
+              onMetricClick ? 'cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/20 active:scale-[0.99]' : ''
             }`}
           >
             <div className="flex flex-col min-w-0 pr-2">

@@ -53,18 +53,8 @@ export async function POST(req: Request) {
     }
 
     const db = getLocalDb();
-    const dbSettings = db.settings || {};
     
     // Configurações dinâmicas baseadas no painel Super ADM
-    const useCustomEndpoint = dbSettings.custom_ai_enabled === true;
-    const aiEndpoint = useCustomEndpoint && dbSettings.custom_ai_url 
-      ? `${dbSettings.custom_ai_url}/chat/completions` 
-      : "https://openrouter.ai/api/v1/chat/completions";
-      
-    const apiKey = useCustomEndpoint && dbSettings.custom_ai_key
-      ? dbSettings.custom_ai_key
-      : process.env.OPENROUTER_API_KEY || dbSettings.openrouter_api_key || "sk-or-v1-mock-key";
-
     const systemPrompt = `Você é o "Zeus BPO IA" — o Engenheiro e Especialista Master em BPO Financeiro e Operações Contábeis.
 
 ### DIRETRIZES DE PERSONA E SEGURANÇA:
@@ -109,45 +99,22 @@ Responda EXCLUSIVAMENTE em formato JSON com a estrutura:
     let extractedData: any = {};
 
     try {
-      const openRouterRes = await fetch(aiEndpoint, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: (useCustomEndpoint ? dbSettings.custom_ai_model : undefined) || "google/gemini-2.5-pro",
-          messages: [
-            { role: "system", content: systemPrompt },
-            ...(history || []),
-            { role: "user", content: userInput }
-          ],
-          stream: false
-        })
+      const { executeAIRequest } = await import("@/lib/ai/openRouterClient");
+      const activeTenantId = req.headers.get("x-company-id") || "comp_zenitus";
+
+      const aiRes = await executeAIRequest({
+        companyId: activeTenantId,
+        requestedModel: model || "google/gemini-2.5-pro",
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...(history || []),
+          { role: "user", content: userInput }
+        ],
+        featureContext: "Conta Azul AI Assistant"
       });
 
-      if (openRouterRes.ok) {
-        const rawText = await openRouterRes.text();
-        let contentStr = "";
-        try {
-          const aiJson = JSON.parse(rawText);
-          contentStr = aiJson.choices?.[0]?.message?.content || "";
-        } catch (parseErr) {
-          // O proxy (como LMStudio/Ollama) devolveu um Stream (SSE) forçado.
-          // Vamos reconstruir a mensagem pegando todos os deltas 'data: {...}'
-          const lines = rawText.split('\\n');
-          let hasData = false;
-          for (const line of lines) {
-            if (line.trim().startsWith('data: ') && !line.includes('[DONE]')) {
-              try {
-                const chunk = JSON.parse(line.replace('data: ', '').trim());
-                contentStr += chunk.choices?.[0]?.delta?.content || chunk.choices?.[0]?.message?.content || "";
-                hasData = true;
-              } catch (e) {}
-            }
-          }
-          if (!hasData) throw new Error(`Resposta do proxy inválida: ${rawText.substring(0, 50)}...`);
-        }
+      if (!aiRes.isError) {
+        let contentStr = aiRes.content;
         
         // Remove markdown wrappers se presentes
         let cleanStr = contentStr.replace(/```json/gi, "").replace(/```/g, "").trim();
@@ -162,8 +129,8 @@ Responda EXCLUSIVAMENTE em formato JSON com a estrutura:
           action = "NONE";
         }
       } else {
-        const errorText = await openRouterRes.text();
-        return NextResponse.json({ success: false, error: `Erro OpenRouter: ${openRouterRes.status} - ${errorText}` }, { status: 500 });
+        aiMessage = aiRes.content || "Não foi possível obter resposta da IA.";
+        action = "NONE";
       }
     } catch (apiError: any) {
       return NextResponse.json({ success: false, error: `Falha na requisição da IA: ${apiError.message}` }, { status: 500 });

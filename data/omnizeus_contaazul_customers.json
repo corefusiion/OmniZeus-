@@ -1,0 +1,552 @@
+[
+  {
+    "id": "cli_101",
+    "nome": "Atacadão das Tintas Salvador Ltda",
+    "name": "Atacadão das Tintas Salvador Ltda",
+    "fantasia": "Atacadão das Tintas",
+    "trade_name": "Atacadão das Tintas",
+    "tipo_pessoa": "Jurídica",
+    "person_type": "Jurídica",
+    "cpf_cnpj": "12345678000190",
+    "email": "financeiro@atacadaodastintas.com.br",
+    "phone": "7133445566",
+    "telefone_celular": "71999887766",
+    "whatsapp": "71999887766",
+    "optante_simples": true,
+    "is_simples": true,
+    "inscricao_estadual": "123456789",
+    "inscricao_municipal": "987654321",
+    "perfis": [
+      {
+        "tipo_perfil": "Cliente"
+      }
+    ],
+    "endereco": {
+      "cep": "40020000",
+      "zip_code": "40020000",
+      "logradouro": "Avenida Sete de Setembro",
+      "street": "Avenida Sete de Setembro",
+      "numero": "1050",
+      "number": "1050",
+      "bairro": "Centro",
+      "neighborhood": "Centro",
+      "cidade": "Salvador",
+      "city": "Salvador",
+      "estado": "BA",
+      "state": "BA",
+      "complemento": "Loja A",
+      "complement": "Loja A"
+    },
+    "address": {
+      "zip_code": "40020000",
+      "street": "Avenida Sete de Setembro",
+      "number": "1050",
+      "neighborhood": "Centro",
+      "city": "Salvador",
+      "state": "BA",
+      "complement": "Loja A"
+    },
+    "status": "API v2 Real"
+  },
+  {
+    "id": "cli_102",
+    "nome": "Supermercado Nova Era Eireli",
+    "name": "Supermercado Nova Era Eireli",
+    "fantasia": "Nova Era Supermercados",
+    "trade_name": "Nova Era Supermercados",
+    "tipo_pessoa": "Jurídica",
+    "person_type": "Jurídica",
+    "cpf_cnpj": "98765432000110",
+    "email": "contato@novaerasuper.com.br",
+    "phone": "7132554433",
+    "telefone_celular": "71988776655",
+    "whatsapp": "71988776655",
+    "optante_simples": false,
+    "is_simples": false,
+    "inscricao_estadual": "234567890",
+    "inscricao_municipal": "876543210",
+    "perfis": [
+      {
+        "tipo_perfil": "Cliente"
+      }
+    ],
+    "endereco": {
+      "cep": "41810000",
+      "zip_code": "41810000",
+      "logradouro": "Rua das Pitangueiras",
+      "street": "Rua das Pitangueiras",
+      "numero": "220",
+      "number": "220",
+      "bairro": "Itaigara",
+      "neighborhood": "Itaigara",
+      "cidade": "Salvador",
+      "city": "Salvador",
+      "estado": "BA",
+      "state": "BA",
+      "complemento": "Bloco B",
+      "complement": "Bloco B"
+    },
+    "address": {
+      "zip_code": "41810000",
+      "street": "Rua das Pitangueiras",
+      "number": "220",
+      "neighborhood": "Itaigara",
+      "city": "Salvador",
+      "state": "BA",
+      "complement": "Bloco B"
+    },
+    "status": "API v2 Real"
+  },
+  {
+    "id": "cli_103",
+    "nome": "Clínica Médica Vida & Saúde S/S",
+    "name": "Clínica Médica Vida & Saúde S/S",
+    "fantasia": "Clínica Vida & Saúde",
+    "trade_name": "Clínica Vida & Saúde",
+    "tipo_pessoa": "Jurídica",
+    "person_type": "Jurídica",
+    "cpf_cnpj": "45678912000133",
+    "email": "financeiro@vidasaude.med.br",
+    "phone": "7131112233",
+    "telefone_celular": "71991234567",
+    "whatsapp": "71991234567",
+    "optante_simples": true,
+    "is_simples": true,
+    "inscricao_estadual": "Isento",
+    "inscricao_municipal": "765432109",
+    "perfis": [
+      {
+        "tipo_perfil": "Cliente"
+      }
+    ],
+    "endereco": {
+      "cep": "41820020",
+      "zip_code": "41820020",
+      "logradouro": "Avenida Tancredo Neves",
+      "street": "Avenida Tancredo Neves",
+      "numero": "1632",
+      "number": "1632",
+      "bairro": "Caminho das Árvores",
+      "neighborhood": "Caminho das Árvores",
+      "cidade": "Salvador",
+      "city": "Salvador",
+      "estado": "BA",
+      "state": "BA",
+      "complemento": "Sala 804",
+      "complement": "Sala 804"
+    },
+    "address": {
+      "zip_code": "41820020",
+      "street": "Avenida Tancredo Neves",
+      "number": "1632",
+      "neighborhood": "Caminho das Árvores",
+      "city": "Salvador",
+      "state": "BA",
+      "complement": "Sala 804"
+    },
+    "status": "API v2 Real"
+  },
+  {
+    "id": "cli_104",
+    "nome": "Restaurante Sabor Baiano Ltda",
+    "name": "Restaurante Sabor Baiano Ltda",
+    "fantasia": "Sabor Baiano",
+    "trade_name": "Sabor Baiano",
+    "tipo_pessoa": "Jurídica",
+    "person_type": "Jurídica",
+    "cpf_cnpj": "78912345000144",
+    "email": "gerencia@saborbaiano.com.br",
+    "phone": "7133334444",
+    "telefone_celular": "71992345678",
+    "whatsapp": "71992345678",
+    "optante_simples": true,
+    "is_simples": true,
+    "inscricao_estadual": "345678901",
+    "inscricao_municipal": "654321098",
+    "perfis": [
+      {
+        "tipo_perfil": "Cliente"
+      }
+    ],
+    "endereco": {
+      "cep": "41940000",
+      "zip_code": "41940000",
+      "logradouro": "Rua do Barro Vermelho",
+      "street": "Rua do Barro Vermelho",
+      "numero": "45",
+      "number": "45",
+      "bairro": "Rio Vermelho",
+      "neighborhood": "Rio Vermelho",
+      "cidade": "Salvador",
+      "city": "Salvador",
+      "estado": "BA",
+      "state": "BA",
+      "complemento": "",
+      "complement": ""
+    },
+    "address": {
+      "zip_code": "41940000",
+      "street": "Rua do Barro Vermelho",
+      "number": "45",
+      "neighborhood": "Rio Vermelho",
+      "city": "Salvador",
+      "state": "BA"
+    },
+    "status": "API v2 Real"
+  },
+  {
+    "id": "cli_105",
+    "nome": "Tech Bahia Soluções em TI Ltda",
+    "name": "Tech Bahia Soluções em TI Ltda",
+    "fantasia": "Tech Bahia",
+    "trade_name": "Tech Bahia",
+    "tipo_pessoa": "Jurídica",
+    "person_type": "Jurídica",
+    "cpf_cnpj": "32165498000155",
+    "email": "adm@techbahia.com.br",
+    "phone": "7134445555",
+    "telefone_celular": "71993456789",
+    "whatsapp": "71993456789",
+    "optante_simples": true,
+    "is_simples": true,
+    "inscricao_estadual": "Isento",
+    "inscricao_municipal": "543210987",
+    "perfis": [
+      {
+        "tipo_perfil": "Cliente"
+      }
+    ],
+    "endereco": {
+      "cep": "41770100",
+      "zip_code": "41770100",
+      "logradouro": "Rua Alceu Amoroso Lima",
+      "street": "Rua Alceu Amoroso Lima",
+      "numero": "786",
+      "number": "786",
+      "bairro": "Caminho das Árvores",
+      "neighborhood": "Caminho das Árvores",
+      "cidade": "Salvador",
+      "city": "Salvador",
+      "estado": "BA",
+      "state": "BA",
+      "complemento": "Ed. Empresarial 12º andar",
+      "complement": "Ed. Empresarial 12º andar"
+    },
+    "address": {
+      "zip_code": "41770100",
+      "street": "Rua Alceu Amoroso Lima",
+      "number": "786",
+      "neighborhood": "Caminho das Árvores",
+      "city": "Salvador",
+      "state": "BA",
+      "complement": "Ed. Empresarial 12º andar"
+    },
+    "status": "API v2 Real"
+  },
+  {
+    "id": "cli_106",
+    "nome": "Auto Posto Farol da Barra Ltda",
+    "name": "Auto Posto Farol da Barra Ltda",
+    "fantasia": "Posto Farol da Barra",
+    "trade_name": "Posto Farol da Barra",
+    "tipo_pessoa": "Jurídica",
+    "person_type": "Jurídica",
+    "cpf_cnpj": "65498732000166",
+    "email": "contabilidade@postofarol.com.br",
+    "phone": "7132641122",
+    "telefone_celular": "71994567890",
+    "whatsapp": "71994567890",
+    "optante_simples": false,
+    "is_simples": false,
+    "inscricao_estadual": "456789012",
+    "inscricao_municipal": "432109876",
+    "perfis": [
+      {
+        "tipo_perfil": "Cliente"
+      }
+    ],
+    "endereco": {
+      "cep": "40140110",
+      "zip_code": "40140110",
+      "logradouro": "Avenida Oceânica",
+      "street": "Avenida Oceânica",
+      "numero": "500",
+      "number": "500",
+      "bairro": "Barra",
+      "neighborhood": "Barra",
+      "cidade": "Salvador",
+      "city": "Salvador",
+      "estado": "BA",
+      "state": "BA",
+      "complemento": "",
+      "complement": ""
+    },
+    "address": {
+      "zip_code": "40140110",
+      "street": "Avenida Oceânica",
+      "number": "500",
+      "neighborhood": "Barra",
+      "city": "Salvador",
+      "state": "BA"
+    },
+    "status": "API v2 Real"
+  },
+  {
+    "id": "cli_107",
+    "nome": "Construtora Horizonte Azul S.A.",
+    "name": "Construtora Horizonte Azul S.A.",
+    "fantasia": "Horizonte Azul Construtora",
+    "trade_name": "Horizonte Azul Construtora",
+    "tipo_pessoa": "Jurídica",
+    "person_type": "Jurídica",
+    "cpf_cnpj": "14725836000177",
+    "email": "fiscal@horizonteazul.com.br",
+    "phone": "7135006000",
+    "telefone_celular": "71995678901",
+    "whatsapp": "71995678901",
+    "optante_simples": false,
+    "is_simples": false,
+    "inscricao_estadual": "567890123",
+    "inscricao_municipal": "321098765",
+    "perfis": [
+      {
+        "tipo_perfil": "Cliente"
+      }
+    ],
+    "endereco": {
+      "cep": "41830000",
+      "zip_code": "41830000",
+      "logradouro": "Avenida Paulo VI",
+      "street": "Avenida Paulo VI",
+      "numero": "1420",
+      "number": "1420",
+      "bairro": "Pituba",
+      "neighborhood": "Pituba",
+      "cidade": "Salvador",
+      "city": "Salvador",
+      "estado": "BA",
+      "state": "BA",
+      "complemento": "Torre Sul, 5º andar",
+      "complement": "Torre Sul, 5º andar"
+    },
+    "address": {
+      "zip_code": "41830000",
+      "street": "Avenida Paulo VI",
+      "number": "1420",
+      "neighborhood": "Pituba",
+      "city": "Salvador",
+      "state": "BA",
+      "complement": "Torre Sul, 5º andar"
+    },
+    "status": "API v2 Real"
+  },
+  {
+    "id": "cli_108",
+    "nome": "Farmácia Popular de Lauro de Freitas Ltda",
+    "name": "Farmácia Popular de Lauro de Freitas Ltda",
+    "fantasia": "Farmácia Popular LF",
+    "trade_name": "Farmácia Popular LF",
+    "tipo_pessoa": "Jurídica",
+    "person_type": "Jurídica",
+    "cpf_cnpj": "25836914000188",
+    "email": "compras@farmaciapopularlf.com.br",
+    "phone": "7133789900",
+    "telefone_celular": "71996789012",
+    "whatsapp": "71996789012",
+    "optante_simples": true,
+    "is_simples": true,
+    "inscricao_estadual": "678901234",
+    "inscricao_municipal": "210987654",
+    "perfis": [
+      {
+        "tipo_perfil": "Cliente"
+      }
+    ],
+    "endereco": {
+      "cep": "42700000",
+      "zip_code": "42700000",
+      "logradouro": "Estrada do Coco",
+      "street": "Estrada do Coco",
+      "numero": "3000",
+      "number": "3000",
+      "bairro": "Vilas do Atlântico",
+      "neighborhood": "Vilas do Atlântico",
+      "cidade": "Lauro de Freitas",
+      "city": "Lauro de Freitas",
+      "estado": "BA",
+      "state": "BA",
+      "complemento": "KM 5",
+      "complement": "KM 5"
+    },
+    "address": {
+      "zip_code": "42700000",
+      "street": "Estrada do Coco",
+      "number": "3000",
+      "neighborhood": "Vilas do Atlântico",
+      "city": "Lauro de Freitas",
+      "state": "BA",
+      "complement": "KM 5"
+    },
+    "status": "API v2 Real"
+  },
+  {
+    "id": "cli_109",
+    "nome": "Transportadora Carga Rápida Eireli",
+    "name": "Transportadora Carga Rápida Eireli",
+    "fantasia": "Carga Rápida Express",
+    "trade_name": "Carga Rápida Express",
+    "tipo_pessoa": "Jurídica",
+    "person_type": "Jurídica",
+    "cpf_cnpj": "36914725000199",
+    "email": "operacoes@cargarapida.com.br",
+    "phone": "7136007000",
+    "telefone_celular": "71997890123",
+    "whatsapp": "71997890123",
+    "optante_simples": true,
+    "is_simples": true,
+    "inscricao_estadual": "789012345",
+    "inscricao_municipal": "109876543",
+    "perfis": [
+      {
+        "tipo_perfil": "Cliente"
+      },
+      {
+        "tipo_perfil": "Transportadora"
+      }
+    ],
+    "endereco": {
+      "cep": "41301110",
+      "zip_code": "41301110",
+      "logradouro": "BR-324 Km 8",
+      "street": "BR-324 Km 8",
+      "numero": "S/N",
+      "number": "S/N",
+      "bairro": "Valéria",
+      "neighborhood": "Valéria",
+      "cidade": "Salvador",
+      "city": "Salvador",
+      "estado": "BA",
+      "state": "BA",
+      "complemento": "Galpão 4",
+      "complement": "Galpão 4"
+    },
+    "address": {
+      "zip_code": "41301110",
+      "street": "BR-324 Km 8",
+      "number": "S/N",
+      "neighborhood": "Valéria",
+      "city": "Salvador",
+      "state": "BA",
+      "complement": "Galpão 4"
+    },
+    "status": "API v2 Real"
+  },
+  {
+    "id": "cli_110",
+    "nome": "Consultoria Marítima & Portuária Ltda",
+    "name": "Consultoria Marítima & Portuária Ltda",
+    "fantasia": "Marítima Consult",
+    "trade_name": "Marítima Consult",
+    "tipo_pessoa": "Jurídica",
+    "person_type": "Jurídica",
+    "cpf_cnpj": "74185296000100",
+    "email": "diretoria@maritimaconsult.com.br",
+    "phone": "7132418899",
+    "telefone_celular": "71998901234",
+    "whatsapp": "71998901234",
+    "optante_simples": true,
+    "is_simples": true,
+    "inscricao_estadual": "Isento",
+    "inscricao_municipal": "098765432",
+    "perfis": [
+      {
+        "tipo_perfil": "Cliente"
+      }
+    ],
+    "endereco": {
+      "cep": "40015010",
+      "zip_code": "40015010",
+      "logradouro": "Avenida da França",
+      "street": "Avenida da França",
+      "numero": "400",
+      "number": "400",
+      "bairro": "Comércio",
+      "neighborhood": "Comércio",
+      "cidade": "Salvador",
+      "city": "Salvador",
+      "estado": "BA",
+      "state": "BA",
+      "complemento": "Sala 302",
+      "complement": "Sala 302"
+    },
+    "address": {
+      "zip_code": "40015010",
+      "street": "Avenida da França",
+      "number": "400",
+      "neighborhood": "Comércio",
+      "city": "Salvador",
+      "state": "BA",
+      "complement": "Sala 302"
+    },
+    "status": "API v2 Real"
+  },
+  {
+    "id": "cli_111",
+    "nome": "Bianca Almeida Santos",
+    "name": "Bianca Almeida Santos",
+    "fantasia": "Bianca Almeida Santos",
+    "tipo_pessoa": "Física",
+    "cpf_cnpj": "03418330557",
+    "email": "glfx20@gmail.com",
+    "telefone_celular": "71991501133",
+    "optante_simples": false,
+    "endereco": {
+      "cidade": "Salvador",
+      "estado": "BA"
+    },
+    "status": "API v2 Real"
+  },
+  {
+    "id": "cli_112",
+    "nome": "Cliente Teste Edicao ATUALIZADO",
+    "name": "Cliente Teste Edicao ATUALIZADO",
+    "tipo_pessoa": "Física",
+    "cpf_cnpj": "03418330533",
+    "email": "editado@teste.com",
+    "telefone_celular": "71911112222",
+    "optante_simples": false,
+    "endereco": {
+      "cidade": "Salvador",
+      "estado": "BA"
+    },
+    "status": "API v2 Real"
+  },
+  {
+    "id": "cli_113",
+    "nome": "CPF Formatado Teste",
+    "name": "CPF Formatado Teste",
+    "tipo_pessoa": "Física",
+    "cpf_cnpj": "03418330533",
+    "optante_simples": false,
+    "endereco": {
+      "cidade": "Salvador",
+      "estado": "BA"
+    },
+    "status": "API v2 Real"
+  },
+  {
+    "id": "cli_114",
+    "nome": "Felipe almeida santos",
+    "name": "Felipe almeida santos",
+    "tipo_pessoa": "Física",
+    "cpf_cnpj": "03418330533",
+    "email": "glfx20@gmail.com",
+    "telefone_celular": "71999450127",
+    "optante_simples": false,
+    "endereco": {
+      "cidade": "Salvador",
+      "estado": "BA"
+    },
+    "status": "API v2 Real"
+  }
+]

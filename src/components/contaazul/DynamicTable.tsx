@@ -51,24 +51,71 @@ export function DynamicTable({
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Normalizar definições de colunas para aceitar tanto strings quanto objetos ColumnDef
+  const normalizedColumns: ColumnDef[] = useMemo(() => {
+    if (!Array.isArray(columns)) return [];
+    return columns.map((col: any) => {
+      if (typeof col === "string") {
+        return { key: col, label: col };
+      }
+      return {
+        key: col.key || col.label || "col",
+        label: col.label || col.key || "Coluna",
+        type: col.type,
+        sortable: col.sortable
+      };
+    });
+  }, [columns]);
+
+  const getRowValue = (row: Record<string, any>, col: ColumnDef) => {
+    if (!row) return undefined;
+    if (row[col.key] !== undefined && row[col.key] !== null) return row[col.key];
+
+    const keyLower = col.key.toLowerCase();
+    const labelLower = col.label.toLowerCase();
+
+    // Property Aliases Fallbacks
+    if (keyLower.includes("nome") || keyLower.includes("name") || labelLower.includes("nome") || labelLower.includes("razão")) {
+      return row.name || row.nome || row.company_name || row.razao_social || row.tradeName || row.description || row.desc;
+    }
+    if (keyLower.includes("doc") || keyLower.includes("cnpj") || keyLower.includes("cpf") || labelLower.includes("doc") || labelLower.includes("cnpj")) {
+      return row.document || row.documento || row.cnpj || row.cpf || row.cpf_cnpj;
+    }
+    if (keyLower.includes("email") || keyLower.includes("mail") || labelLower.includes("email") || labelLower.includes("contato")) {
+      return row.email || row.contato || row.phone || row.telefone;
+    }
+    if (keyLower.includes("valor") || keyLower.includes("val") || labelLower.includes("valor") || labelLower.includes("preço")) {
+      return row.valor || row.value || row.value_brl || row.amount;
+    }
+    if (keyLower.includes("situacao") || keyLower.includes("status") || labelLower.includes("status")) {
+      return row.situacao || row.status;
+    }
+    if (keyLower.includes("vencimento") || keyLower.includes("data") || labelLower.includes("vencimento")) {
+      return row.due_date || row.vencimento || row.data || row.data_vencimento;
+    }
+
+    return undefined;
+  };
+
   // Filtrar dados pela busca
   const filteredRows = useMemo(() => {
     if (!searchQuery.trim()) return rows;
     const q = searchQuery.toLowerCase();
     return rows.filter(row => 
-      columns.some(col => {
-        const val = row[col.key];
+      normalizedColumns.some(col => {
+        const val = getRowValue(row, col);
         return val !== undefined && val !== null && String(val).toLowerCase().includes(q);
       })
     );
-  }, [rows, columns, searchQuery]);
+  }, [rows, normalizedColumns, searchQuery]);
 
   // Ordenar dados
   const sortedRows = useMemo(() => {
     if (!sortConfig) return filteredRows;
     return [...filteredRows].sort((a, b) => {
-      const valA = a[sortConfig.key];
-      const valB = b[sortConfig.key];
+      const col = normalizedColumns.find(c => c.key === sortConfig.key) || { key: sortConfig.key, label: sortConfig.key };
+      const valA = getRowValue(a, col);
+      const valB = getRowValue(b, col);
 
       if (valA === valB) return 0;
       if (valA === undefined || valA === null) return 1;
@@ -82,7 +129,7 @@ export function DynamicTable({
         ? String(valA).localeCompare(String(valB)) 
         : String(valB).localeCompare(String(valA));
     });
-  }, [filteredRows, sortConfig]);
+  }, [filteredRows, sortConfig, normalizedColumns]);
 
   // Paginação
   const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
@@ -98,20 +145,15 @@ export function DynamicTable({
       const allIds = sortedRows.map((r, i) => r.id || String(i));
       const newSet = new Set(allIds);
       setSelectedIds(newSet);
-      onSelect?.(Array.from(newSet));
     } else {
       setSelectedIds(new Set());
-      onSelect?.([]);
     }
   };
 
   const handleSelectRow = (id: string, checked: boolean) => {
     const newSet = new Set(selectedIds);
-    if (checked) {
-      newSet.add(id);
-    } else {
-      newSet.delete(id);
-    }
+    if (checked) newSet.add(id);
+    else newSet.delete(id);
     setSelectedIds(newSet);
     onSelect?.(Array.from(newSet));
   };
@@ -126,7 +168,7 @@ export function DynamicTable({
   };
 
   const renderCell = (row: Record<string, any>, col: ColumnDef) => {
-    const value = row[col.key];
+    const value = getRowValue(row, col);
 
     if (col.type === 'currency') {
       const num = typeof value === 'number' ? value : parseFloat(String(value || 0));
@@ -152,7 +194,7 @@ export function DynamicTable({
 
     if (col.type === 'badge') {
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
           {String(value || 'N/A')}
         </span>
       );
@@ -179,7 +221,7 @@ export function DynamicTable({
               setSearchQuery(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full pl-8 pr-3 py-1 bg-white border border-[#E2E8F0] rounded-md text-xs outline-none focus:ring-1 focus:ring-blue-500 transition-all"
+            className="w-full pl-8 pr-3 py-1 bg-white border border-[#E2E8F0] rounded-md text-xs outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
           />
         </div>
 
@@ -199,10 +241,10 @@ export function DynamicTable({
                   checked={isAllSelected}
                   ref={input => { if (input) input.indeterminate = isIndeterminate; }}
                   onChange={handleSelectAll}
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
+                  className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
                 />
               </th>
-              {columns.map(col => (
+              {normalizedColumns.map(col => (
                 <th 
                   key={col.key} 
                   className={`px-3 py-2.5 whitespace-nowrap ${col.sortable !== false ? 'cursor-pointer hover:bg-slate-100 transition-colors select-none' : ''}`}
@@ -213,7 +255,7 @@ export function DynamicTable({
                     {col.sortable !== false && (
                       <span className="inline-flex flex-col text-slate-400">
                         {sortConfig && sortConfig.key === col.key ? (
-                          sortConfig.direction === 'asc' ? <ChevronUp size={12} className="text-blue-600" /> : <ChevronDown size={12} className="text-blue-600" />
+                          sortConfig.direction === 'asc' ? <ChevronUp size={12} className="text-emerald-600" /> : <ChevronDown size={12} className="text-emerald-600" />
                         ) : (
                           <ChevronDown size={12} className="opacity-40" />
                         )}
@@ -227,7 +269,7 @@ export function DynamicTable({
           <tbody className="divide-y divide-slate-100 bg-white">
             {paginatedRows.length === 0 ? (
               <tr>
-                <td colSpan={columns.length + 1} className="px-4 py-6 text-center text-slate-400 font-medium">
+                <td colSpan={normalizedColumns.length + 1} className="px-4 py-6 text-center text-slate-400 font-medium">
                   {emptyMessage}
                 </td>
               </tr>
@@ -236,16 +278,16 @@ export function DynamicTable({
                 const rowId = row.id || String(i);
                 const isSelected = selectedIds.has(rowId);
                 return (
-                  <tr key={rowId} className={`hover:bg-slate-50/80 transition-colors ${isSelected ? 'bg-blue-50/20' : ''}`}>
+                  <tr key={rowId} className={`hover:bg-slate-50/80 transition-colors ${isSelected ? 'bg-emerald-50/20' : ''}`}>
                     <td className="px-3 py-2">
                       <input 
                         type="checkbox"
                         checked={isSelected}
                         onChange={(e) => handleSelectRow(rowId, e.target.checked)}
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
+                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
                       />
                     </td>
-                    {columns.map(col => (
+                    {normalizedColumns.map(col => (
                       <td key={col.key} className="px-3 py-2 whitespace-nowrap">
                         {renderCell(row, col)}
                       </td>

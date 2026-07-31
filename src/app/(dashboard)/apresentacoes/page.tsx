@@ -158,15 +158,26 @@ const canonical7Themes = [
 ];
 
 export default function ApresentacoesPage() {
-  const [topic, setTopic] = useState("Proposta Comercial de BPO Financeiro & Gestão de Caixas");
-  const [description, setDescription] = useState("Apresentação executiva para clientes de médio porte demonstrando a redução de custos com a terceirização de contas a pagar/receber, conciliação bancária diária e emissão de DRE gerencial.");
-  const [slideCount, setSlideCount] = useState<number>(5);
-  const [selectedTheme, setSelectedTheme] = useState(canonical7Themes[0].id);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [topic, setTopic] = useState("Proposta Comercial de BPO Financeiro");
+  const [description, setDescription] = useState("Apresentação de proposta comercial para terceirização completa da gestão financeira de empresa de médio porte.");
+  const [slideCount, setSlideCount] = useState(5);
+  const [selectedTheme, setSelectedTheme] = useState("escuro");
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [showNoCoinsModal, setShowNoCoinsModal] = useState(false);
   const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
+  const [coinBalance, setCoinBalance] = useState<number>(14250);
+
+  // Dynamic cost per slide count
+  const estimatedCoins = slideCount <= 3 ? 40 : slideCount <= 5 ? 60 : slideCount <= 8 ? 80 : 100;
+
+  useEffect(() => {
+    import("@/lib/coins/store").then(m => setCoinBalance(m.getCoinBalance()));
+    const handleCoins = () => import("@/lib/coins/store").then(m => setCoinBalance(m.getCoinBalance()));
+    window.addEventListener("omnizeus_coins_change", handleCoins);
+    return () => window.removeEventListener("omnizeus_coins_change", handleCoins);
+  }, []);
 
   const [slides, setSlides] = useState<Slide[]>([
     {
@@ -252,22 +263,204 @@ export default function ApresentacoesPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isFullscreen, slides.length]);
 
+const generateDynamicDeck = (count: number, topicText: string, descText: string): Slide[] => {
+  const layouts: Slide['layoutType'][] = [
+    "hero_cover",
+    "single_stat_hero",
+    "kpi_metrics",
+    "comparison_before_after",
+    "process_timeline",
+    "matrix_2x2",
+    "executive_table",
+    "bullets_pills",
+    "roadmap",
+    "quote_highlight"
+  ];
+
+  const rawCleanDesc = descText.replace(/\*\*/g, '').trim();
+  const descItems = rawCleanDesc.split(/[\n,;•.]/).map(s => s.trim()).filter(s => s.length > 3);
+  const mainSubtitle = descItems[0] || rawCleanDesc || "Apresentação Executiva de Alto Impacto • Zenitus Contábil";
+
+  const generated: Slide[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const layout = layouts[i % layouts.length];
+    const slideNum = i + 1;
+
+    if (slideNum === 1) {
+      generated.push({
+        id: 1,
+        layoutType: "hero_cover",
+        title: topicText || "Proposta Comercial de BPO Financeiro",
+        subtitle: mainSubtitle,
+        cards: [
+          { title: "Diagnóstico Completo", desc: descItems[1] || "Mapeamento das rotinas contábeis e fiscais do cliente", stat: "100%" },
+          { title: "Redução de Riscos", desc: descItems[2] || "Controle preventivo contra contingências na malha e-CAC", stat: "0%" },
+          { title: "Eficiência Operacional", desc: descItems[3] || "Automação de conciliação bancária e DRE em tempo real", stat: "24/7" }
+        ]
+      });
+    } else if (layout === "single_stat_hero") {
+      generated.push({
+        id: slideNum,
+        layoutType: "single_stat_hero",
+        title: `Indicadores de Sucesso — ${topicText}`,
+        subtitle: descItems[slideNum % Math.max(1, descItems.length)] || "Métricas institucionais de alta performance",
+        singleStat: {
+          value: "65%",
+          label: "Redução de Custo Fixo Operacional",
+          desc: rawCleanDesc || "Substituição de rotinas manuais por BPO financeiro especializado com SLAs contratuais."
+        }
+      });
+    } else if (layout === "kpi_metrics") {
+      generated.push({
+        id: slideNum,
+        layoutType: "kpi_metrics",
+        title: "Metas & KPIs Institucionais",
+        subtitle: "Acompanhamento em tempo real no ecossistema OmniZeus",
+        metrics: [
+          { label: "Conciliação OFX", value: "100%", detail: "Processamento diário sem divergências" },
+          { label: "Redução de Multas", value: "0%", detail: "Conformidade fiscal rigorosa com e-CAC" },
+          { label: "Disponibilidade", value: "24/7", detail: "Painel de bordo para decisão estratégica" }
+        ]
+      });
+    } else if (layout === "comparison_before_after") {
+      generated.push({
+        id: slideNum,
+        layoutType: "comparison_before_after",
+        title: "Comparativo de Modelo de Operação",
+        subtitle: "Evolução do Modelo Tradicional para o BPO Digital",
+        comparison: [
+          {
+            side: "Gestão Interna / Tradicional",
+            points: [
+              "Processos manuais em planilhas dispersas",
+              "Risco de multas e pendências fiscais",
+              "Atrasos em pagamentos e conciliação bancária"
+            ]
+          },
+          {
+            side: "BPO Digital Zenitus Contábil",
+            points: [
+              "Automação OFX integrada com ContaAzul",
+              "Monitoramento preventivo e-CAC",
+              "Emissão mensal de DRE gerencial"
+            ]
+          }
+        ]
+      });
+    } else if (layout === "process_timeline") {
+      generated.push({
+        id: slideNum,
+        layoutType: "process_timeline",
+        title: "Fluxo de Execução & Etapas",
+        subtitle: "Processo estruturado passo a passo",
+        timelineSteps: [
+          { stepNumber: 1, title: "Diagnóstico Inicial", desc: descItems[0] || "Mapeamento das rotinas e contas bancárias." },
+          { stepNumber: 2, title: "Integração & Parâmetros", desc: descItems[1] || "Configuração do sistema e alçadas." },
+          { stepNumber: 3, title: "Operação Assistida & GO-LIVE", desc: descItems[2] || "Acompanhamento diário com especialista dedicado." }
+        ]
+      });
+    } else if (layout === "matrix_2x2") {
+      generated.push({
+        id: slideNum,
+        layoutType: "matrix_2x2",
+        title: "Matriz Estratégica de Prioridades",
+        subtitle: "Análise de valor vs esforço de implantação",
+        matrix: [
+          { quad: "Q1 — Urgente & Vital", title: "Compliance Fiscal", desc: "Regularização imediata de pendências e-CAC." },
+          { quad: "Q2 — Alto Valor", title: "Conciliação OFX", desc: "Automação do fluxo diário com o ERP." },
+          { quad: "Q3 — Suporte", title: "Emissão de Notas", desc: "Faturamento padronizado e otimizado." },
+          { quad: "Q4 — Estratégico", title: "DRE Gerencial", desc: "Relatórios mensais para conselho diretor." }
+        ]
+      });
+    } else if (layout === "executive_table") {
+      generated.push({
+        id: slideNum,
+        layoutType: "executive_table",
+        title: "Quadro Resumo de Entregáveis",
+        subtitle: "Detalhamento dos escopos contratuais",
+        tableRows: [
+          { escopo: "Contas a Pagar & Agendamentos", frequencia: "Diária", nivel: "Crítico", status: "Incluso" },
+          { escopo: "Conciliação Bancária OFX", frequencia: "Diária", nivel: "Alto", status: "Incluso" },
+          { escopo: "Emissão de DRE & Relatórios", frequencia: "Mensal", nivel: "Estratégico", status: "Incluso" },
+          { escopo: "Suporte Fiscal & Dúvidas", frequencia: "Contínuo", nivel: "Alto", status: "Incluso" }
+        ]
+      });
+    } else if (layout === "bullets_pills") {
+      generated.push({
+        id: slideNum,
+        layoutType: "bullets_pills",
+        title: `Checklist & Próximos Passos — Slide ${slideNum}`,
+        subtitle: rawCleanDesc.slice(0, 120) || "Alinhamento das rotinas contábeis e fiscais",
+        bullets: descItems.length >= 3 ? descItems.slice(0, 5) : [
+          "Revisão de Compensações Fiscais",
+          "Calendário de Obrigações Acessórias",
+          "Reunião de Alinhamento Fiscal & Contábil",
+          "Validação de Saldos Bancários",
+          "Entrega de Relatórios Executivos"
+        ]
+      });
+    } else if (layout === "roadmap") {
+      generated.push({
+        id: slideNum,
+        layoutType: "roadmap",
+        title: "Cronograma de Implantação",
+        subtitle: "Fases de transição e resultados esperados",
+        timelineSteps: [
+          { stepNumber: 1, title: "Fase 1 (Semanas 1-2)", desc: "Mapeamento de rotinas e integração de APIs." },
+          { stepNumber: 2, title: "Fase 2 (Semanas 3-4)", desc: "Homologação de pagamentos e testes de conciliação." },
+          { stepNumber: 3, title: "Fase 3 (Mês 2 em diante)", desc: "Operação plena com envio de DRE gerencial." }
+        ]
+      });
+    } else {
+      generated.push({
+        id: slideNum,
+        layoutType: "quote_highlight",
+        title: "Compromisso de Encerramento",
+        subtitle: "Garantia institucional de qualidade Zenitus",
+        quoteText: rawCleanDesc.length > 20 ? rawCleanDesc : "Transformamos a rotina financeira do seu negócio em um motor estratégico de dados precisos e previsibilidade de caixa.",
+        quoteAuthor: "Diretoria de Operações & BPO Financeiro — Zenitus Contábil"
+      });
+    }
+  }
+
+  return generated;
+};
+
   const handleGenerateSlides = async () => {
-    const success = deductCoins(80, "Geração Deck Executivo (80 Coins)");
-    if (!success) {
-      setShowNoCoinsModal(true);
-      return;
+    // Consume Coins in backend first
+    try {
+      const consumeRes = await fetch("/api/coins/consume", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agente_id: "gerador_apresentacoes",
+          agente_nome: "Gerador Decks Executivos",
+          modelo: "google/gemini-2.5-pro",
+          funcionalidade: `Geração Deck (${slideCount} slides)`,
+          tipo_operacao: "EXECUTIVE_PRESENTATION",
+          coins_consumed: estimatedCoins
+        })
+      });
+
+      if (consumeRes.status === 402) {
+        setShowNoCoinsModal(true);
+        return;
+      }
+    } catch (e) {
+      console.error("Erro ao descontar coins no backend:", e);
     }
 
     setIsGenerating(true);
     try {
       const promptContent = `PRESENTATION INTELLIGENCE ENGINE V4.0 — MINIMAX & GAMMA DESIGN ENGINE:
-Gere a estrutura completa de ${slideCount} slides para uma apresentação sobre o tema: "${topic}".
-Descrição e objetivo: ${description}.
+Gere a estrutura completa de EXATAMENTE ${slideCount} slides para uma apresentação sobre o tema: "${topic}".
+Descrição e objetivo da reunião: ${description}.
 
 REGRAS ESTRITAS DE VARIABILIDADE VISUAL & STORYTELLING:
-1. NUNCA REPITA O MESMO LAYOUT EM SLIDES CONSECUTIVOS.
-2. Alterne obrigatoriamente entre as seguintes estruturas de layout:
+1. O array JSON DEVE CONTER EXATAMENTE ${slideCount} OBJETOS DE SLIDE (NÃO GERE MENOS QUE ${slideCount}).
+2. NUNCA REPITA O MESMO LAYOUT EM SLIDES CONSECUTIVOS.
+3. Alterne obrigatoriamente entre as seguintes estruturas de layout:
    - "hero_cover": Capa Impactante (Título, subtítulo, estatísticas de topo).
    - "single_stat_hero": Destaque de Número Gigante (Single Stat Callout).
    - "kpi_metrics": 3 Métricas Numéricas de ROI / Estatísticas.
@@ -276,55 +469,10 @@ REGRAS ESTRITAS DE VARIABILIDADE VISUAL & STORYTELLING:
    - "process_timeline": Fluxo de Processo Conectado (#1 → #2 → #3 → #4).
    - "roadmap": Cronograma de Implantação por fases.
    - "executive_table": Tabela Executiva Estruturada.
+   - "bullets_pills": Lista de itens em pílulas destacadas.
    - "quote_highlight": Citação de Conselho com destaque serifado.
-   - "cards_grid": Cartões informativos (PERMITIDO NO MÁXIMO 1X em toda a apresentação!).
 
-RETORNE APENAS UM ARRAY JSON VÁLIDO:
-[
-  {
-    "id": 1,
-    "layoutType": "hero_cover",
-    "title": "...",
-    "subtitle": "...",
-    "cards": [
-      { "title": "...", "desc": "...", "stat": "..." }
-    ]
-  },
-  {
-    "id": 2,
-    "layoutType": "single_stat_hero",
-    "title": "...",
-    "subtitle": "...",
-    "singleStat": { "value": "...", "label": "...", "desc": "..." }
-  },
-  {
-    "id": 3,
-    "layoutType": "comparison_before_after",
-    "title": "...",
-    "subtitle": "...",
-    "comparison": [
-      { "side": "Antes / Tradicional", "points": ["...", "..."] },
-      { "side": "Depois / Com Solução", "points": ["...", "..."] }
-    ]
-  },
-  {
-    "id": 4,
-    "layoutType": "process_timeline",
-    "title": "...",
-    "subtitle": "...",
-    "timelineSteps": [
-      { "stepNumber": 1, "title": "...", "desc": "..." }
-    ]
-  },
-  {
-    "id": 5,
-    "layoutType": "quote_highlight",
-    "title": "...",
-    "subtitle": "...",
-    "quoteText": "...",
-    "quoteAuthor": "..."
-  }
-]`;
+RETORNE APENAS UM ARRAY JSON VÁLIDO COM ${slideCount} SLIDES.`;
 
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -342,7 +490,7 @@ RETORNE APENAS UM ARRAY JSON VÁLIDO:
           const parsedSlides = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(aiText);
           
           if (Array.isArray(parsedSlides) && parsedSlides.length > 0) {
-            setSlides(parsedSlides.map((s: any, idx: number) => ({
+            const mapped = parsedSlides.map((s: any, idx: number) => ({
               id: idx + 1,
               layoutType: s.layoutType || (idx === 0 ? 'hero_cover' : idx === 1 ? 'single_stat_hero' : idx === 2 ? 'comparison_before_after' : idx === 3 ? 'process_timeline' : 'quote_highlight'),
               title: s.title || "Slide Sem Título",
@@ -357,48 +505,27 @@ RETORNE APENAS UM ARRAY JSON VÁLIDO:
               singleStat: s.singleStat || s.single_stat,
               quoteText: s.quoteText || s.quote_text || "",
               quoteAuthor: s.quoteAuthor || s.quote_author || ""
-            })));
+            }));
+
+            // If AI returned fewer slides than requested, complement dynamically
+            if (mapped.length < slideCount) {
+              const fullDeck = generateDynamicDeck(slideCount, topic, description);
+              const combined = [...mapped, ...fullDeck.slice(mapped.length)].map((s, i) => ({ ...s, id: i + 1 }));
+              setSlides(combined);
+            } else {
+              setSlides(mapped.slice(0, slideCount));
+            }
           } else {
             throw new Error("Formato JSON Inválido");
           }
         } catch (parseError) {
-          console.error("Failed to parse AI JSON response:", parseError, aiText);
-          throw new Error("Fallback para gerador interno");
+          setSlides(generateDynamicDeck(slideCount, topic, description));
         }
       } else {
-        throw new Error("Fallback para gerador interno");
+        setSlides(generateDynamicDeck(slideCount, topic, description));
       }
     } catch (e) {
-      setSlides([
-        {
-          id: 1,
-          layoutType: "hero_cover",
-          title: topic,
-          subtitle: "Apresentação Executiva • Zenitus Contábil",
-          cards: [
-            { title: "Diagnóstico Completo", desc: "Mapeamento das rotinas contábeis e fiscais do cliente", stat: "100%" },
-            { title: "Redução de Erros", desc: "Controle preventivo contra contingências na malha e-CAC", stat: "0%" }
-          ]
-        },
-        {
-          id: 2,
-          layoutType: "comparison_before_after",
-          title: "Comparativo de Performance",
-          subtitle: "Evolução do Modelo Tradicional para o BPO Digital",
-          comparison: [
-            { side: "Gestão Tradicional", points: ["Processos manuais", "Risco de multas", "Falta de conciliação"] },
-            { side: "BPO Digital Zenitus", points: ["Automação OFX", "Conformidade e-CAC", "DRE em tempo real"] }
-          ]
-        },
-        {
-          id: 3,
-          layoutType: "quote_highlight",
-          title: "Conclusão Estratégica",
-          subtitle: "Encerramento Executivo",
-          quoteText: "Garantimos previsibilidade e dados precisos para o crescimento sustentável da sua empresa.",
-          quoteAuthor: "Equipe Técnica Zenitus Inteligência Contábil"
-        }
-      ]);
+      setSlides(generateDynamicDeck(slideCount, topic, description));
     } finally {
       setCurrentSlideIndex(0);
       setIsGenerating(false);
@@ -648,6 +775,20 @@ RETORNE APENAS UM ARRAY JSON VÁLIDO:
           </div>
         </div>
 
+        {/* Encarte de Estimativa de Consumo de Coins */}
+        <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl space-y-1.5 text-xs">
+          <div className="flex items-center justify-between font-bold text-amber-900">
+            <span className="flex items-center gap-1.5">
+              <span>🪙</span> Custo Estimado da Apresentação ({slideCount} slides):
+            </span>
+            <span className="text-sm font-extrabold text-amber-800">🪙 {estimatedCoins} OMNICoins</span>
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-slate-600">
+            <span>Saldo Atual: <strong>{coinBalance.toLocaleString('pt-BR')} Coins</strong></span>
+            <span>Saldo Após Geração: <strong>{Math.max(0, coinBalance - estimatedCoins).toLocaleString('pt-BR')} Coins</strong></span>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4 items-end">
           <div className="md:col-span-6">
             <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Descrição / Objetivo da Reunião:</label>
@@ -660,7 +801,7 @@ RETORNE APENAS UM ARRAY JSON VÁLIDO:
             />
           </div>
 
-          <div className="md:col-span-4">
+          <div className="md:col-span-3">
             <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5 flex items-center gap-1.5">
               <Palette className="w-3.5 h-3.5 text-primary" />
               Sistema de Design (7):
@@ -676,14 +817,14 @@ RETORNE APENAS UM ARRAY JSON VÁLIDO:
             </select>
           </div>
 
-          <div className="md:col-span-2">
+          <div className="md:col-span-3">
             <button
               onClick={handleGenerateSlides}
               disabled={isGenerating}
               className="w-full py-2.5 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition-all shadow-xs disabled:opacity-50"
             >
               {isGenerating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              <span>Gerar</span>
+              <span>{isGenerating ? "Criando..." : `Gerar — ${estimatedCoins} Coins`}</span>
             </button>
           </div>
         </div>

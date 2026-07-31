@@ -10,7 +10,8 @@ import {
   UserCheck,
   Briefcase,
   Building2,
-  ChevronDown
+  ChevronDown,
+  Globe
 } from "lucide-react";
 import { 
   getCurrentUser, logoutUser, UserProfile, ROLE_LABELS, 
@@ -32,7 +33,7 @@ export function Header({
   
   // Multi-Tenant Context State
   const [companies, setCompanies] = useState<CompanyProfile[]>([]);
-  const [activeCompanyId, setActiveCompanyIdState] = useState<string>("comp_zenitus");
+  const [activeCompanyId, setActiveCompanyIdState] = useState<string>("global");
 
   useEffect(() => {
     setCurrentUser(getCurrentUser());
@@ -84,87 +85,83 @@ export function Header({
     };
   }, []);
 
-  const handleSelectCompany = (comp: CompanyProfile) => {
-    setActiveCompanyContext(comp.id, comp.tradeName || comp.corporateName);
-    setActiveCompanyIdState(comp.id);
-    setBalance(comp.coinsFranchise || 15000);
-  };
-
-  const isMasterAdmin = currentUser.role === "super_adm" || currentUser.email === "jsgleisson@gmail.com";
-  const activeCompany = companies.find(c => c.id === activeCompanyId) || companies[0] || {
-    id: "comp_zenitus",
-    corporateName: "Zenitus Inteligência Contábil Ltda",
-    tradeName: "Zenitus Contábil",
-    cnpj: "42.189.902/0001-55"
-  };
+  const isMasterAdmin = currentUser.role === "super_adm";
+  const activeCompany = companies.find(c => c.id === activeCompanyId);
 
   return (
     <header 
-      className={`h-14 bg-white border-b border-gray-200 fixed top-0 right-0 z-30 flex items-center justify-between px-4 sm:px-6 transition-all duration-300 ${
+      className={`h-14 bg-white border-b border-slate-200/80 fixed top-0 right-0 z-30 flex items-center justify-between px-4 sm:px-6 transition-all duration-300 ${
         isCollapsed ? "left-0 lg:left-16" : "left-0 lg:left-64"
       }`}
     >
-      {/* Left: Mobile Toggle & Company Context */}
+      {/* Left: Mobile Toggle & Super Admin Company Context Selector */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 mr-2">
         <button
           onClick={() => setIsMobileOpen(true)}
-          className="lg:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors shrink-0"
+          className="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors shrink-0"
           title="Abrir menu"
         >
           <Menu className="w-5 h-5" />
         </button>
 
-        {/* Multi-Tenant Company Context Selector ONLY VISIBLE FOR MASTER ADMIN */}
         {isMasterAdmin ? (
-          <div className="flex items-center gap-2 bg-primary/10 border border-primary/20 px-2.5 py-1 rounded-lg">
-            <Building2 className="w-4 h-4 text-primary shrink-0" />
-            <div className="flex flex-col min-w-0">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-primary leading-none">
-                Empresa Ativa (Master Admin):
-              </span>
+          <div className="flex items-center gap-2">
+            <div className="relative flex items-center">
+              {activeCompanyId === 'global' ? (
+                <Globe className="w-3.5 h-3.5 text-primary absolute left-3 pointer-events-none" />
+              ) : (
+                <Building2 className="w-3.5 h-3.5 text-primary absolute left-3 pointer-events-none" />
+              )}
               <select
                 value={activeCompanyId}
                 onChange={(e) => {
-                  const target = companies.find(c => c.id === e.target.value);
-                  if (target) handleSelectCompany(target);
+                  const val = e.target.value;
+                  if (val === 'global') {
+                    setActiveCompanyContext('global', 'Visão Global SaaS Master');
+                  } else {
+                    const found = companies.find(c => c.id === val);
+                    if (found) {
+                      setActiveCompanyContext(found.id, found.tradeName || found.corporateName);
+                    }
+                  }
                 }}
-                className="bg-transparent text-xs font-bold text-slate-900 focus:outline-none cursor-pointer truncate max-w-[180px] sm:max-w-[260px]"
+                className="h-8 pl-8 pr-7 text-xs bg-slate-50 hover:bg-slate-100/80 text-slate-800 font-medium rounded-lg border border-slate-200/90 focus:outline-none focus:border-primary cursor-pointer transition-all appearance-none max-w-[140px] sm:max-w-[220px] truncate"
               >
+                <option value="global">Visão Global (Consolidado SaaS)</option>
+                {companies.length > 0 && <option disabled>──────────────</option>}
                 {companies.map(c => (
-                  <option key={c.id} value={c.id}>{c.tradeName || c.corporateName}</option>
+                  <option key={c.id} value={c.id}>
+                    {c.tradeName || c.corporateName}
+                  </option>
                 ))}
               </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 pointer-events-none" />
             </div>
+
+            {activeCompanyId !== 'global' ? (
+              <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200/70 rounded-md text-[10px] font-semibold tracking-tight">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                Empresa Ativa: <strong className="font-bold">{activeCompany?.tradeName || activeCompanyId}</strong>
+              </span>
+            ) : (
+              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 bg-primary/5 text-primary border border-primary/20 rounded-md text-[10px] font-semibold">
+                Consolidado Master
+              </span>
+            )}
           </div>
         ) : (
-          /* Standard Company Title for Gestores and Funcionários */
-          <div className="hidden sm:flex flex-col shrink-0 min-w-0">
-            <div className="flex items-center gap-1.5 truncate">
-              <h2 className="text-xs font-semibold text-gray-900 tracking-tight truncate max-w-[200px] lg:max-w-[300px]">
-                {activeCompany.tradeName || activeCompany.corporateName}
-              </h2>
-              <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 text-[10px] font-medium border border-gray-200 shrink-0">
-                Matriz
-              </span>
-            </div>
-            <p className="text-[10px] text-gray-400 font-normal truncate">CNPJ: {activeCompany.cnpj || "42.189.902/0001-55"}</p>
+          <div className="flex items-center gap-2 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700">
+            <Building2 className="w-3.5 h-3.5 text-primary" />
+            <span>{currentUser.companyName || 'Empresa Contratante'}</span>
           </div>
         )}
       </div>
 
+
+
       {/* Right Controls */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        {/* OmniCoins Balance Widget (Specific to current active company) */}
-        {currentUser.role !== "funcionario" && (
-          <div className="flex items-center gap-1.5 sm:gap-2 bg-gray-50 border border-gray-200 px-2.5 sm:px-3 py-1 rounded-lg transition-all hover:bg-gray-100 shrink-0">
-            <Coins className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-            <div className="text-xs font-medium">
-              <span className="text-gray-500 font-normal hidden xl:inline">Saldo OmniCoins: </span>
-              <span className="font-semibold text-gray-900">{balance.toLocaleString('pt-BR')}</span>
-              <span className="text-[10px] text-gray-400 ml-1 hidden 2xl:inline">(~R$ {(balance * 0.1).toFixed(2)})</span>
-            </div>
-          </div>
-        )}
+        {/* OmniCoins widget removed per user request */}
 
         {/* Interactive Notifications Trigger */}
         <NotificationsFilter />

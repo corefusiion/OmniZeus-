@@ -33,7 +33,7 @@ export function ActionConfirmCard({ action, onConfirm, onCancel }: ActionConfirm
   
   const getIcon = () => {
     switch (action.type) {
-      case 'CREATE_CLIENT': return <UserPlus size={24} className="text-blue-600" />;
+      case 'CREATE_CLIENT': return <UserPlus size={24} className="text-emerald-600" />;
       case 'CREATE_ENTRY': return <DollarSign size={24} className="text-emerald-600" />;
       case 'UPDATE_DOCUMENT': return <FileText size={24} className="text-purple-600" />;
       default: return <Settings size={24} className="text-slate-600" />;
@@ -45,11 +45,11 @@ export function ActionConfirmCard({ action, onConfirm, onCancel }: ActionConfirm
       case 'pending': 
         return <div className="w-2.5 h-2.5 rounded-full bg-yellow-400 animate-pulse" title="Aguardando confirmação" />;
       case 'executing': 
-        return <Loader2 size={18} className="text-[#1E6FD9] animate-spin" title="Executando..." />;
+        return <span title="Executando..."><Loader2 size={18} className="text-[#10b981] animate-spin" /></span>;
       case 'success': 
-        return <CheckCircle2 size={18} className="text-green-500" title="Concluído" />;
+        return <span title="Concluído"><CheckCircle2 size={18} className="text-green-500" /></span>;
       case 'error': 
-        return <XCircle size={18} className="text-red-500" title="Erro" />;
+        return <span title="Erro"><XCircle size={18} className="text-red-500" /></span>;
       default: 
         return null;
     }
@@ -67,7 +67,7 @@ export function ActionConfirmCard({ action, onConfirm, onCancel }: ActionConfirm
         <div className="flex items-start justify-between gap-4 mb-4">
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-lg ${
-               action.type === 'CREATE_CLIENT' ? 'bg-blue-50' : 
+               action.type === 'CREATE_CLIENT' ? 'bg-emerald-50' : 
                action.type === 'CREATE_ENTRY' ? 'bg-emerald-50' : 
                action.type === 'UPDATE_DOCUMENT' ? 'bg-purple-50' : 
                'bg-slate-50'

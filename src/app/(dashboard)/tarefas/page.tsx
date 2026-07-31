@@ -196,33 +196,35 @@ export default function TarefasPage() {
   useEffect(() => {
     setRole(getActiveRole());
     const handleRoleChange = () => setRole(getActiveRole());
-    window.addEventListener("omnizeus_role_change", handleRoleChange);
-    loadTasks();
-    loadEmployees();
+    const handleContextChange = () => {
+      loadPageData();
+    };
 
-    return () => window.removeEventListener("omnizeus_role_change", handleRoleChange);
+    window.addEventListener("omnizeus_role_change", handleRoleChange);
+    window.addEventListener("omnizeus_company_context_change", handleContextChange);
+    window.addEventListener("omnizeus_sql_db_change", handleContextChange);
+
+    loadPageData();
+
+    return () => {
+      window.removeEventListener("omnizeus_role_change", handleRoleChange);
+      window.removeEventListener("omnizeus_company_context_change", handleContextChange);
+      window.removeEventListener("omnizeus_sql_db_change", handleContextChange);
+    };
   }, []);
 
-  const loadEmployees = async () => {
+  const loadPageData = async () => {
+    setLoading(true);
     try {
-      const emps = await fetchServerTable<EmployeeUser>("employees");
+      const [records, emps] = await Promise.all([
+        fetchTasks(),
+        fetchServerTable<EmployeeUser>("employees")
+      ]);
+
       if (Array.isArray(emps) && emps.length > 0) {
         setEmployees(emps);
       }
-    } catch (e) {}
-  };
 
-function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'concluido' {
-  const str = String(rawStatus || '').toLowerCase().trim();
-  if (str.includes('andamento') || str === 'em_andamento') return 'em_andamento';
-  if (str.includes('conclu') || str === 'concluido') return 'concluido';
-  return 'pendente';
-}
-
-  const loadTasks = async () => {
-    setLoading(true);
-    try {
-      const records = await fetchTasks();
       if (Array.isArray(records)) {
         const uniqueMap = new Map<string, TaskRecord>();
         records.forEach((r: any) => {
@@ -246,22 +248,26 @@ function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'con
             company_id: r.company_id || "comp_zenitus",
             isTimerRunning: false
           };
-          const key = `${norm.id}_${norm.title}`;
-          if (!uniqueMap.has(key)) {
-            uniqueMap.set(key, norm);
-          }
+          uniqueMap.set(norm.id, norm);
         });
         setTasks(Array.from(uniqueMap.values()));
       } else {
         setTasks([]);
       }
-    } catch (err) {
-      console.error("Erro ao carregar tarefas do servidor SQLite:", err);
+    } catch (e) {
+      console.error("Erro ao carregar dados de tarefas:", e);
       setTasks([]);
     } finally {
       setLoading(false);
     }
   };
+
+function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'concluido' {
+  const str = String(rawStatus || '').toLowerCase().trim();
+  if (str.includes('andamento') || str === 'em_andamento') return 'em_andamento';
+  if (str.includes('conclu') || str === 'concluido') return 'concluido';
+  return 'pendente';
+}
 
   // Real-time Timer Tick Effect for running tasks
   useEffect(() => {

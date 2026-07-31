@@ -192,9 +192,23 @@ export default function ContratosPage() {
     setRole(getActiveRole());
     loadContracts();
 
-    const handleRoleChange = () => setRole(getActiveRole());
+    const handleRoleChange = () => {
+      setRole(getActiveRole());
+      loadContracts();
+    };
+    const handleContextChange = () => {
+      loadContracts();
+    };
+
     window.addEventListener("omnizeus_role_change", handleRoleChange);
-    return () => window.removeEventListener("omnizeus_role_change", handleRoleChange);
+    window.addEventListener("omnizeus_company_context_change", handleContextChange);
+    window.addEventListener("omnizeus_sql_db_change", handleContextChange);
+
+    return () => {
+      window.removeEventListener("omnizeus_role_change", handleRoleChange);
+      window.removeEventListener("omnizeus_company_context_change", handleContextChange);
+      window.removeEventListener("omnizeus_sql_db_change", handleContextChange);
+    };
   }, []);
 
   const loadContracts = async () => {

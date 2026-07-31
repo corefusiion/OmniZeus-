@@ -1,12 +1,20 @@
-import { fetchServerSettings, updateServerSettings } from "../db/serverDb";
+// OmniCoins Store — Per-Company Wallet
+// Each company has its own coins_franchise balance stored in companies[id].coins_franchise
+// Global settings.coins_balance is NO LONGER used for tenant deductions
 
 export interface CoinTransaction {
   id: string;
+  company_id: string;
   timestamp: string;
   type: 'usage' | 'recharge';
   action: string;
   coins: number;
   costBrl: number;
+  agent?: string;
+  model?: string;
+  tokens?: number;
+  messages?: number;
+  balanceAfter?: number;
 }
 
 export const COIN_CONVERSION = {
@@ -20,39 +28,97 @@ export const COIN_CONVERSION = {
   }
 };
 
-let inMemoryCoinBalance = 14250;
-let isInitialized = false;
+// Per-company in-memory cache: { [companyId]: balance }
+let inMemoryBalances: Record<string, number> = {};
+// In-memory transaction log (no mock data — all real)
+let inMemoryTransactions: CoinTransaction[] = [];
 
-export async function fetchCoinBalanceFromServer(): Promise<number> {
+// ─── Fetch balance for a specific company from server ──────────────────────
+
+export async function fetchCoinBalanceFromServer(companyId: string): Promise<number> {
   try {
-    const settings = await fetchServerSettings();
-    if (settings && typeof settings.coins_balance === 'number') {
-      inMemoryCoinBalance = settings.coins_balance;
-      isInitialized = true;
+    const res = await fetch(`/api/db?table=companies`, { cache: 'no-store' });
+    if (res.ok) {
+      const json = await res.json();
+      const companies: any[] = Array.isArray(json.data) ? json.data : [];
+      const company = companies.find((c: any) => c.id === companyId);
+      if (company) {
+        const balance = typeof company.coins_franchise === 'number'
+          ? company.coins_franchise
+          : (typeof company.coinsFranchise === 'number' ? company.coinsFranchise : 0);
+        inMemoryBalances[companyId] = balance;
+        return balance;
+      }
     }
   } catch (err) {
-    console.error("Error fetching coin balance from server:", err);
+    console.error(`[Coins] Error fetching balance for company ${companyId}:`, err);
   }
-  return inMemoryCoinBalance;
+  return inMemoryBalances[companyId] ?? 0;
 }
 
-export function getCoinBalance(): number {
-  if (typeof window !== 'undefined' && !isInitialized) {
-    isInitialized = true;
-    fetchCoinBalanceFromServer().then(() => {
+// ─── Get cached balance (triggers async fetch on first call) ───────────────
+
+export function getCoinBalance(companyId: string = 'comp_zenitus'): number {
+  if (typeof window !== 'undefined' && !(companyId in inMemoryBalances)) {
+    fetchCoinBalanceFromServer(companyId).then(() => {
       window.dispatchEvent(new Event('omnizeus_coins_change'));
     }).catch(() => {});
   }
-  return inMemoryCoinBalance;
+  return inMemoryBalances[companyId] ?? 0;
 }
 
-export function deductCoins(amount: number, actionName: string): boolean {
-  const current = getCoinBalance();
+// ─── Get usage logs, optionally filtered by company ────────────────────────
+
+export function getCoinUsageLogs(companyId?: string): CoinTransaction[] {
+  if (!companyId) return inMemoryTransactions;
+  return inMemoryTransactions.filter(t => t.company_id === companyId);
+}
+
+// ─── Deduct coins from a specific company ──────────────────────────────────
+
+export async function deductCoinsFromCompany(
+  companyId: string,
+  amount: number,
+  actionName: string,
+  meta?: { agent?: string; model?: string; tokens?: number }
+): Promise<boolean> {
+  const current = await fetchCoinBalanceFromServer(companyId);
   if (current < amount) return false;
-  
-  const updated = current - amount;
-  inMemoryCoinBalance = updated;
-  updateServerSettings({ coins_balance: updated }).catch(() => {});
+
+  const updated = Math.max(0, current - amount);
+  inMemoryBalances[companyId] = updated;
+
+  // Persist via the consume API (which updates companies table)
+  try {
+    await fetch('/api/coins/consume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        company_id: companyId,
+        coins_consumed: amount,
+        funcionalidade: actionName,
+        agente_nome: meta?.agent || 'Omni IA Hub',
+        modelo: meta?.model || 'OpenRouter LLM',
+        tokens_input: meta?.tokens || Math.floor(amount * 450),
+        tokens_output: 0,
+      })
+    });
+  } catch (e) {}
+
+  inMemoryTransactions.unshift({
+    id: `tx-${Date.now()}`,
+    company_id: companyId,
+    timestamp: new Date().toISOString(),
+    type: 'usage',
+    action: actionName,
+    agent: meta?.agent || 'Omni IA Hub',
+    model: meta?.model || 'OpenRouter LLM',
+    tokens: meta?.tokens || Math.floor(amount * 450),
+    messages: 1,
+    coins: amount,
+    costBrl: Number((amount * COIN_CONVERSION.BRL_PER_COIN).toFixed(2)),
+    balanceAfter: updated
+  });
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('omnizeus_coins_change'));
@@ -60,14 +126,58 @@ export function deductCoins(amount: number, actionName: string): boolean {
   return true;
 }
 
-export function addCoins(amount: number): void {
-  const current = getCoinBalance();
+// ─── Legacy sync shim — components not yet updated can still call deductCoins
+
+export function deductCoins(amount: number, actionName: string, meta?: { agent?: string; model?: string; tokens?: number }): boolean {
+  const companyId = 'comp_zenitus';
+  deductCoinsFromCompany(companyId, amount, actionName, meta).catch(() => {});
+  const current = inMemoryBalances[companyId] ?? 0;
+  inMemoryBalances[companyId] = Math.max(0, current - amount);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('omnizeus_coins_change'));
+  }
+  return true;
+}
+
+// ─── Add coins to a company (recharge) ────────────────────────────────────
+
+export async function addCoinsToCompany(companyId: string, amount: number): Promise<void> {
+  const current = await fetchCoinBalanceFromServer(companyId);
   const updated = current + amount;
-  inMemoryCoinBalance = updated;
-  updateServerSettings({ coins_balance: updated }).catch(() => {});
+  inMemoryBalances[companyId] = updated;
+
+  try {
+    await fetch('/api/db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'update',
+        table: 'companies',
+        record: { id: companyId, coins_franchise: updated }
+      })
+    });
+  } catch (e) {}
+
+  inMemoryTransactions.unshift({
+    id: `tx-rec-${Date.now()}`,
+    company_id: companyId,
+    timestamp: new Date().toISOString(),
+    type: 'recharge',
+    action: `Recarga de Franquia (+${amount.toLocaleString('pt-BR')} Coins)`,
+    agent: 'Plano SaaS Master',
+    coins: amount,
+    costBrl: Number((amount * COIN_CONVERSION.BRL_PER_COIN).toFixed(2)),
+    balanceAfter: updated
+  });
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('omnizeus_coins_change'));
   }
 }
+
+// Legacy shim
+export function addCoins(amount: number): void {
+  addCoinsToCompany('comp_zenitus', amount).catch(() => {});
+}
+
 

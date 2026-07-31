@@ -73,7 +73,7 @@ export function FileImportZone({
     const ext = fileName.split('.').pop()?.toLowerCase();
     if (['pdf'].includes(ext || '')) return <FileText size={32} className="text-red-500" />;
     if (['xlsx', 'xls', 'csv'].includes(ext || '')) return <FileSpreadsheet size={32} className="text-green-500" />;
-    if (['png', 'jpg', 'jpeg'].includes(ext || '')) return <ImageIcon size={32} className="text-blue-500" />;
+    if (['png', 'jpg', 'jpeg'].includes(ext || '')) return <ImageIcon size={32} className="text-emerald-500" />;
     return <FileIcon size={32} className="text-slate-500" />;
   };
 
@@ -87,7 +87,7 @@ export function FileImportZone({
     <div className="w-full">
       <div 
         className={`relative border-2 border-dashed rounded-lg p-8 transition-colors flex flex-col items-center justify-center text-center cursor-pointer ${
-          isDragging ? 'border-[#1E6FD9] bg-blue-50' : 
+          isDragging ? 'border-[#10b981] bg-emerald-50' : 
           selectedFile ? 'border-green-300 bg-green-50' : 
           'border-slate-300 bg-slate-50 hover:bg-slate-100'
         } ${isProcessing ? 'opacity-80 pointer-events-none' : ''}`}
@@ -106,7 +106,7 @@ export function FileImportZone({
 
         {!selectedFile ? (
           <>
-            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mb-4 text-[#1E6FD9]">
+            <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mb-4 text-[#10b981]">
               <Upload size={24} />
             </div>
             <h3 className="text-sm font-semibold text-slate-900 mb-1">{label}</h3>
@@ -145,7 +145,7 @@ export function FileImportZone({
                 </div>
                 <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
                   <div 
-                    className="h-full bg-[#1E6FD9] transition-all duration-300 ease-out"
+                    className="h-full bg-[#10b981] transition-all duration-300 ease-out"
                     style={{ width: `${progress}%` }}
                   />
                 </div>

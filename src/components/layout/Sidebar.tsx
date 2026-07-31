@@ -54,12 +54,13 @@ const mainNavGroups: NavGroup[] = [
     category: "Operação Financeira",
     icon: DollarSign,
     items: [
-      { href: "/financeiro", label: "Contas a Pagar & Coins", icon: DollarSign },
+      { href: "/financeiro", label: "Contas a Pagar", icon: DollarSign },
       { href: "/contratos", label: "Contratos de Honorários", icon: Briefcase },
       { href: "/solicitacoes", label: "Solicitações & Compras", icon: FileCheck },
       { href: "/contaazul", label: "Integração Conta Azul", icon: LinkIcon },
     ],
   },
+
   {
     id: "operacao",
     category: "Operação",
@@ -97,10 +98,7 @@ const masterGroup: NavGroup = {
   items: [
     { href: "/empresas", label: "Empresas (Centro de Comando)", icon: Building2 },
     { href: "/super-adm", label: "Configurações da Plataforma", icon: Settings },
-    { href: "/super-adm?tab=users", label: "Usuários Globais", icon: Users },
-    { href: "/super-adm?tab=agents", label: "Agentes Globais", icon: Bot },
     { href: "/super-adm?tab=integrations", label: "Integrações Globais", icon: Share2 },
-    { href: "/super-adm?tab=audit", label: "Auditoria Global", icon: ScrollText },
   ],
 };
 
@@ -163,12 +161,20 @@ export function Sidebar({
     setOpenGroups(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const isMasterAdmin = role === "super_adm" || currentUserEmail === "jsgleisson@gmail.com";
+  const isMasterAdmin = role === "super_adm";
 
-  const displayedGroups = [...mainNavGroups];
+  const displayedGroups = mainNavGroups.filter(group => {
+    // Hide "Administração" category for operational employees (funcionario)
+    if (group.id === "admin" && role === "funcionario") {
+      return false;
+    }
+    return true;
+  });
+
   if (isMasterAdmin) {
     displayedGroups.push(masterGroup);
   }
+
 
   return (
     <>
@@ -275,6 +281,7 @@ export function Sidebar({
                         <Link
                           key={item.label}
                           href={item.href}
+                          prefetch={true}
                           onClick={(e) => {
                             if (item.isFuture) e.preventDefault();
                             setIsMobileOpen(false);
