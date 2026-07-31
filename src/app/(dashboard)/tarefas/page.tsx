@@ -223,7 +223,7 @@ function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'con
     setLoading(true);
     try {
       const records = await fetchTasks();
-      if (Array.isArray(records) && records.length > 0) {
+      if (Array.isArray(records)) {
         const uniqueMap = new Map<string, TaskRecord>();
         records.forEach((r: any) => {
           const norm: TaskRecord = {
@@ -253,14 +253,11 @@ function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'con
         });
         setTasks(Array.from(uniqueMap.values()));
       } else {
-        for (const mockTask of INITIAL_MOCK_TASKS) {
-          await insertTask(mockTask);
-        }
-        setTasks(INITIAL_MOCK_TASKS.map(t => ({ ...t, isTimerRunning: false })));
+        setTasks([]);
       }
     } catch (err) {
       console.error("Erro ao carregar tarefas do servidor SQLite:", err);
-      setTasks(INITIAL_MOCK_TASKS.map(t => ({ ...t, isTimerRunning: false })));
+      setTasks([]);
     } finally {
       setLoading(false);
     }

@@ -471,27 +471,12 @@ export default function OmniContaAzulIAPage() {
     }
   };
 
-  // Criar Nova Consulta e Selecionar o Novo Chat Imediatamente
-  const handleNewConversation = async () => {
-    const newId = `conv_${Date.now()}`;
-    const newConv: ConversationItem = {
-      id: newId,
-      title: "Nova Consulta ERP",
-      date: new Date().toLocaleDateString("pt-BR"),
-      isPinned: false
-    };
-
-    setConversations(prev => [newConv, ...prev]);
-    setCurrentConvId(newId);
-    currentConvIdRef.current = newId;
-    localStorage.setItem("omnizeus_contaazul_active_conv_id", newId);
+  // Prepara o ambiente para Nova Consulta (criação real do histórico ocorre no 1º envio)
+  const handleNewConversation = () => {
+    setCurrentConvId("");
+    currentConvIdRef.current = "";
+    localStorage.removeItem("omnizeus_contaazul_active_conv_id");
     setMessages([]);
-
-    await fetch('/api/contaazul/ia-workspace/history', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'create', conversation: newConv })
-    });
   };
 
   const handleTogglePin = async (convId: string, e: React.MouseEvent) => {
@@ -879,9 +864,15 @@ export default function OmniContaAzulIAPage() {
                                 if (act.type === 'CREATE_CLIENT') {
                                   const payload = {
                                     name: act.data.nome || act.data.name,
+                                    tradeName: act.data.nomeFantasia || act.data.tradeName,
                                     document: act.data.documento || act.data.document,
                                     email: act.data.email,
-                                    phone: act.data.telefone || act.data.phone
+                                    phone: act.data.telefone || act.data.phone,
+                                    personType: act.data.tipoPessoa === 'Física' ? 'Física' : 'Jurídica',
+                                    roleIsClient: act.data.papel === 'Cliente' || !act.data.papel,
+                                    roleIsSupplier: act.data.papel === 'Fornecedor',
+                                    roleIsCarrier: act.data.papel === 'Transportadora',
+                                    isSimples: String(act.data.optanteSimples).toLowerCase() === 'sim' || act.data.optanteSimples === true
                                   };
                                   res = await fetch('/api/contaazul/customers', {
                                     method: 'POST',
@@ -914,12 +905,11 @@ export default function OmniContaAzulIAPage() {
                                 }));
                               } catch (e: any) {
                                 console.error("Erro ao executar ação:", e);
-                                alert("Falha na Integração Real: " + e.message);
                                 setMessages(prev => prev.map(m => {
                                   if (m.id === msg.id && m.actions) {
                                     return {
                                       ...m,
-                                      actions: m.actions.map(a => a.id === actionId ? { ...a, status: 'error' } : a)
+                                      actions: m.actions.map(a => a.id === actionId ? { ...a, status: 'error', errorReason: e.message } : a)
                                     };
                                   }
                                   return m;
@@ -992,15 +982,18 @@ export default function OmniContaAzulIAPage() {
 
                 <textarea
                   value={inputText}
+                  disabled={isProcessing}
                   onChange={e => setInputText(e.target.value)}
                   onKeyDown={e => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      handleSendPrompt(inputText);
+                      if (!isProcessing && inputText.trim()) {
+                        handleSendPrompt(inputText);
+                      }
                     }
                   }}
-                  placeholder="Pergunte sobre clientes, fornecedores, lançamentos ou peça para cadastrar títulos..."
-                  className="flex-1 max-h-28 min-h-[40px] bg-transparent resize-none py-2 outline-none text-xs md:text-sm text-[#0F172A] placeholder-slate-400"
+                  placeholder={isProcessing ? "Aguarde, processando consulta..." : "Pergunte sobre clientes, fornecedores, lançamentos ou peça para cadastrar títulos..."}
+                  className="flex-1 max-h-28 min-h-[40px] bg-transparent resize-none py-2 outline-none text-xs md:text-sm text-[#0F172A] placeholder-slate-400 disabled:opacity-60 disabled:cursor-not-allowed"
                   rows={1}
                 />
 

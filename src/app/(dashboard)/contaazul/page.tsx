@@ -36,14 +36,7 @@ export interface ContaAzulCategory {
   status: string;
 }
 
-const DEFAULT_CATEGORIES: ContaAzulCategory[] = [
-  { id: "cat_1", categoryName: "Honorários de Recorrência Mensal BPO", type: "RECEITA", dreLine: "Receita Bruta (DRE 1.1)", status: "Ativo" },
-  { id: "cat_2", categoryName: "Softwares Fiscais & Assinaturas", type: "DESPESA", dreLine: "Custos Operacionais (DRE 4.2)", status: "Ativo" },
-  { id: "cat_3", categoryName: "Aluguel & Infraestrutura", type: "DESPESA", dreLine: "Despesas Administrativas (DRE 6.1)", status: "Ativo" },
-  { id: "cat_4", categoryName: "Tributos e Taxas Municipais/Federais", type: "DESPESA", dreLine: "Impostos e Abatimentos (DRE 2.1)", status: "Ativo" },
-  { id: "cat_5", categoryName: "Folha de Pagamento & Encargos", type: "DESPESA", dreLine: "Despesas com Pessoal (DRE 5.1)", status: "Ativo" },
-  { id: "cat_6", categoryName: "Consultoria & Serviços Terceirizados", type: "DESPESA", dreLine: "Custos Operacionais (DRE 4.2)", status: "Ativo" }
-];
+const DEFAULT_CATEGORIES: ContaAzulCategory[] = [];
 
 export default function ContaAzulPage() {
   const searchParams = useSearchParams();

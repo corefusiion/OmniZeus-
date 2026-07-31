@@ -100,45 +100,9 @@ export default function DashboardPage() {
         setContaAzulClients(caClients || []);
         setContaAzulEntries(caEntries || []);
 
-        // Auto-seed mock data if SQLite tables are empty
-        if (!payables || payables.length === 0) {
-          const defaultPayables = [
-            { id: "pag_202601", desc: "Licença Mensal Alterdata ERP", fornecedor: "Alterdata Ltda", valor: 3450.00, vencimento: "2026-08-05", status: "Pendente" },
-            { id: "pag_202602", desc: "Servidor Cloud AWS & OpenRouter", fornecedor: "Amazon Web Services", valor: 1280.50, vencimento: "2026-08-10", status: "Pendente" },
-            { id: "pag_202603", desc: "Aluguel Conjunto Comercial", fornecedor: "Imobiliária Salvador", valor: 8500.00, vencimento: "2026-08-10", status: "Pendente" },
-            { id: "pag_202604", desc: "Assinatura WhatsApp Evolution API", fornecedor: "Zenitus Tech", valor: 490.00, vencimento: "2026-08-15", status: "Agendado" },
-            { id: "pag_202605", desc: "Certificados Digitais e-CNPJ", fornecedor: "Certisign", valor: 1650.00, vencimento: "2026-08-18", status: "Pago" }
-          ];
-          for (const p of defaultPayables) {
-            await insertServerTable('payables', p);
-          }
-          payables = defaultPayables;
-        }
-
-        if (!contracts || contracts.length === 0) {
-          const defaultContracts = [
-            { id: "ct_301", contract_number: "CTR-2026-001", client_name: "Atacadão das Tintas Ltda", monthly_fee_brl: 4850.00, adjustment_index: "IPCA", next_adjustment_date: "2026-08-01", status: "Em Reajuste" },
-            { id: "ct_302", contract_number: "CTR-2026-002", client_name: "Supermercado Nova Era", monthly_fee_brl: 7200.00, adjustment_index: "IGP-M", next_adjustment_date: "2026-09-15", status: "Ativo" },
-            { id: "ct_303", contract_number: "CTR-2026-003", client_name: "Clínica Médica Vida & Saúde", monthly_fee_brl: 3900.00, adjustment_index: "IPCA", next_adjustment_date: "2026-10-01", status: "Ativo" },
-            { id: "ct_304", contract_number: "CTR-2026-004", client_name: "Construtora Horizonte Azul", monthly_fee_brl: 12500.00, adjustment_index: "INPC", next_adjustment_date: "2026-11-10", status: "Ativo" }
-          ];
-          for (const c of defaultContracts) {
-            await insertServerTable('contracts', c);
-          }
-          contracts = defaultContracts;
-        }
-
-        if (!requests || requests.length === 0) {
-          const defaultReqs = [
-            { id: "req_401", req_number: "REQ-2026-001", requester_name: "Juliana Lima", department: "Operações Tributárias", type: "recarga_coins", description: "Inclusão de saldo de 5.000 OmniCoins", value_brl: 490.00, status: "Aprovado" },
-            { id: "req_402", req_number: "REQ-2026-002", requester_name: "Juliana Lima", department: "Operações Tributárias", type: "compra_material", description: "Aquisição de dois monitores Dell 27 polegadas", value_brl: 2400.00, status: "Pendente" },
-            { id: "req_403", req_number: "REQ-2026-003", requester_name: "Carlos Mendes", department: "Diretoria Contábil", type: "servico_terceiro", description: "Auditoria externa independente", value_brl: 6800.00, status: "Aprovado" }
-          ];
-          for (const r of defaultReqs) {
-            await insertServerTable('purchase_requests', r);
-          }
-          requests = defaultReqs;
-        }
+        if (!payables) payables = [];
+        if (!contracts) contracts = [];
+        if (!requests) requests = [];
 
         // Compute KPI values
         const totalPayablesSum = payables.reduce((acc: number, item: any) => acc + (item.valor || item.value_brl || 0), 0);
@@ -150,33 +114,54 @@ export default function DashboardPage() {
         setContractsMrr(totalContractsMrr);
         setRequestsCount(requests ? requests.length : 0);
 
-        // Build Purchase Request Status breakdown for Chart 1
-        const reqApproved = requests.filter((r: any) => (r.status || "").toLowerCase() === "aprovado").length;
+        // Build Purchase Request Status breakdown for Chart 1 (Dynamic)
+        const reqApproved = requests.filter((r: any) => (r.status || "").toLowerCase() === "aprovado" || (r.status || "").toLowerCase() === "aprovada").length;
         const reqPending = requests.filter((r: any) => (r.status || "").toLowerCase() === "pendente").length;
         const reqOther = Math.max(0, requests.length - reqApproved - reqPending);
 
         setRequestStatusData([
-          { name: "Aprovadas", value: reqApproved || 2, color: "#10B981" },
-          { name: "Pendentes", value: reqPending || 1, color: "#F59E0B" },
-          { name: "Em Análise", value: reqOther || 1, color: "hsl(var(--primary))" }
+          { name: "Aprovadas", value: reqApproved, color: "#10B981" },
+          { name: "Pendentes", value: reqPending, color: "#F59E0B" },
+          { name: "Em Análise", value: reqOther, color: "#1E6FD9" }
         ]);
 
-        // Build 8-month financial trend data (Jan-Ago 2026) for Charts 2, 3, 4
-        const mrr = totalContractsMrr || 28450;
-        const currExp = totalPayablesSum || 25561.30;
+        // Build 8-month financial trend data (Jan-Ago 2026) dynamically from real DB records
+        const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago"];
 
-        const trend = [
-          { month: "Jan", despesas: 18200, receita: 24500, compras: 3200, fluxo: 6300 },
-          { month: "Fev", despesas: 19500, receita: 25000, compras: 1800, fluxo: 5500 },
-          { month: "Mar", despesas: 21100, receita: 26200, compras: 4500, fluxo: 5100 },
-          { month: "Abr", despesas: 20400, receita: 27800, compras: 2900, fluxo: 7400 },
-          { month: "Mai", despesas: 22800, receita: 28450, compras: 5100, fluxo: 5650 },
-          { month: "Jun", despesas: 23100, receita: 28450, compras: 3800, fluxo: 5350 },
-          { month: "Jul", despesas: 24200, receita: 28450, compras: 9690, fluxo: 4250 },
-          { month: "Ago", despesas: Math.round(currExp), receita: Math.round(mrr), compras: 9690, fluxo: Math.round(mrr - currExp) }
-        ];
+        const dynamicTrend = monthNames.map((monthStr, idx) => {
+          const monthPayables = payables.reduce((acc: number, p: any) => {
+            const dStr = p.due_date || p.vencimento || p.created_at || "";
+            if (!dStr) return acc;
+            const dateObj = new Date(dStr);
+            if (!isNaN(dateObj.getTime()) && dateObj.getMonth() === idx) {
+              return acc + Number(p.value_brl || p.valor || 0);
+            }
+            return acc;
+          }, 0);
 
-        setMonthlyData(trend);
+          const monthReqs = requests.reduce((acc: number, r: any) => {
+            const dStr = r.created_at || "";
+            if (!dStr) return acc;
+            const dateObj = new Date(dStr);
+            if (!isNaN(dateObj.getTime()) && dateObj.getMonth() === idx) {
+              return acc + Number(r.value_brl || 0);
+            }
+            return acc;
+          }, 0);
+
+          const monthMrr = totalContractsMrr;
+          const monthFluxo = monthMrr - monthPayables;
+
+          return {
+            month: monthStr,
+            despesas: Math.round(monthPayables),
+            receita: Math.round(monthMrr),
+            compras: Math.round(monthReqs),
+            fluxo: Math.round(monthFluxo)
+          };
+        });
+
+        setMonthlyData(dynamicTrend);
       } catch (err) {
         console.error("Error loading dashboard data:", err);
       } finally {

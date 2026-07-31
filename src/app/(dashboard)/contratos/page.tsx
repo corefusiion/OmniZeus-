@@ -201,18 +201,14 @@ export default function ContratosPage() {
     setLoading(true);
     try {
       const data = await fetchContracts();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setContracts(data.map(normalizeContract));
       } else {
-        // Seed default contracts to SQLite DB if empty
-        for (const c of DEFAULT_CONTRACTS) {
-          await insertContract(c);
-        }
-        setContracts(DEFAULT_CONTRACTS);
+        setContracts([]);
       }
     } catch (e) {
       console.error("Error loading contracts from serverDb:", e);
-      setContracts(DEFAULT_CONTRACTS);
+      setContracts([]);
     } finally {
       setLoading(false);
     }

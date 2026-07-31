@@ -212,7 +212,7 @@ export function DynamicTable({
                     {col.label}
                     {col.sortable !== false && (
                       <span className="inline-flex flex-col text-slate-400">
-                        {sortConfig?.key === col.key ? (
+                        {sortConfig && sortConfig.key === col.key ? (
                           sortConfig.direction === 'asc' ? <ChevronUp size={12} className="text-blue-600" /> : <ChevronDown size={12} className="text-blue-600" />
                         ) : (
                           <ChevronDown size={12} className="opacity-40" />

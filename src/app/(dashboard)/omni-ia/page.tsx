@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   Sparkles, Send, Bot, User, RefreshCw, Cpu, BookOpen, Coins, 
-  Copy, Trash2, Plus, History, ChevronRight, Layers, Pin, Edit2, Check, X
+  Copy, Trash2, Plus, History, ChevronRight, Layers, Pin, Edit2, Check, X, ArrowRight, MessageSquare
 } from "lucide-react";
 import { deductCoins } from "@/lib/coins/store";
-import { sqlDb, getLocalSqlDb } from "@/lib/db/sqlite";
+import { sqlDb } from "@/lib/db/sqlite";
 import { getCustomAgents, CustomAgent } from "@/lib/agents/store";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { fetchServerSettings, fetchServerTable, insertServerTable } from "@/lib/db/serverDb";
@@ -26,7 +26,7 @@ interface ConversationItem {
   isPinned?: boolean;
 }
 
-// 15 Newest 2026 Frontier LLMs organized by Providers (3 top models per provider)
+// 15 Newest 2026 Frontier LLMs organized by Providers
 const modelGroups = [
   {
     provider: "OpenAI",
@@ -72,35 +72,87 @@ const modelGroups = [
 
 const allModelsList = modelGroups.flatMap(g => g.models);
 
+const SPECIALIST_CARDS = [
+  {
+    id: "geral",
+    label: "Assistente Geral Contábil",
+    category: "Contábil & DRE",
+    color: "bg-blue-50 text-blue-700 border-blue-200/60",
+    description: "Dúvidas contábeis, escrituração NBC TG, balancetes e conciliações de contas.",
+    samplePrompt: "Como estruturar o plano de contas e DRE gerencial para prestador de BPO?"
+  },
+  {
+    id: "fiscal",
+    label: "Especialista Fiscal & SPED",
+    category: "Tributário & SPED",
+    color: "bg-emerald-50 text-emerald-700 border-emerald-200/60",
+    description: "Apuração de Simples Nacional, Fator R, ICMS, IPI, PIS/COFINS, DCTFWeb e SPED.",
+    samplePrompt: "Calcular alíquota efetiva do Simples Nacional no Anexo III aplicando Fator R."
+  },
+  {
+    id: "contratos",
+    label: "Redator de Contratos & Societário",
+    category: "Jurídico & Societário",
+    color: "bg-purple-50 text-purple-700 border-purple-200/60",
+    description: "Elaboração de contratos sociais, alteração contratual, distratos e acordos de sócios.",
+    samplePrompt: "Gerar minuta de alteração contratual LTDA para entrada de novo sócio."
+  },
+  {
+    id: "apresentacoes_deck",
+    label: "Agente IA Decks & Apresentações",
+    category: "Apresentações Executive",
+    color: "bg-indigo-50 text-indigo-700 border-indigo-200/60",
+    description: "Criação de roteiros para slides executivos, reuniões de resultados e propostas.",
+    samplePrompt: "Elaborar estrutura de slides para apresentação de resultado fiscal e BPO ao cliente."
+  }
+];
+function sanitizeAiText(raw: string): string {
+  if (!raw) return "";
+  let text = raw.trim();
+  // Remove markdown code blocks containing json
+  text = text.replace(/```json[\s\S]*?```/gi, "").trim();
+  text = text.replace(/```[\s\S]*?```/gi, (match) => {
+    if (match.includes("{") && match.includes("}")) return "";
+    return match;
+  }).trim();
+  // If the whole string is a JSON array or object, convert to friendly text or strip
+  if ((text.startsWith("[") && text.endsWith("]")) || (text.startsWith("{") && text.endsWith("}"))) {
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed) || typeof parsed === "object") {
+        return "Análise concluída e estrutura processada com sucesso. Como deseja detalhar cada tópico abordado?";
+      }
+    } catch (e) {}
+  }
+  return text || "Resposta processada com sucesso.";
+}
+
 export default function OmniIAPage() {
   const [selectedModel, setSelectedModel] = useState(allModelsList[3].id);
   const [personas, setPersonas] = useState<CustomAgent[]>([]);
   const [selectedPersona, setSelectedPersona] = useState<string>("agente_geral");
   const [inputMessage, setInputMessage] = useState("");
-  const [loadingConvId, setLoadingConvId] = useState<string | null>(null);
+  
+  // Isolated loading state per conversation ID
+  const [loadingConvIds, setLoadingConvIds] = useState<Record<string, boolean>>({});
+  
   const [showHistorySidebar, setShowHistorySidebar] = useState(true);
-  const [activeConvId, setActiveConvId] = useState<string>("conv_1");
+  const [activeConvId, setActiveConvId] = useState<string>("");
+  const activeConvIdRef = useRef<string>(activeConvId);
+
+  useEffect(() => {
+    activeConvIdRef.current = activeConvId;
+  }, [activeConvId]);
 
   const [editingConvId, setEditingConvId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState<string>("");
 
-  // Elegant Confirmation Modal States
+  // Confirmation Modal States
   const [deletingConvId, setDeletingConvId] = useState<string | null>(null);
   const [showNoCoinsModal, setShowNoCoinsModal] = useState(false);
 
-  const [conversations, setConversations] = useState<ConversationItem[]>([
-    { id: 'conv_1', title: 'Dúvida Simples Nacional - Fator R', model: 'Claude 4.8 Sonnet', isPinned: true }
-  ]);
-
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "msg_1",
-      sender: "ai",
-      text: "Olá, Carlos! Sou o cérebro do OmniIA Hub. Como posso auxiliar o escritório Zenitus Contábil hoje? Selecione um dos modelos de ponta (GPT-5.5, Claude 4.8 Sonnet, Gemini 3.6 Pro, DeepSeek V4) no menu superior.",
-      timestamp: "09:00",
-      model: "Claude 4.8 Sonnet"
-    }
-  ]);
+  const [conversations, setConversations] = useState<ConversationItem[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
 
   const activeModelObj = allModelsList.find(m => m.id === selectedModel) || allModelsList[0];
   const activePersonaObj = personas.find(p => p.id === selectedPersona) || personas.find(p => p.id === "agente_geral") || personas[0] || {
@@ -124,28 +176,42 @@ export default function OmniIAPage() {
               isPinned: Boolean(c.pinned)
             })));
             setActiveConvId(activeConvs[0].id);
+            activeConvIdRef.current = activeConvs[0].id;
             if (activeConvs[0].persona) {
               setSelectedPersona(activeConvs[0].persona);
             }
+          } else {
+            setConversations([]);
+            setActiveConvId("");
+            activeConvIdRef.current = "";
           }
+        } else {
+          setConversations([]);
+          setActiveConvId("");
+          activeConvIdRef.current = "";
         }
       } catch (err) {
-        console.error("Erro ao carregar conversas do SQLite serverDb:", err);
+        console.error("Erro ao carregar conversas do servidor DB:", err);
+        setConversations([]);
+        setActiveConvId("");
+        activeConvIdRef.current = "";
       }
     };
 
     loadConversationsFromSql();
 
-    // Load dynamic custom agents
     setPersonas(getCustomAgents());
     const handleAgentsChange = () => setPersonas(getCustomAgents());
     window.addEventListener("omnizeus_agents_change", handleAgentsChange);
     return () => window.removeEventListener("omnizeus_agents_change", handleAgentsChange);
   }, []);
 
-  // Listen to Active Conversation Changes and Load Messages & Sync Persona
+  // Listen to Active Conversation Changes and Load Messages Strictly Filtered by ConvId
   useEffect(() => {
-    if (!activeConvId) return;
+    if (!activeConvId) {
+      setMessages([]);
+      return;
+    }
 
     const loadMessagesFromSql = async () => {
       try {
@@ -163,66 +229,91 @@ export default function OmniIAPage() {
           setMessages(sortedMsgs.map((m: any) => ({
             id: m.id,
             sender: m.sender as 'user' | 'ai',
-            text: m.text,
+            text: m.sender === 'ai' ? sanitizeAiText(m.text) : m.text,
             timestamp: new Date(m.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             model: m.model || activeModelObj.name
           })));
         } else {
-          const modelName = conv?.model || activeModelObj.name;
-          setMessages([{
-            id: `msg_init_${Date.now()}`,
-            sender: "ai",
-            text: `Sessão iniciada com o modelo ${modelName}. Como posso ajudar?`,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            model: modelName
-          }]);
+          setMessages([]);
         }
       } catch (err) {
-        console.error("Erro ao carregar mensagens da conversa no SQLite serverDb:", err);
+        console.error("Erro ao carregar mensagens da conversa:", err);
+        setMessages([]);
       }
     };
 
     loadMessagesFromSql();
   }, [activeConvId, activeModelObj]);
 
+  const executeChatQuery = async (textToSend: string, overridePersonaId?: string) => {
+    const promptText = textToSend.trim();
+    if (!promptText) return;
 
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim() || loadingConvId === activeConvId) return;
+    const activePersona = overridePersonaId || selectedPersona;
+    const personaObj = personas.find(p => p.id === activePersona) || activePersonaObj;
 
-    // Check & Deduct OmniCoins (5 Coins = R$ 0,50)
+    // Deduct OmniCoins (5 Coins)
     const success = deductCoins(5, `Consulta Chat OmniIA (${activeModelObj.name})`);
     if (!success) {
       setShowNoCoinsModal(true);
       return;
     }
 
-    const currentInput = inputMessage;
-    const currentConvId = activeConvId;
+    let targetConvId = activeConvId;
+
+    // Always create a new conversation ID if starting from welcome screen or clicking a specialist card
+    if (!targetConvId || conversations.length === 0 || overridePersonaId) {
+      targetConvId = `conv_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const newTitle = personaObj.label || promptText.substring(0, 30);
+      const newConv: ConversationItem = { id: targetConvId, title: newTitle, model: activeModelObj.name, isPinned: false };
+      setConversations(prev => [newConv, ...prev.filter(c => c.id !== targetConvId)]);
+      setActiveConvId(targetConvId);
+      activeConvIdRef.current = targetConvId;
+      setMessages([]);
+      
+      sqlDb.insert('conversations', {
+        id: targetConvId,
+        title: newConv.title,
+        model: activeModelObj.name,
+        persona: activePersona,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+    }
+
+    if (overridePersonaId) {
+      setSelectedPersona(overridePersonaId);
+    }
+
     const userMsg: Message = {
       id: `msg_${Date.now()}`,
       sender: "user",
-      text: currentInput,
+      text: promptText,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
+    // Store in SQL DB immediately
     await insertServerTable('messages', {
       id: userMsg.id,
-      conversation_id: currentConvId,
+      conversation_id: targetConvId,
       sender: 'user',
-      text: currentInput,
+      text: promptText,
       model: activeModelObj.name,
       created_at: new Date().toISOString()
     });
 
-    setMessages(prev => [...prev, userMsg]);
+    // Update screen if user is currently viewing targetConvId
+    if (activeConvIdRef.current === targetConvId) {
+      setMessages(prev => [...prev, userMsg]);
+    }
+    
     setInputMessage("");
-    setLoadingConvId(currentConvId);
+    setLoadingConvIds(prev => ({ ...prev, [targetConvId]: true }));
 
     try {
       const settings = await fetchServerSettings();
       const savedKey = settings?.openrouter_api_key || null;
 
-      // Call Edge Proxy Endpoint
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { 
@@ -230,12 +321,18 @@ export default function OmniIAPage() {
           ...(savedKey ? { "x-openrouter-key": savedKey } : {})
         },
         body: JSON.stringify({
-          messages: [{ role: "user", content: currentInput }],
+          messages: [
+            ...messages.map(m => ({
+              role: m.sender === 'user' ? 'user' : 'assistant',
+              content: m.text
+            })),
+            { role: "user", content: promptText }
+          ],
           model: selectedModel,
-          persona: selectedPersona,
-          personaPrompt: activePersonaObj.systemPrompt,
+          persona: activePersona,
+          personaPrompt: personaObj.systemPrompt,
           clientApiKey: savedKey || undefined,
-          conversationId: currentConvId
+          conversationId: targetConvId
         }),
       });
 
@@ -254,13 +351,12 @@ export default function OmniIAPage() {
         model: activeModelObj.name
       };
 
-      setMessages(prev => [...prev, aiMsg]);
-      
-      // O salvamento no banco agora é feito diretamente pelo backend para garantir persistência 
-      // mesmo que a página seja atualizada durante o processamento da IA.
-
+      // Update screen ONLY if user is currently viewing targetConvId
+      if (activeConvIdRef.current === targetConvId) {
+        setMessages(prev => [...prev, aiMsg]);
+      }
     } catch (err) {
-      const fallbackText = `Estamos offline no momento.`;
+      const fallbackText = `Estamos enfrentando uma instabilidade temporária no servidor de IA.`;
 
       const aiMsg: Message = {
         id: `msg_${Date.now() + 1}`,
@@ -270,33 +366,27 @@ export default function OmniIAPage() {
         model: activeModelObj.name
       };
 
-      setMessages(prev => [...prev, aiMsg]);
+      if (activeConvIdRef.current === targetConvId) {
+        setMessages(prev => [...prev, aiMsg]);
+      }
     } finally {
-      setLoadingConvId(prev => prev === currentConvId ? null : prev);
+      setLoadingConvIds(prev => ({ ...prev, [targetConvId]: false }));
     }
   };
 
+  const handleStartAgentChat = (agentId: string, samplePrompt?: string) => {
+    executeChatQuery(samplePrompt || `Olá! Preciso de auxílio contábil como ${agentId}.`, agentId);
+  };
+
+  const handleSendMessage = async () => {
+    executeChatQuery(inputMessage);
+  };
+
   const handleNewConversation = () => {
-    const newId = `conv_${Date.now()}`;
-    const newTitle = activePersonaObj.label || `Nova Consulta (${activeModelObj.name})`;
-    const newConv: ConversationItem = { id: newId, title: newTitle, model: activeModelObj.name, isPinned: false };
-    setConversations([newConv, ...conversations]);
-    setActiveConvId(newId);
-    sqlDb.insert('conversations', {
-      id: newId,
-      title: newConv.title,
-      model: activeModelObj.name,
-      persona: selectedPersona,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    });
-    setMessages([{
-      id: `msg_${Date.now()}`,
-      sender: "ai",
-      text: `Nova sessão iniciada com o agente ${activePersonaObj.label}. Como posso ajudar?`,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      model: activeModelObj.name
-    }]);
+    setActiveConvId("");
+    activeConvIdRef.current = "";
+    setMessages([]);
+    setInputMessage("");
   };
 
   const togglePinConversation = (id: string, e: React.MouseEvent) => {
@@ -326,36 +416,38 @@ export default function OmniIAPage() {
 
   const confirmDeleteConversation = () => {
     if (!deletingConvId) return;
-    
-    // Delete in SQL DB local storage
     sqlDb.deleteConversation(deletingConvId);
 
     const updated = conversations.filter(c => c.id !== deletingConvId);
     setConversations(updated);
-    if (activeConvId === deletingConvId && updated.length > 0) {
-      setActiveConvId(updated[0].id);
+    if (activeConvId === deletingConvId) {
+      if (updated.length > 0) {
+        setActiveConvId(updated[0].id);
+        activeConvIdRef.current = updated[0].id;
+      } else {
+        setActiveConvId("");
+        activeConvIdRef.current = "";
+        setMessages([]);
+      }
     }
     setDeletingConvId(null);
   };
 
-  // Sort conversations: Pinned items first
   const sortedConversations = [...conversations].sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
 
   return (
     <div className="h-[calc(100vh-7rem)] flex bg-white rounded-xl border border-slate-200/80 overflow-hidden shadow-xs relative">
-      {/* Elegant Deletion Confirmation Modal */}
       <ConfirmModal
         isOpen={deletingConvId !== null}
         onClose={() => setDeletingConvId(null)}
         onConfirm={confirmDeleteConversation}
         title="Excluir Consulta do Histórico?"
-        description="Esta conversa será removida permanentemente do banco de dados local da Zenitus. Esta ação não poderá ser desfeita."
+        description="Esta conversa será removida permanentemente do banco de dados."
         confirmText="Excluir Consulta"
         cancelText="Cancelar"
         variant="danger"
       />
 
-      {/* Elegant Insufficient Coins Modal */}
       <ConfirmModal
         isOpen={showNoCoinsModal}
         onClose={() => setShowNoCoinsModal(false)}
@@ -373,7 +465,7 @@ export default function OmniIAPage() {
           <div className="p-3 border-b border-slate-200/80 flex items-center justify-between">
             <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
               <History className="w-3.5 h-3.5 text-primary" />
-              Histórico (SQL Local)
+              Histórico
             </span>
             <button
               onClick={() => setShowHistorySidebar(false)}
@@ -383,6 +475,7 @@ export default function OmniIAPage() {
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
+
           <div className="p-3 border-b border-slate-200/80 bg-slate-100/50 space-y-3">
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Nova Conversa</label>
@@ -407,7 +500,7 @@ export default function OmniIAPage() {
                 </select>
               </div>
 
-              {/* Persona Selector (Dynamic Custom Agents) */}
+              {/* Persona Selector */}
               <div className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200/80 text-[11px] font-medium hover:border-slate-300 transition-colors">
                 <BookOpen className="w-3.5 h-3.5 text-purple-600 shrink-0" />
                 <select
@@ -432,87 +525,98 @@ export default function OmniIAPage() {
           </div>
           
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {sortedConversations.map(c => (
-              <div
-                key={c.id}
-                onClick={() => setActiveConvId(c.id)}
-                className={`group relative p-2.5 rounded-lg text-xs font-medium cursor-pointer transition-all border ${
-                  activeConvId === c.id 
-                    ? 'bg-white border-slate-200/90 text-slate-900 shadow-xs font-bold' 
-                    : 'bg-transparent border-transparent text-slate-600 hover:bg-white hover:border-slate-200/60'
-                }`}
-              >
-                {editingConvId === c.id ? (
-                  <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="text"
-                      value={editingTitle}
-                      onChange={(e) => setEditingTitle(e.target.value)}
-                      className="w-full px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs font-medium focus:outline-none focus:border-primary"
-                      autoFocus
-                      onKeyDown={(e) => e.key === 'Enter' && saveEditedTitle(c.id, e as any)}
-                    />
-                    <button 
-                      onClick={(e) => saveEditedTitle(c.id, e)} 
-                      className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"
-                      title="Salvar"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                    </button>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); setEditingConvId(null); }} 
-                      className="p-1 text-slate-400 hover:bg-slate-100 rounded"
-                      title="Cancelar"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between gap-1">
-                      <div className="truncate flex-1 pr-2 flex items-center gap-1.5">
-                        {c.isPinned && (
-                          <Pin className="w-3 h-3 text-primary fill-[#1E6FD9] shrink-0" strokeWidth={1.75} />
-                        )}
-                        <span className="truncate">{c.title}</span>
-                        {loadingConvId === c.id && (
-                          <span className="relative flex h-1.5 w-1.5 shrink-0 ml-1" title="Processando resposta...">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary"></span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-[10px] text-slate-400 font-normal mt-0.5">{c.model}</div>
-
-                    {/* Quick Action Buttons (Pin, Edit, Delete) on Hover */}
-                    <div className="absolute right-2 top-2 hidden group-hover:flex items-center gap-1 bg-white/90 backdrop-blur-xs px-1 py-0.5 rounded border border-slate-200 shadow-xs">
-                      <button
-                        onClick={(e) => togglePinConversation(c.id, e)}
-                        className={`p-1 rounded hover:bg-slate-100 transition-colors ${c.isPinned ? 'text-primary' : 'text-slate-400 hover:text-slate-700'}`}
-                        title={c.isPinned ? "Desafixar" : "Fixar no Topo"}
-                      >
-                        <Pin className="w-3 h-3" strokeWidth={1.75} />
-                      </button>
-                      <button
-                        onClick={(e) => startEditingTitle(c.id, c.title, e)}
-                        className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
-                        title="Renomear Chat"
-                      >
-                        <Edit2 className="w-3 h-3" strokeWidth={1.75} />
-                      </button>
-                      <button
-                        onClick={(e) => openDeleteModal(c.id, e)}
-                        className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                        title="Excluir Chat"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" strokeWidth={1.75} />
-                      </button>
-                    </div>
-                  </>
-                )}
+            {sortedConversations.length === 0 ? (
+              <div className="p-4 text-center text-xs text-slate-400">
+                Nenhuma consulta salva. Clique acima em "Iniciar Nova Consulta".
               </div>
-            ))}
+            ) : (
+              sortedConversations.map(c => {
+                const isConvLoading = Boolean(loadingConvIds[c.id]);
+                return (
+                  <div
+                    key={c.id}
+                    onClick={() => {
+                      setActiveConvId(c.id);
+                      activeConvIdRef.current = c.id;
+                    }}
+                    className={`group relative p-2.5 rounded-lg text-xs font-medium cursor-pointer transition-all border ${
+                      activeConvId === c.id 
+                        ? 'bg-white border-slate-200/90 text-slate-900 shadow-xs font-bold' 
+                        : 'bg-transparent border-transparent text-slate-600 hover:bg-white hover:border-slate-200/60'
+                    }`}
+                  >
+                    {editingConvId === c.id ? (
+                      <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="text"
+                          value={editingTitle}
+                          onChange={(e) => setEditingTitle(e.target.value)}
+                          className="w-full px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs font-medium focus:outline-none focus:border-primary"
+                          autoFocus
+                          onKeyDown={(e) => e.key === 'Enter' && saveEditedTitle(c.id, e as any)}
+                        />
+                        <button 
+                          onClick={(e) => saveEditedTitle(c.id, e)} 
+                          className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"
+                          title="Salvar"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setEditingConvId(null); }} 
+                          className="p-1 text-slate-400 hover:bg-slate-100 rounded"
+                          title="Cancelar"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between gap-1">
+                          <div className="truncate flex-1 pr-2 flex items-center gap-1.5">
+                            {c.isPinned && (
+                              <Pin className="w-3 h-3 text-primary fill-[#1E6FD9] shrink-0" strokeWidth={1.75} />
+                            )}
+                            <span className="truncate">{c.title}</span>
+                            {isConvLoading && (
+                              <span className="relative flex h-2 w-2 shrink-0 ml-1" title="Processando análise em segundo plano...">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-normal mt-0.5">{c.model}</div>
+
+                        <div className="absolute right-2 top-2 hidden group-hover:flex items-center gap-1 bg-white/90 backdrop-blur-xs px-1 py-0.5 rounded border border-slate-200 shadow-xs">
+                          <button
+                            onClick={(e) => togglePinConversation(c.id, e)}
+                            className={`p-1 rounded hover:bg-slate-100 transition-colors ${c.isPinned ? 'text-primary' : 'text-slate-400 hover:text-slate-700'}`}
+                            title={c.isPinned ? "Desafixar" : "Fixar no Topo"}
+                          >
+                            <Pin className="w-3 h-3" strokeWidth={1.75} />
+                          </button>
+                          <button
+                            onClick={(e) => startEditingTitle(c.id, c.title, e)}
+                            className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
+                            title="Renomear Chat"
+                          >
+                            <Edit2 className="w-3 h-3" strokeWidth={1.75} />
+                          </button>
+                          <button
+                            onClick={(e) => openDeleteModal(c.id, e)}
+                            className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                            title="Excluir Chat"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" strokeWidth={1.75} />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       )}
@@ -521,18 +625,22 @@ export default function OmniIAPage() {
         {/* Top Toolbar */}
         <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
-            <button
-              onClick={() => setShowHistorySidebar(!showHistorySidebar)}
-              className="p-2 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors text-xs font-semibold flex items-center gap-1.5 shadow-xs"
-              title="Alternar histórico de conversas"
-            >
-              <History className="w-4 h-4 text-primary" />
-              <span className="hidden sm:inline">Histórico</span>
-            </button>
+            {!showHistorySidebar && (
+              <button
+                onClick={() => setShowHistorySidebar(true)}
+                className="p-2.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors text-xs font-semibold flex items-center justify-center shadow-xs"
+                title="Abrir histórico de conversas"
+              >
+                <div className="flex flex-col justify-center items-center gap-[3px] w-4 h-4">
+                  <span className="w-full h-[2px] bg-slate-600 rounded-full"></span>
+                  <span className="w-full h-[2px] bg-slate-600 rounded-full"></span>
+                  <span className="w-full h-[2px] bg-slate-600 rounded-full"></span>
+                </div>
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2.5">
-            {/* Cost Badge */}
             <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200/60">
               <Coins className="w-3.5 h-3.5 text-amber-600" />
               <span>5 Coins / Consulta</span>
@@ -540,62 +648,96 @@ export default function OmniIAPage() {
           </div>
         </div>
 
-        {/* Messages Stream Container */}
-        <div className="flex-1 px-4 sm:px-6 py-5 overflow-y-auto space-y-5 bg-[#FAFBFC]">
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex gap-3 max-w-2xl ${msg.sender === 'user' ? 'ml-auto flex-row-reverse' : ''}`}
-            >
-              <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs shrink-0 shadow-xs ${
-                msg.sender === 'user' ? 'bg-primary text-white' : 'bg-slate-900 text-white'
-              }`}>
-                {msg.sender === 'user' ? <User className="w-3.5 h-3.5" /> : <Sparkles className="w-3.5 h-3.5" />}
-              </div>
+        {/* Main Content Area: Welcome Cards Grid when no active chat/empty, or Chat Messages when active */}
+        {!activeConvId || messages.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-xl mx-auto space-y-6 my-auto">
+            <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center shadow-2xs">
+              <Sparkles className="w-8 h-8 text-primary" />
+            </div>
 
-              <div className="min-w-0 flex-1">
-                <div className={`p-4 rounded-xl text-sm leading-relaxed ${
-                  msg.sender === 'user'
-                    ? 'bg-primary text-white rounded-tr-sm'
-                    : 'bg-white border border-slate-200/80 text-slate-800 rounded-tl-sm shadow-xs'
+            <div className="space-y-1.5">
+              <h2 className="text-lg font-bold text-[#0F172A]">Workspace Omni IA Hub</h2>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Consulte especialistas em contabilidade, fiscal/SPED, contratos e apresentações em linguagem natural com modelos de IA de ponta.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full pt-2">
+              {SPECIALIST_CARDS.map(agent => (
+                <button
+                  key={agent.id}
+                  onClick={() => handleStartAgentChat(agent.id, agent.samplePrompt)}
+                  className="p-3 bg-white border border-[#E2E8F0] hover:border-blue-300 hover:bg-blue-50/30 rounded-xl text-left flex items-start gap-2.5 group transition-all shadow-2xs"
+                >
+                  <BookOpen className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-semibold text-slate-800 block truncate group-hover:text-blue-700">
+                      {agent.label}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block truncate">{agent.category} • Clique para consultar</span>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 shrink-0 mt-0.5" />
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 px-4 sm:px-6 py-5 overflow-y-auto space-y-5 bg-[#FAFBFC]">
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex gap-3 max-w-2xl ${msg.sender === 'user' ? 'ml-auto flex-row-reverse' : ''}`}
+              >
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs shrink-0 shadow-xs ${
+                  msg.sender === 'user' ? 'bg-primary text-white' : 'bg-slate-900 text-white'
                 }`}>
-                  <p className="whitespace-pre-wrap">{msg.text}</p>
+                  {msg.sender === 'user' ? <User className="w-3.5 h-3.5" /> : <Sparkles className="w-3.5 h-3.5" />}
                 </div>
 
-                <div className={`flex items-center gap-2.5 mt-1.5 text-[10px] text-slate-400 font-medium ${
-                  msg.sender === 'user' ? 'justify-end' : ''
-                }`}>
-                  <span>{msg.timestamp}</span>
-                  {msg.model && (
-                    <>
-                      <span className="w-0.5 h-0.5 rounded-full bg-slate-300" />
-                      <span>{msg.model}</span>
-                    </>
-                  )}
-                  <button onClick={() => navigator.clipboard.writeText(msg.text)} className="p-1 hover:bg-slate-100 rounded transition-colors ml-2" title="Copiar texto">
-                    <Copy className="w-3 h-3" />
-                  </button>
+                <div className="min-w-0 flex-1">
+                  <div className={`p-4 rounded-xl text-sm leading-relaxed ${
+                    msg.sender === 'user'
+                      ? 'bg-primary text-white rounded-tr-sm'
+                      : 'bg-white border border-slate-200/80 text-slate-800 rounded-tl-sm shadow-xs'
+                  }`}>
+                    <p className="whitespace-pre-wrap">{msg.text}</p>
+                  </div>
+
+                  <div className={`flex items-center gap-2.5 mt-1.5 text-[10px] text-slate-400 font-medium ${
+                    msg.sender === 'user' ? 'justify-end' : ''
+                  }`}>
+                    <span>{msg.timestamp}</span>
+                    {msg.model && (
+                      <>
+                        <span className="w-0.5 h-0.5 rounded-full bg-slate-300" />
+                        <span>{msg.model}</span>
+                      </>
+                    )}
+                    <button onClick={() => navigator.clipboard.writeText(msg.text)} className="p-1 hover:bg-slate-100 rounded transition-colors ml-2" title="Copiar texto">
+                      <Copy className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
 
-          {loadingConvId === activeConvId && (
-            <div className="flex gap-3 max-w-2xl">
-              <div className="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center text-xs shrink-0 shadow-xs">
-                <Sparkles className="w-3.5 h-3.5" />
+            {Boolean(loadingConvIds[activeConvId]) && (
+              <div className="flex gap-3 max-w-2xl">
+                <div className="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center text-xs shrink-0 shadow-xs">
+                  <Sparkles className="w-3.5 h-3.5" />
+                </div>
+                <div className="p-4 rounded-xl bg-white border border-slate-200/80 text-xs text-slate-500 flex items-center gap-2 shadow-xs rounded-tl-sm">
+                  <span className="flex gap-1 items-center h-4">
+                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"></span>
+                  </span>
+                  <span className="ml-1 text-slate-400 font-medium">Processando análise...</span>
+                </div>
               </div>
-              <div className="p-4 rounded-xl bg-white border border-slate-200/80 text-xs text-slate-500 flex items-center gap-2 shadow-xs rounded-tl-sm">
-                <span className="flex gap-1 items-center h-4">
-                  <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                  <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                  <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"></span>
-                </span>
-                <span className="ml-1 text-slate-400 font-medium">Processando análise...</span>
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* Input Form Bar */}
         <div className="p-4 bg-white border-t border-slate-100">
@@ -604,18 +746,23 @@ export default function OmniIAPage() {
               <input
                 type="text"
                 value={inputMessage}
+                disabled={Boolean(loadingConvIds[activeConvId])}
                 onChange={(e) => setInputMessage(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder="Digite sua dúvida tributária, fiscal ou operacional..."
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-primary focus:bg-white transition-all placeholder:text-slate-400"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !loadingConvIds[activeConvId] && inputMessage.trim()) {
+                    handleSendMessage();
+                  }
+                }}
+                placeholder={loadingConvIds[activeConvId] ? "Processando resposta... por favor aguarde." : "Digite sua dúvida tributária, fiscal ou operacional..."}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-primary focus:bg-white transition-all placeholder:text-slate-400 disabled:bg-slate-100 disabled:cursor-not-allowed"
               />
             </div>
             <button
               onClick={handleSendMessage}
-              disabled={loadingConvId === activeConvId || !inputMessage.trim()}
+              disabled={Boolean(loadingConvIds[activeConvId]) || !inputMessage.trim()}
               className="px-4 py-2.5 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-xs"
             >
-              <span className="hidden sm:inline">Enviar</span>
+              <span className="hidden sm:inline">{loadingConvIds[activeConvId] ? "Gerando..." : "Enviar"}</span>
               <Send className="w-3.5 h-3.5" />
             </button>
           </div>

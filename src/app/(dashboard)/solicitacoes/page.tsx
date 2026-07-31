@@ -153,7 +153,7 @@ export default function SolicitacoesPage() {
     setLoading(true);
     try {
       const data = await fetchPurchaseRequests();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         const uniqueMap = new Map<string, PurchaseRequest>();
         data.forEach((item: any) => {
           const norm = normalizeRequest(item);
@@ -164,14 +164,11 @@ export default function SolicitacoesPage() {
         });
         setRequests(Array.from(uniqueMap.values()));
       } else {
-        for (const req of DEFAULT_REQUESTS) {
-          await insertPurchaseRequest(req);
-        }
-        setRequests(DEFAULT_REQUESTS);
+        setRequests([]);
       }
     } catch (e) {
       console.error("Error loading purchase requests from serverDb:", e);
-      setRequests(DEFAULT_REQUESTS);
+      setRequests([]);
     } finally {
       setLoading(false);
     }

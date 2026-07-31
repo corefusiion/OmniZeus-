@@ -20,6 +20,7 @@ export type ActionData = {
   data: Record<string, any>;
   requiresConfirmation: boolean;
   status: 'pending' | 'executing' | 'success' | 'error';
+  errorReason?: string;
 };
 
 export type ActionConfirmCardProps = {
@@ -118,9 +119,16 @@ export function ActionConfirmCard({ action, onConfirm, onCancel }: ActionConfirm
 
         {action.status === 'error' && (
           <div className="mt-4 pt-4 border-t border-red-100">
-            <div className="flex items-center gap-2 text-red-600 text-sm font-medium bg-red-50 p-2 rounded">
-              <AlertCircle size={16} />
-              <span>Ocorreu um erro ao processar esta ação.</span>
+            <div className="flex flex-col gap-1 text-red-600 text-sm font-medium bg-red-50 p-2.5 rounded border border-red-100">
+              <div className="flex items-center gap-2">
+                <AlertCircle size={16} />
+                <span>Ocorreu um erro ao processar esta ação.</span>
+              </div>
+              {action.errorReason && (
+                <div className="text-xs text-red-500 font-normal mt-1 break-words">
+                  {action.errorReason}
+                </div>
+              )}
             </div>
           </div>
         )}

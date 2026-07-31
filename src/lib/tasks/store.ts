@@ -1,7 +1,8 @@
 import {
   fetchTasks,
   insertTask,
-  updateTask
+  updateTask,
+  deleteTask
 } from "@/lib/db/serverDb";
 
 export interface TaskItem {
@@ -20,61 +21,13 @@ export interface TaskItem {
   execution_report?: string | null;
 }
 
-const INITIAL_TASKS: TaskItem[] = [
-  {
-    id: "t_501",
-    title: "Apurar DAS Simples Nacional e enviar ao cliente",
-    client: "Atacadão das Tintas Salvador Ltda",
-    assignee: "Juliana Lima",
-    priority: "alta",
-    status: "em_andamento",
-    timeSpentSec: 1420,
-    isTimerRunning: false,
-    department: "Fiscal"
-  },
-  {
-    id: "t_502",
-    title: "Conciliação Bancária Extrato OFX vs ContaAzul",
-    client: "Supermercado Nova Era Eireli",
-    assignee: "Carlos Mendes",
-    priority: "alta",
-    status: "pendente",
-    timeSpentSec: 0,
-    isTimerRunning: false,
-    department: "BPO Financeiro"
-  },
-  {
-    id: "t_503",
-    title: "Envio da EFD-Reinf e DCTFWeb referente mês anterior",
-    client: "Clínica Médica Vida & Saúde S/S",
-    assignee: "Juliana Lima",
-    priority: "media",
-    status: "concluido",
-    timeSpentSec: 2850,
-    isTimerRunning: false,
-    department: "Fiscal",
-    execution_report: "Declarações transmitidas e recibos validados com sucesso."
-  },
-  {
-    id: "t_504",
-    title: "Elaboração de DRE Gerencial e Balancete Mensal",
-    client: "Construtora Horizonte Azul S.A.",
-    assignee: "Carlos Mendes",
-    priority: "baixa",
-    status: "pendente",
-    timeSpentSec: 0,
-    isTimerRunning: false,
-    department: "Contábil"
-  }
-];
-
-let inMemoryTasks: TaskItem[] = [...INITIAL_TASKS];
+let inMemoryTasks: TaskItem[] = [];
 let tasksFetched = false;
 
 export async function fetchStoredTasksFromServer(): Promise<TaskItem[]> {
   try {
     const records = await fetchTasks();
-    if (records && records.length > 0) {
+    if (Array.isArray(records)) {
       inMemoryTasks = records.map((r: any) => ({
         id: r.id,
         title: r.title || '',
@@ -90,10 +43,13 @@ export async function fetchStoredTasksFromServer(): Promise<TaskItem[]> {
         duration_sec: r.duration_sec || null,
         execution_report: r.execution_report || null
       }));
+    } else {
+      inMemoryTasks = [];
     }
     tasksFetched = true;
   } catch (err) {
     console.error("Error fetching tasks from server DB:", err);
+    inMemoryTasks = [];
   }
   return inMemoryTasks;
 }
@@ -151,6 +107,14 @@ export function updateStoredTaskStatus(id: string, status: TaskItem['status'], t
     }).catch(() => {});
   }
 
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('omnizeus_sql_db_change'));
+  }
+}
+
+export function deleteStoredTask(id: string) {
+  inMemoryTasks = inMemoryTasks.filter(t => t.id !== id);
+  deleteTask(id).catch(() => {});
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('omnizeus_sql_db_change'));
   }

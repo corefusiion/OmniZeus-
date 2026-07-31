@@ -2,6 +2,28 @@ import { NextResponse } from "next/server";
 import { fetchWithAutoRefresh } from "@/lib/contaazul/store";
 
 export async function POST(req: Request) {
+  const fs = require("fs");
+  const path = require("path");
+  const DATA_DIR = path.join(process.cwd(), "data");
+  const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
+  
+  function getLocalDbFile(): any {
+    try {
+      if (fs.existsSync(DB_FILE_PATH)) {
+        return JSON.parse(fs.readFileSync(DB_FILE_PATH, "utf-8"));
+      }
+    } catch (e) {}
+    return {};
+  }
+
+  function saveLocalDbFile(db: any): void {
+    try {
+      if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(DB_FILE_PATH, JSON.stringify(db, null, 2), "utf-8");
+    } catch (err) {
+      console.error("[IA-Workspace] Erro ao salvar DB local:", err);
+    }
+  }
   try {
     const { 
       accessToken, refreshToken, clientId, clientSecret, 

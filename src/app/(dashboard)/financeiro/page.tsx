@@ -210,14 +210,10 @@ export default function FinanceiroPage() {
     setIsLoading(true);
     try {
       const data = await fetchPayables();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setPayables(data.map(normalizePayable));
       } else {
-        for (const item of DEFAULT_PAYABLES) {
-          await insertPayable(item);
-        }
-        const fresh = await fetchPayables();
-        setPayables((fresh.length > 0 ? fresh : DEFAULT_PAYABLES).map(normalizePayable));
+        setPayables([]);
       }
 
       // Calculate real total monthly contract revenue from SQLite
@@ -227,10 +223,13 @@ export default function FinanceiroPage() {
           const fee = Number(c.monthlyFeeBrl ?? c.monthly_fee_brl ?? 0);
           return acc + fee;
         }, 0);
-        if (sum > 0) setContractsTotalMonthlyRevenue(sum);
+        setContractsTotalMonthlyRevenue(sum);
+      } else {
+        setContractsTotalMonthlyRevenue(0);
       }
     } catch (err) {
-      console.error("Erro ao carregar contas a pagar e contratos do banco SQLite:", err);
+      console.error("Erro ao carregar contas a pagar do banco SQLite:", err);
+      setPayables([]);
     } finally {
       setIsLoading(false);
     }
