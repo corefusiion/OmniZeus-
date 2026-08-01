@@ -1,38 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { getSession } from "@/lib/auth/session";
+import { readDb, writeDb } from "@/lib/db/localDb";
+import { USD_TO_BRL } from "@/lib/ai/pricing";
 
 export const runtime = "nodejs";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
-
-function getLocalDbFile(): any {
-  try {
-    if (fs.existsSync(DB_FILE_PATH)) {
-      const raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
-      return JSON.parse(raw);
-    }
-  } catch (e) {}
-  return {};
-}
-
-function saveLocalDbFile(db: any): void {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(db, null, 2), "utf-8");
-  } catch (err) {
-    console.error("Error saving local SQL database file:", err);
-  }
-}
-
 export async function POST(req: NextRequest) {
   try {
+    const session = getSession(req);
+    if (!session) {
+      return NextResponse.json({ error: "Não autenticado.", code: "UNAUTHORIZED" }, { status: 401 });
+    }
+
     const body = await req.json();
     const {
-      company_id,
+      company_id: requestedCompanyId,
       usuario_id,
       agente_id,
       agente_nome,
@@ -48,13 +30,19 @@ export async function POST(req: NextRequest) {
       custo_openrouter_brl
     } = body;
 
+    // O tenant cobrado vem da sessão. Aceitar company_id do body permitiria
+    // debitar OmniCoins da carteira de outra empresa.
+    const company_id = session.role === "super_adm"
+      ? (requestedCompanyId || session.companyId)
+      : session.companyId;
+
     if (!company_id) {
       return NextResponse.json({ error: "company_id é obrigatório." }, { status: 400 });
     }
 
     const coinsToDeduct = typeof coins_consumed === 'number' && coins_consumed > 0 ? coins_consumed : 5;
 
-    const db = getLocalDbFile();
+    const db = await readDb();
 
     // ── Deduzir da carteira da empresa específica (isolamento por tenant) ──────
     if (!Array.isArray(db.companies)) {
@@ -67,12 +55,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Support both coins_franchise (snake_case) and coinsFranchise (camelCase)
-    const currentBalance: number =
-      typeof db.companies[companyIndex].coins_franchise === 'number'
-        ? db.companies[companyIndex].coins_franchise
-        : (typeof db.companies[companyIndex].coinsFranchise === 'number'
-            ? db.companies[companyIndex].coinsFranchise
-            : 0);
+    let currentBalance: number = db.companies[companyIndex].coins_franchise;
+    if (currentBalance === undefined) currentBalance = db.companies[companyIndex].coinsFranchise || 0;
 
     if (currentBalance < coinsToDeduct) {
       return NextResponse.json(
@@ -99,7 +83,7 @@ export async function POST(req: NextRequest) {
     const outputToks = tokens_output || 1500;
     const totalToks = total_tokens || (inputToks + outputToks);
     const costUsd = custo_openrouter_usd || parseFloat(((inputToks * 0.000003) + (outputToks * 0.000012)).toFixed(6));
-    const costBrl = custo_openrouter_brl || parseFloat((costUsd * 5.80).toFixed(4));
+    const costBrl = custo_openrouter_brl || parseFloat((costUsd * USD_TO_BRL).toFixed(4));
 
     const usageLog = {
       id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
@@ -125,17 +109,11 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(db.ai_usage_logs)) db.ai_usage_logs = [];
     db.ai_usage_logs.unshift(usageLog);
 
-    saveLocalDbFile(db);
+    await writeDb(db);
 
-    return NextResponse.json({
-      success: true,
-      coins_consumed: coinsToDeduct,
-      new_balance: newBalance,
-      company_id,
-      log: usageLog
-    });
+    return NextResponse.json({ success: true, consumed: coinsToDeduct, newBalance });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Falha ao processar consumo de OmniCoins" }, { status: 500 });
+    console.error("Error consuming coins:", err);
+    return NextResponse.json({ error: "Erro interno ao descontar moedas." }, { status: 500 });
   }
 }
-

@@ -1,5 +1,4 @@
-import fs from "fs";
-import path from "path";
+import { readDb } from "@/lib/db/localDb";
 
 export interface ResolvedAIProvider {
   apiUrl: string;
@@ -19,27 +18,18 @@ export function maskApiKey(key?: string): string {
   return `${prefix}-••••••••${suffix}`;
 }
 
-export function resolveAIProvider(options: {
+export async function resolveAIProvider(options: {
   companyId?: string;
   userRole?: string;
   userEmail?: string;
   requestedModel?: string;
-}): ResolvedAIProvider {
-  const DATA_DIR = path.join(process.cwd(), "data");
-  const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
-
-  let db: any = {};
-  try {
-    if (fs.existsSync(DB_FILE_PATH)) {
-      const raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
-      db = JSON.parse(raw);
-    }
-  } catch (e) {}
+}): Promise<ResolvedAIProvider> {
+  const db = await readDb();
 
   const settings = db.settings || {};
   const companies: any[] = db.companies || [];
 
-  const isSuperAdmin = options.userRole === 'super_adm' || options.userEmail === 'jsgleisson@gmail.com';
+  const isSuperAdmin = options.userRole === 'super_adm';
 
   // 1. SUPER ADMIN DEDICATED RESOLUTION PATH
   if (isSuperAdmin) {

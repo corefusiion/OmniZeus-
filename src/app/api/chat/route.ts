@@ -3,39 +3,18 @@ import fs from "fs";
 import path from "path";
 import { resolveAIProvider } from "@/lib/ai/providerResolver";
 import { executeAIRequest } from "@/lib/ai/openRouterClient";
+import { readDb, writeDb } from "@/lib/db/localDb";
+import { USD_TO_BRL } from "@/lib/ai/pricing";
+import { getSession } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
-
-function getLocalDbFile(): any {
-  try {
-    if (fs.existsSync(DB_FILE_PATH)) {
-      const raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
-      return JSON.parse(raw);
-    }
-  } catch (e) {}
-  return {};
-}
-
-function saveLocalDbFile(db: any): void {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(db, null, 2), "utf-8");
-  } catch (err) {
-    console.error("Error saving local SQL database file:", err);
-  }
-}
-
-function getSavedSettings(): any {
-  const db = getLocalDbFile();
+async function getSavedSettings(): Promise<any> {
+  const db = await readDb();
   return db?.settings || {};
 }
 
-function recordChatMetrics(
+async function recordChatMetrics(
   companyId: string,
   model: string,
   persona: string,
@@ -47,7 +26,7 @@ function recordChatMetrics(
   credentialSource?: string
 ) {
   try {
-    const db = getLocalDbFile();
+    const db = await readDb();
     const now = new Date().toISOString();
 
     const inputTokens = usageData?.input_tokens || Math.round(promptLength / 4);
@@ -57,7 +36,7 @@ function recordChatMetrics(
 
     const isCustom = credentialSource === 'superadmin_custom_endpoint';
     const costUsd = isCustom ? 0 : parseFloat(((inputTokens * 0.0000025) + (outputTokens * 0.000010)).toFixed(6));
-    const costBrl = isCustom ? 0 : parseFloat((costUsd * 5.80).toFixed(4));
+    const costBrl = isCustom ? 0 : parseFloat((costUsd * USD_TO_BRL).toFixed(4));
 
     const omnicoinsConsumed = 5;
 
@@ -119,7 +98,7 @@ function recordChatMetrics(
       created_at: now
     });
 
-    saveLocalDbFile(db);
+    await writeDb(db);
   } catch (err) {
     console.error("Error recording AI usage metrics to SQLite:", err);
   }
@@ -129,31 +108,26 @@ export async function POST(req: NextRequest) {
   const startTime = Date.now();
   try {
     const body = await req.json();
-    const { messages, personaPrompt, persona } = body;
+    const { messages, personaPrompt, persona, temperature } = body;
     let { model } = body;
 
     // ── Tenant Isolation: companyId ALWAYS from session, never from body ────────
-    let activeTenantId = "comp_zenitus";
-    let userRole: string | undefined;
-    let userEmail: string | undefined;
-
-    const sessionCookie = req.cookies.get("omnizeus_session")?.value;
-    if (sessionCookie) {
-      try {
-        const [encoded] = sessionCookie.split(".");
-        const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf-8"));
-        if (payload?.companyId) activeTenantId = payload.companyId;
-        if (payload?.role) userRole = payload.role;
-        if (payload?.email) userEmail = payload.email;
-      } catch {}
-    } else {
-      // Fallback during transition: trust x-user-role header only (not companyId)
-      userRole = req.headers.get("x-user-role") || undefined;
-      userEmail = req.headers.get("x-user-email") || undefined;
+    const session = getSession(req);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
     }
+    // Super Admin pode operar no contexto da empresa selecionada no header;
+    // demais papéis ficam presos ao próprio tenant. Isso mantém a mensagem da
+    // IA no mesmo company_id da mensagem do usuário (gravada via /api/db).
+    const isSuperAdmin = session.role === "super_adm";
+    const requestedCompanyId = req.headers.get("x-company-id");
+    const activeTenantId = isSuperAdmin && requestedCompanyId && requestedCompanyId !== "global"
+      ? requestedCompanyId
+      : (session.companyId || "comp_zenitus");
+    const userRole = session.role;
+    const userEmail = session.email;
 
-
-    const resolved = resolveAIProvider({
+    const resolved = await resolveAIProvider({
       companyId: activeTenantId,
       userRole,
       userEmail,
@@ -293,6 +267,7 @@ export async function POST(req: NextRequest) {
       userRole,
       userEmail,
       requestedModel: model || "anthropic/claude-3.7-sonnet",
+      temperature,
       messages: apiMessages,
       persona: persona,
       featureContext: "Omni IA Hub Chat"
@@ -304,20 +279,40 @@ export async function POST(req: NextRequest) {
 
     const textContent = aiRes.content;
 
+    // Débito único dos OmniCoins + registro de uso (fonte única de verdade).
+    // O cliente NÃO debita mais — apenas checa saldo e envia. Isso vale tanto
+    // para o caminho real quanto para o fallback (que já chama recordChatMetrics).
+    const durationMs = Date.now() - startTime;
+    const promptLen = JSON.stringify(messages || []).length;
+    await recordChatMetrics(
+      activeTenantId,
+      model,
+      persona || "geral",
+      promptLen,
+      textContent.length,
+      (messages || []).length,
+      durationMs,
+      undefined,
+      credentialSource
+    );
+
     // Save directly to DB for true persistence across browser refreshes
+    const persistedAiId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    const persistedAt = new Date().toISOString();
     if (body.conversationId) {
       try {
-        const db = getLocalDbFile();
+        const db = await readDb();
         if (!Array.isArray(db.messages)) db.messages = [];
         db.messages.push({
-          id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          id: persistedAiId,
           conversation_id: body.conversationId,
+          company_id: activeTenantId,
           sender: 'ai',
           text: textContent,
           model: model || "anthropic/claude-3.7-sonnet",
-          created_at: new Date().toISOString()
+          created_at: persistedAt
         });
-        saveLocalDbFile(db);
+        await writeDb(db);
       } catch (e) {
         console.error("Error saving persistent message:", e);
       }
@@ -326,6 +321,8 @@ export async function POST(req: NextRequest) {
     return new NextResponse(textContent, {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
+        "x-omni-message-id": persistedAiId,
+        "x-omni-message-created-at": persistedAt,
       },
     });
   } catch (error: any) {

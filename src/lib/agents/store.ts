@@ -6,12 +6,30 @@ import {
 
 export interface CustomAgent {
   id: string;
-  label: string;
+  label: string; // Nome do agente
+  description?: string;
+  specialty?: string;
   category: string;
-  systemPrompt: string;
+  avatar?: string;
   color: string;
+  icon?: string;
+  modelLlm?: string;
+  provider?: string;
+  temperature?: number;
+  context?: string;
+  objective?: string;
+  systemPrompt: string;
+  initialPrompt?: string;
+  instructions?: string;
+  allowedTools?: string[];
+  mcpsEnabled?: string[];
+  permissions?: string[];
+  status?: string;
+  createdBy?: string;
+  companyId?: string;
   isCustom?: boolean;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export const BUILTIN_PERSONAS: CustomAgent[] = [
@@ -138,11 +156,29 @@ export async function fetchCustomAgentsFromServer(): Promise<CustomAgent[]> {
       customAgentsList = records.map((r: any) => ({
         id: r.id,
         label: r.label || r.name || 'Agente Customizado',
+        description: r.description,
+        specialty: r.specialty,
         category: r.category || 'Geral',
-        systemPrompt: r.systemPrompt || r.system_prompt || '',
+        avatar: r.avatar,
         color: r.color || 'bg-primary/10 text-primary border-primary/20/60',
+        icon: r.icon,
+        modelLlm: r.modelLlm || r.model_llm,
+        provider: r.provider,
+        temperature: r.temperature,
+        context: r.context,
+        objective: r.objective,
+        systemPrompt: r.systemPrompt || r.system_prompt || '',
+        initialPrompt: r.initialPrompt || r.initial_prompt,
+        instructions: r.instructions,
+        allowedTools: r.allowedTools || r.allowed_tools,
+        mcpsEnabled: r.mcpsEnabled || r.mcps_enabled,
+        permissions: r.permissions,
+        status: r.status,
+        createdBy: r.createdBy || r.created_by,
+        companyId: r.companyId || r.company_id,
         isCustom: true,
-        createdAt: r.createdAt || r.created_at || new Date().toISOString()
+        createdAt: r.createdAt || r.created_at || new Date().toISOString(),
+        updatedAt: r.updatedAt || r.updated_at
       }));
     }
     agentsFetched = true;
@@ -172,18 +208,45 @@ export function saveCustomAgent(agent: Omit<CustomAgent, 'id' | 'createdAt'>): C
 
   customAgentsList = [newAgent, ...customAgentsList];
 
-  insertServerTable('custom_agents', {
+  const dbPayload = {
     id: newAgent.id,
     label: newAgent.label,
+    description: newAgent.description,
+    specialty: newAgent.specialty,
     category: newAgent.category,
+    avatar: newAgent.avatar,
+    color: newAgent.color,
+    icon: newAgent.icon,
+    model_llm: newAgent.modelLlm,
+    modelLlm: newAgent.modelLlm,
+    provider: newAgent.provider,
+    temperature: newAgent.temperature,
+    context: newAgent.context,
+    objective: newAgent.objective,
     system_prompt: newAgent.systemPrompt,
     systemPrompt: newAgent.systemPrompt,
-    color: newAgent.color,
+    initial_prompt: newAgent.initialPrompt,
+    initialPrompt: newAgent.initialPrompt,
+    instructions: newAgent.instructions,
+    allowed_tools: newAgent.allowedTools,
+    allowedTools: newAgent.allowedTools,
+    mcps_enabled: newAgent.mcpsEnabled,
+    mcpsEnabled: newAgent.mcpsEnabled,
+    permissions: newAgent.permissions,
+    status: newAgent.status || 'Ativo',
+    created_by: newAgent.createdBy,
+    createdBy: newAgent.createdBy,
+    company_id: newAgent.companyId,
+    companyId: newAgent.companyId,
     is_custom: true,
     isCustom: true,
     created_at: newAgent.createdAt,
-    createdAt: newAgent.createdAt
-  }).catch(() => {});
+    createdAt: newAgent.createdAt,
+    updated_at: newAgent.updatedAt,
+    updatedAt: newAgent.updatedAt
+  };
+
+  insertServerTable('custom_agents', dbPayload).catch(() => {});
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('omnizeus_agents_change'));

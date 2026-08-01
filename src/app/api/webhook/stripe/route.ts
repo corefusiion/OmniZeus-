@@ -8,6 +8,8 @@ const DATA_DIR = path.join(process.cwd(), "data");
 const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
 
 // HMAC-SHA256 Stripe Webhook Signature Verification
+const SIGNATURE_TOLERANCE_SEC = 300;
+
 function verifyStripeSignature(rawBody: string, signatureHeader: string, webhookSecret: string): boolean {
   try {
     const items = signatureHeader.split(",").reduce((acc: any, item: string) => {
@@ -21,13 +23,20 @@ function verifyStripeSignature(rawBody: string, signatureHeader: string, webhook
 
     if (!timestamp || !signature) return false;
 
+    // Rejeita eventos antigos para impedir replay de um webhook capturado
+    const ageSec = Math.abs(Date.now() / 1000 - Number(timestamp));
+    if (!Number.isFinite(ageSec) || ageSec > SIGNATURE_TOLERANCE_SEC) return false;
+
     const payload = `${timestamp}.${rawBody}`;
     const expectedSignature = crypto
       .createHmac("sha256", webhookSecret)
       .update(payload, "utf8")
       .digest("hex");
 
-    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+    const sigBuf = Buffer.from(signature);
+    const expectedBuf = Buffer.from(expectedSignature);
+    if (sigBuf.length !== expectedBuf.length) return false;
+    return crypto.timingSafeEqual(sigBuf, expectedBuf);
   } catch (err) {
     console.error("Error verifying Stripe signature:", err);
     return false;
@@ -64,17 +73,19 @@ export async function POST(req: NextRequest) {
     if (rawDb.charCodeAt(0) === 0xFEFF) rawDb = rawDb.slice(1);
     const dbData = JSON.parse(rawDb);
 
-    const webhookSecret = (dbData.settings?.stripe_webhook_secret || "").trim();
+    const webhookSecret = (dbData.settings?.stripe_webhook_secret || process.env.STRIPE_WEBHOOK_SECRET || "").trim();
 
-    // Verify webhook signature if whsec_ is configured
-    if (webhookSecret && webhookSecret.startsWith("whsec_")) {
-      if (!signatureHeader) {
-        return NextResponse.json({ error: "Missing stripe-signature header" }, { status: 400 });
-      }
-      const isValid = verifyStripeSignature(rawBody, signatureHeader, webhookSecret);
-      if (!isValid) {
-        return NextResponse.json({ error: "Invalid Stripe Webhook signature" }, { status: 400 });
-      }
+    // A assinatura é obrigatória. Sem ela, qualquer pessoa poderia forjar um
+    // "invoice.paid" e liberar acesso pago sem cobrança.
+    if (!webhookSecret) {
+      console.error("STRIPE_WEBHOOK_SECRET não configurado — webhook rejeitado.");
+      return NextResponse.json({ error: "Webhook secret não configurado no servidor." }, { status: 500 });
+    }
+    if (!signatureHeader) {
+      return NextResponse.json({ error: "Missing stripe-signature header" }, { status: 400 });
+    }
+    if (!verifyStripeSignature(rawBody, signatureHeader, webhookSecret)) {
+      return NextResponse.json({ error: "Invalid Stripe Webhook signature" }, { status: 400 });
     }
 
     let event: any;

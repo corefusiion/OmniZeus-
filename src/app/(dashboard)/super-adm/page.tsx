@@ -30,7 +30,7 @@ const DEFAULT_JOB_ROLES = [
 ];
 
 export default function SuperADMPage() {
-  const [role, setRole] = useState<UserRole>("super_adm");
+  const [role, setRole] = useState<UserRole>("funcionario");
   const [activeTab, setActiveTab] = useState<'economia_ia' | 'infraestrutura' | 'pedidos_compra'>('pedidos_compra');
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
@@ -257,6 +257,9 @@ export default function SuperADMPage() {
         if (s.stripe_pub_key) setStripePublishableKey(s.stripe_pub_key);
         if (s.stripe_secret_key) setStripeSecretKey(s.stripe_secret_key);
         if (s.stripe_webhook_secret) setStripeWebhookSecret(s.stripe_webhook_secret);
+        if (s.custom_ai_enabled !== undefined) setCustomAiEnabled(s.custom_ai_enabled);
+        if (s.custom_ai_url) setCustomAiUrl(s.custom_ai_url);
+        if (s.custom_ai_key) setCustomAiKey(s.custom_ai_key);
         if (s.custom_ai_model) setCustomAiModel(s.custom_ai_model);
         if (s.super_admin_ai_provider) setSuperAdminAiProvider(s.super_admin_ai_provider);
         if (s.super_admin_auto_fallback !== undefined) setSuperAdminAutoFallback(s.super_admin_auto_fallback);

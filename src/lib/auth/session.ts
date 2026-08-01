@@ -3,10 +3,24 @@
 // companyId from the frontend body/query is NEVER trusted for authorization.
 
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import type { UserRole } from "./roles";
 
 const SESSION_COOKIE = "omnizeus_session";
-const SESSION_SECRET = process.env.SESSION_SECRET || "omnizeus_super_secret_2026_change_in_prod";
+
+// O segredo é obrigatório. Sem ele qualquer pessoa que conheça o default
+// consegue forjar um cookie de super_adm. O middleware valida a mesma assinatura,
+// então ambos precisam ler exatamente o mesmo valor de SESSION_SECRET.
+const SESSION_SECRET = (() => {
+  const fromEnv = process.env.SESSION_SECRET;
+  if (!fromEnv || fromEnv.length < 32) {
+    throw new Error(
+      "SESSION_SECRET ausente ou com menos de 32 caracteres. " +
+      "Defina em .env.local — gere com: node -e \"console.log(require('crypto').randomBytes(48).toString('hex'))\""
+    );
+  }
+  return fromEnv;
+})();
 
 export interface SessionPayload {
   userId: string;
@@ -21,39 +35,37 @@ export interface SessionPayload {
 }
 
 
-// ─── Simple HMAC-free base64 encoding (suitable for dev; swap with jose in prod) ────
+// ─── Assinatura HMAC-SHA256 com comparação em tempo constante ──────────────────
 
 function encodeSession(payload: SessionPayload): string {
   const json = JSON.stringify(payload);
   const encoded = Buffer.from(json).toString("base64url");
-  // Sign with a simple HMAC-like checksum (XOR of chars with secret)
-  const sig = Buffer.from(simpleSign(encoded, SESSION_SECRET)).toString("base64url");
-  return `${encoded}.${sig}`;
+  return `${encoded}.${sign(encoded)}`;
 }
 
 function decodeSession(token: string): SessionPayload | null {
   try {
     const [encoded, sig] = token.split(".");
     if (!encoded || !sig) return null;
-    const expectedSig = Buffer.from(simpleSign(encoded, SESSION_SECRET)).toString("base64url");
-    if (sig !== expectedSig) return null;
+
+    const expectedSig = sign(encoded);
+    const sigBuf = Buffer.from(sig);
+    const expectedBuf = Buffer.from(expectedSig);
+    // timingSafeEqual exige buffers do mesmo tamanho
+    if (sigBuf.length !== expectedBuf.length) return null;
+    if (!crypto.timingSafeEqual(sigBuf, expectedBuf)) return null;
+
     const payload: SessionPayload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf-8"));
-    if (Date.now() > payload.expiresAt) return null;
+    if (typeof payload?.expiresAt !== "number" || Date.now() > payload.expiresAt) return null;
+    if (!payload.userId || !payload.role) return null;
     return payload;
   } catch {
     return null;
   }
 }
 
-function simpleSign(data: string, secret: string): string {
-  // Deterministic string signature using char codes
-  let hash = 0;
-  const combined = data + secret;
-  for (let i = 0; i < combined.length; i++) {
-    hash = ((hash << 5) - hash) + combined.charCodeAt(i);
-    hash |= 0;
-  }
-  return hash.toString(16);
+function sign(data: string): string {
+  return crypto.createHmac("sha256", SESSION_SECRET).update(data).digest("base64url");
 }
 
 // ─── Create a session cookie response ──────────────────────────────────────────

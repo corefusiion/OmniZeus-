@@ -10,12 +10,11 @@ export interface UserProfile {
   avatarUrl?: string;
 }
 
-export const PRODUCTION_USERS: (UserProfile & { passwordHash: string })[] = [
+export const PRODUCTION_USERS: UserProfile[] = [
   {
     id: 'usr_super',
     name: 'Gleisson (Master Admin)',
     email: 'jsgleisson@gmail.com',
-    passwordHash: 'Design20',
     role: 'super_adm',
     companyId: 'global',
     companyName: 'Visão Global SaaS Master'
@@ -60,7 +59,7 @@ export function getActiveCompanyId(): string {
 export async function rehydrateSession(): Promise<UserProfile | null> {
   if (typeof window === 'undefined') return null;
   try {
-    const res = await fetch('/api/auth/me');
+    const res = await fetch('/api/auth/me', { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
       if (data.success && data.user) {
@@ -99,7 +98,6 @@ export function setActiveCompanyContext(companyId: string, companyName?: string)
   }
 }
 
-
 export function setCurrentUser(userProfile: UserProfile): void {
   activeUserSession = userProfile;
   activeTenantContextId = userProfile.companyId;
@@ -110,81 +108,27 @@ export function setCurrentUser(userProfile: UserProfile): void {
   }
 }
 
-export function loginUser(emailInput: string, passwordInput: string): { success: boolean; user?: UserProfile; error?: string } {
-  const cleanEmail = emailInput.trim().toLowerCase();
-  const cleanPass = passwordInput.trim();
-
-  // 1. Check hardcoded production users (master admin + any fixed accounts)
-  const found = PRODUCTION_USERS.find(
-    u => u.email.toLowerCase() === cleanEmail && u.passwordHash === cleanPass
-  );
-
-  if (found) {
-    const userProfile: UserProfile = {
-      id: found.id,
-      name: found.name,
-      email: found.email,
-      role: found.role,
-      companyId: found.companyId,
-      companyName: found.companyName
-    };
-
-    activeUserSession = userProfile;
-    activeTenantContextId = userProfile.companyId;
-
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new Event('omnizeus_role_change'));
-      window.dispatchEvent(new Event('omnizeus_user_change'));
-      window.dispatchEvent(new Event('omnizeus_company_context_change'));
-    }
-    return { success: true, user: userProfile };
-  }
-
-  // 2. Check dynamically created employees in localStorage/DB cache
-  // Employees created via super-adm have their password stored as 'passwordHash' field
-  try {
-    const { getEmployees } = require('../company/store');
-    const allEmployees = getEmployees() as Array<any>;
-    const emp = allEmployees.find(
-      (e: any) => (e.email || '').toLowerCase() === cleanEmail && (e.passwordHash || e.password || '123') === cleanPass
-    );
-
-    if (emp) {
-      const userProfile: UserProfile = {
-        id: emp.id,
-        name: emp.name,
-        email: emp.email,
-        role: emp.role as UserRole,
-        companyId: emp.companyId,
-        companyName: emp.companyName || emp.companyId
-      };
-
-      activeUserSession = userProfile;
-      activeTenantContextId = userProfile.companyId;
-
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new Event('omnizeus_role_change'));
-        window.dispatchEvent(new Event('omnizeus_user_change'));
-        window.dispatchEvent(new Event('omnizeus_company_context_change'));
-      }
-      return { success: true, user: userProfile };
-    }
-  } catch (_e) {}
-
-  return { success: false, error: 'E-mail ou senha incorretos. Verifique suas credenciais.' };
-}
-
-export function logoutUser(): void {
-  activeUserSession = {
-    id: PRODUCTION_USERS[0].id,
-    name: PRODUCTION_USERS[0].name,
-    email: PRODUCTION_USERS[0].email,
-    role: PRODUCTION_USERS[0].role,
-    companyId: PRODUCTION_USERS[0].companyId,
-    companyName: PRODUCTION_USERS[0].companyName
-  };
-  activeTenantContextId = PRODUCTION_USERS[0].companyId;
+export async function logoutUser(): Promise<void> {
   if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/auth/login', { method: 'DELETE' });
+    } catch (e) {
+      console.error("Logout falhou", e);
+    }
+    
+    localStorage.removeItem('omnizeus_active_company_id');
+    localStorage.removeItem('omnizeus_active_company_name');
+    
+    activeUserSession = {
+      id: '',
+      name: '',
+      email: '',
+      role: 'funcionario',
+      companyId: '',
+      companyName: ''
+    };
+    activeTenantContextId = 'global';
+    
     window.dispatchEvent(new Event('omnizeus_user_change'));
     window.location.href = '/login';
   }

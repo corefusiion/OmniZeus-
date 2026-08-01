@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { getSession } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
 
@@ -9,6 +10,14 @@ const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
 
 export async function POST(req: NextRequest) {
   try {
+    const session = getSession(req);
+    if (!session) {
+      return NextResponse.json({ success: false, message: "Não autenticado." }, { status: 401 });
+    }
+    if (session.role !== "super_adm") {
+      return NextResponse.json({ success: false, message: "Acesso negado." }, { status: 403 });
+    }
+
     const { companyId, apiKey } = await req.json();
 
     let targetKey = apiKey;

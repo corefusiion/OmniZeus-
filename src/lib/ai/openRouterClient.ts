@@ -1,6 +1,6 @@
 import { resolveAIProvider } from "./providerResolver";
-import fs from "fs";
-import path from "path";
+import { readDb, writeDb } from "@/lib/db/localDb";
+import { FALLBACK_PRICING, USD_TO_BRL } from "./pricing";
 
 // Mapping futuristic models to actual models available on OpenRouter
 const MODEL_MAP: Record<string, string> = {
@@ -30,39 +30,6 @@ const MODEL_MAP: Record<string, string> = {
   "moonshot/kimi-256k": "google/gemini-2.5-flash", // Fallback if moonshot not available
 };
 
-// Hardcoded fallback pricing in case OR headers are missing (Price per 1M tokens in USD)
-const FALLBACK_PRICING: Record<string, { prompt: number; completion: number }> = {
-  "openai/gpt-4o": { prompt: 2.5, completion: 10.0 },
-  "openai/o3-mini": { prompt: 1.1, completion: 4.4 },
-  "openai/o3-mini-high": { prompt: 1.1, completion: 4.4 },
-  "anthropic/claude-3.7-sonnet": { prompt: 3.0, completion: 15.0 },
-  "anthropic/claude-3.5-haiku": { prompt: 0.8, completion: 4.0 },
-  "google/gemini-2.5-pro": { prompt: 1.25, completion: 5.0 },
-  "google/gemini-2.5-flash": { prompt: 0.075, completion: 0.3 },
-  "deepseek/deepseek-chat": { prompt: 0.14, completion: 0.28 },
-  "deepseek/deepseek-r1": { prompt: 0.55, completion: 2.19 },
-};
-
-function getLocalDbFile(): any {
-  const DB_FILE_PATH = path.join(process.cwd(), "data", "omnizeus_local_sql_database.json");
-  try {
-    if (fs.existsSync(DB_FILE_PATH)) {
-      const raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
-      return JSON.parse(raw);
-    }
-  } catch (e) {}
-  return {};
-}
-
-function saveLocalDbFile(db: any): void {
-  const DB_FILE_PATH = path.join(process.cwd(), "data", "omnizeus_local_sql_database.json");
-  try {
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(db, null, 2), "utf-8");
-  } catch (err) {
-    console.error("Error saving local SQL database file:", err);
-  }
-}
-
 export interface AIResponse {
   content: string;
   isError: boolean;
@@ -74,6 +41,7 @@ export async function executeAIRequest(options: {
   userRole?: string;
   userEmail?: string;
   requestedModel: string;
+  temperature?: number;
   messages: any[];
   persona?: string;
   featureContext: string;
@@ -81,7 +49,7 @@ export async function executeAIRequest(options: {
   const startTime = Date.now();
   
   // 1. Resolve Provider and Key
-  const resolved = resolveAIProvider({
+  const resolved = await resolveAIProvider({
     companyId: options.companyId,
     userRole: options.userRole,
     userEmail: options.userEmail,
@@ -98,6 +66,25 @@ export async function executeAIRequest(options: {
       content: "Nenhuma chave de API configurada. Por favor, adicione sua chave da OpenRouter no Painel Super ADM.",
       errorDetail: "Missing API Key"
     };
+  }
+
+  // Balance check logic (Item 6)
+  if (!resolved.isCustomEndpoint) {
+    const dbCheck = await readDb();
+    if (dbCheck.companies) {
+      const companyIndex = dbCheck.companies.findIndex((c: any) => c.id === options.companyId);
+      if (companyIndex >= 0) {
+        let currentFranchise = dbCheck.companies[companyIndex].coins_franchise;
+        if (currentFranchise === undefined) currentFranchise = dbCheck.companies[companyIndex].coinsFranchise;
+        if (currentFranchise === undefined || currentFranchise < 1) {
+          return {
+            isError: true,
+            content: "Saldo insuficiente de OmniCoins para realizar a operação. Recarregue no módulo financeiro.",
+            errorDetail: "Insufficient Coins"
+          };
+        }
+      }
+    }
   }
 
   try {
@@ -135,6 +122,7 @@ export async function executeAIRequest(options: {
       body: JSON.stringify({
         model: realModel,
         messages: finalMessages,
+        temperature: options.temperature,
         stream: false,
       }),
     });
@@ -172,7 +160,7 @@ export async function executeAIRequest(options: {
     // Custom endpoints cost 0
     if (resolved.isCustomEndpoint) costUsd = 0;
     
-    const costBrl = parseFloat((costUsd * 5.80).toFixed(6));
+    const costBrl = parseFloat((costUsd * USD_TO_BRL).toFixed(6));
     
     // Coins logic: $0.10 USD = 1 Coin? 
     // Wait, the documentation says "1 OmniCoin = R$ 0,10". Let's use costBrl / 0.10
@@ -180,13 +168,17 @@ export async function executeAIRequest(options: {
     let omnicoinsConsumed = resolved.isCustomEndpoint ? 0 : Math.max(1, Math.ceil(costBrl / 0.10));
 
     // Deduzir Coins da Empresa Específica e Salvar Métricas
-    const db = getLocalDbFile();
+    const db = await readDb();
     
     if (db.companies) {
       const companyIndex = db.companies.findIndex((c: any) => c.id === options.companyId);
       if (companyIndex >= 0) {
-        let currentFranchise = db.companies[companyIndex].coinsFranchise || 0;
-        db.companies[companyIndex].coinsFranchise = Math.max(0, currentFranchise - omnicoinsConsumed);
+        let currentFranchise = db.companies[companyIndex].coins_franchise;
+        if (currentFranchise === undefined) currentFranchise = db.companies[companyIndex].coinsFranchise || 0;
+        
+        let newFranchise = Math.max(0, currentFranchise - omnicoinsConsumed);
+        db.companies[companyIndex].coins_franchise = newFranchise;
+        db.companies[companyIndex].coinsFranchise = newFranchise; // Compatibility
         
         let totalConsumed = db.companies[companyIndex].consumed_coins || 0;
         db.companies[companyIndex].consumed_coins = totalConsumed + omnicoinsConsumed;
@@ -235,11 +227,11 @@ export async function executeAIRequest(options: {
       created_at: now
     });
 
-    saveLocalDbFile(db);
+    await writeDb(db);
 
     return {
       isError: false,
-      content: textContent
+      content: textContent,
     };
 
   } catch (error: any) {

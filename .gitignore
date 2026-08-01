@@ -29,11 +29,11 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
-# Database/data
-# /data/
+# Database/data — contem chaves de API e credenciais em runtime, nunca versionar
+/data/
 *.sqlite
 *.sqlite3
-# omnizeus_local_sql_database.json
+*.bak-*
 
 # Gemini/Antigravity metadata
 /.agents/

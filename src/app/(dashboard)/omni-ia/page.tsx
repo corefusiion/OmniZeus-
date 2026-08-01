@@ -5,7 +5,7 @@ import {
   Sparkles, Send, Bot, User, RefreshCw, Cpu, BookOpen, Coins, 
   Copy, Trash2, Plus, History, ChevronRight, Layers, Pin, Edit2, Check, X, ArrowRight, MessageSquare
 } from "lucide-react";
-import { deductCoins } from "@/lib/coins/store";
+import { fetchCoinBalanceFromServer } from "@/lib/coins/store";
 import { sqlDb } from "@/lib/db/sqlite";
 import { getCustomAgents, CustomAgent } from "@/lib/agents/store";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -152,7 +152,12 @@ export default function OmniIAPage() {
   const [showNoCoinsModal, setShowNoCoinsModal] = useState(false);
 
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
+  // Per-conversation message cache. Keyed by conversation id.
+  // A conversation whose key exists (even as []) is considered locally hydrated
+  // and will NOT be destructively re-fetched from the DB — this prevents the
+  // async loader from wiping optimistic (in-flight) messages.
+  const [messagesByConv, setMessagesByConv] = useState<Record<string, Message[]>>({});
+  const messages = activeConvId ? (messagesByConv[activeConvId] || []) : [];
 
   const activeModelObj = allModelsList.find(m => m.id === selectedModel) || allModelsList[0];
   const activePersonaObj = personas.find(p => p.id === selectedPersona) || personas.find(p => p.id === "agente_geral") || personas[0] || {
@@ -206,13 +211,18 @@ export default function OmniIAPage() {
     return () => window.removeEventListener("omnizeus_agents_change", handleAgentsChange);
   }, []);
 
-  // Listen to Active Conversation Changes and Load Messages Strictly Filtered by ConvId
+  // Load messages from DB when switching to a conversation that isn't hydrated
+  // locally yet. Conversations already in the cache (including in-flight ones)
+  // are never destructively overwritten here.
   useEffect(() => {
-    if (!activeConvId) {
-      setMessages([]);
+    if (!activeConvId) return;
+
+    // Already hydrated locally (has an entry, or is currently loading a response) → skip DB reload.
+    if (messagesByConv[activeConvId] !== undefined || loadingConvIds[activeConvId]) {
       return;
     }
 
+    let cancelled = false;
     const loadMessagesFromSql = async () => {
       try {
         const convRecords = await fetchServerTable('conversations');
@@ -224,26 +234,34 @@ export default function OmniIAPage() {
         const msgRecords = await fetchServerTable('messages');
         const msgs = msgRecords.filter((m: any) => m.conversation_id === activeConvId);
 
-        if (msgs.length > 0) {
-          const sortedMsgs = [...msgs].sort((a, b) => new Date(a.created_at || Date.now()).getTime() - new Date(b.created_at || Date.now()).getTime());
-          setMessages(sortedMsgs.map((m: any) => ({
-            id: m.id,
-            sender: m.sender as 'user' | 'ai',
-            text: m.sender === 'ai' ? sanitizeAiText(m.text) : m.text,
-            timestamp: new Date(m.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            model: m.model || activeModelObj.name
-          })));
-        } else {
-          setMessages([]);
-        }
+        if (cancelled) return;
+
+        const sortedMsgs = [...msgs].sort((a, b) => new Date(a.created_at || Date.now()).getTime() - new Date(b.created_at || Date.now()).getTime());
+        const mapped: Message[] = sortedMsgs.map((m: any) => ({
+          id: m.id,
+          sender: m.sender as 'user' | 'ai',
+          text: m.sender === 'ai' ? sanitizeAiText(m.text) : m.text,
+          timestamp: new Date(m.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          model: m.model || activeModelObj.name
+        }));
+
+        // Guard against a race: if the conversation got hydrated while we were
+        // fetching (e.g. user sent a message), don't clobber it.
+        setMessagesByConv(prev => {
+          if (prev[activeConvId] !== undefined) return prev;
+          return { ...prev, [activeConvId]: mapped };
+        });
       } catch (err) {
         console.error("Erro ao carregar mensagens da conversa:", err);
-        setMessages([]);
+        if (!cancelled) {
+          setMessagesByConv(prev => (prev[activeConvId] !== undefined ? prev : { ...prev, [activeConvId]: [] }));
+        }
       }
     };
 
     loadMessagesFromSql();
-  }, [activeConvId, activeModelObj]);
+    return () => { cancelled = true; };
+  }, [activeConvId, activeModelObj, messagesByConv, loadingConvIds]);
 
   const executeChatQuery = async (textToSend: string, overridePersonaId?: string) => {
     const promptText = textToSend.trim();
@@ -252,25 +270,35 @@ export default function OmniIAPage() {
     const activePersona = overridePersonaId || selectedPersona;
     const personaObj = personas.find(p => p.id === activePersona) || activePersonaObj;
 
-    // Deduct OmniCoins (5 Coins)
-    const success = deductCoins(5, `Consulta Chat OmniIA (${activeModelObj.name})`);
-    if (!success) {
+    // Verifica saldo ANTES de enviar (sem debitar aqui). O débito real dos 5
+    // OmniCoins acontece uma única vez no servidor (/api/chat → recordChatMetrics),
+    // que possui a sessão e o tenant corretos. Debitar também no cliente causava
+    // cobrança dupla.
+    const selectedCompanyId = typeof window !== "undefined"
+      ? (localStorage.getItem("omnizeus_active_company_id") || "")
+      : "";
+    const activeCompany = selectedCompanyId || "comp_zenitus";
+    const currentBalance = await fetchCoinBalanceFromServer(activeCompany);
+    if (currentBalance < 5) {
       setShowNoCoinsModal(true);
       return;
     }
 
     let targetConvId = activeConvId;
+    let isNewConv = false;
 
     // Always create a new conversation ID if starting from welcome screen or clicking a specialist card
     if (!targetConvId || conversations.length === 0 || overridePersonaId) {
       targetConvId = `conv_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      isNewConv = true;
       const newTitle = personaObj.label || promptText.substring(0, 30);
       const newConv: ConversationItem = { id: targetConvId, title: newTitle, model: activeModelObj.name, isPinned: false };
       setConversations(prev => [newConv, ...prev.filter(c => c.id !== targetConvId)]);
       setActiveConvId(targetConvId);
       activeConvIdRef.current = targetConvId;
-      setMessages([]);
-      
+      // Mark as hydrated (empty) so the DB loader won't try to overwrite it.
+      setMessagesByConv(prev => ({ ...prev, [targetConvId]: [] }));
+
       sqlDb.insert('conversations', {
         id: targetConvId,
         title: newConv.title,
@@ -285,12 +313,21 @@ export default function OmniIAPage() {
       setSelectedPersona(overridePersonaId);
     }
 
+    // Snapshot of prior messages for this conversation (for the API history payload).
+    const priorMessages = isNewConv ? [] : (messagesByConv[targetConvId] || []);
+
     const userMsg: Message = {
       id: `msg_${Date.now()}`,
       sender: "user",
       text: promptText,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
+
+    // Optimistically show the user message in the correct conversation.
+    setMessagesByConv(prev => ({
+      ...prev,
+      [targetConvId]: [...(prev[targetConvId] || []), userMsg]
+    }));
 
     // Store in SQL DB immediately
     await insertServerTable('messages', {
@@ -302,33 +339,31 @@ export default function OmniIAPage() {
       created_at: new Date().toISOString()
     });
 
-    // Update screen if user is currently viewing targetConvId
-    if (activeConvIdRef.current === targetConvId) {
-      setMessages(prev => [...prev, userMsg]);
-    }
-    
     setInputMessage("");
     setLoadingConvIds(prev => ({ ...prev, [targetConvId]: true }));
 
     try {
       const settings = await fetchServerSettings();
       const savedKey = settings?.openrouter_api_key || null;
+      const activeCompanyId = selectedCompanyId;
 
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
-          ...(savedKey ? { "x-openrouter-key": savedKey } : {})
+          ...(savedKey ? { "x-openrouter-key": savedKey } : {}),
+          ...(activeCompanyId ? { "x-company-id": activeCompanyId } : {})
         },
         body: JSON.stringify({
           messages: [
-            ...messages.map(m => ({
+            ...priorMessages.map(m => ({
               role: m.sender === 'user' ? 'user' : 'assistant',
               content: m.text
             })),
             { role: "user", content: promptText }
           ],
-          model: selectedModel,
+          model: personaObj.modelLlm || selectedModel,
+          temperature: personaObj.temperature !== undefined ? personaObj.temperature : undefined,
           persona: activePersona,
           personaPrompt: personaObj.systemPrompt,
           clientApiKey: savedKey || undefined,
@@ -343,18 +378,25 @@ export default function OmniIAPage() {
         throw new Error("Falha na rota de streaming");
       }
 
+      // O servidor debitou os 5 coins; sincroniza o saldo em cache para a UI refletir.
+      fetchCoinBalanceFromServer(activeCompany)
+        .then(() => window.dispatchEvent(new Event("omnizeus_coins_change")))
+        .catch(() => {});
+
       const aiMsg: Message = {
-        id: `msg_${Date.now() + 1}`,
+        id: res.headers.get("x-omni-message-id") || `msg_${Date.now() + 1}`,
         sender: "ai",
-        text: aiResponseText,
+        text: sanitizeAiText(aiResponseText),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         model: activeModelObj.name
       };
 
-      // Update screen ONLY if user is currently viewing targetConvId
-      if (activeConvIdRef.current === targetConvId) {
-        setMessages(prev => [...prev, aiMsg]);
-      }
+      // Append to the correct conversation cache regardless of which conversation
+      // the user is currently viewing (so responses never get lost).
+      setMessagesByConv(prev => ({
+        ...prev,
+        [targetConvId]: [...(prev[targetConvId] || []), aiMsg]
+      }));
     } catch (err) {
       const fallbackText = `Estamos enfrentando uma instabilidade temporária no servidor de IA.`;
 
@@ -366,9 +408,10 @@ export default function OmniIAPage() {
         model: activeModelObj.name
       };
 
-      if (activeConvIdRef.current === targetConvId) {
-        setMessages(prev => [...prev, aiMsg]);
-      }
+      setMessagesByConv(prev => ({
+        ...prev,
+        [targetConvId]: [...(prev[targetConvId] || []), aiMsg]
+      }));
     } finally {
       setLoadingConvIds(prev => ({ ...prev, [targetConvId]: false }));
     }
@@ -385,7 +428,6 @@ export default function OmniIAPage() {
   const handleNewConversation = () => {
     setActiveConvId("");
     activeConvIdRef.current = "";
-    setMessages([]);
     setInputMessage("");
   };
 
@@ -418,16 +460,21 @@ export default function OmniIAPage() {
     if (!deletingConvId) return;
     sqlDb.deleteConversation(deletingConvId);
 
-    const updated = conversations.filter(c => c.id !== deletingConvId);
+    const removedId = deletingConvId;
+    const updated = conversations.filter(c => c.id !== removedId);
     setConversations(updated);
-    if (activeConvId === deletingConvId) {
+    setMessagesByConv(prev => {
+      const next = { ...prev };
+      delete next[removedId];
+      return next;
+    });
+    if (activeConvId === removedId) {
       if (updated.length > 0) {
         setActiveConvId(updated[0].id);
         activeConvIdRef.current = updated[0].id;
       } else {
         setActiveConvId("");
         activeConvIdRef.current = "";
-        setMessages([]);
       }
     }
     setDeletingConvId(null);

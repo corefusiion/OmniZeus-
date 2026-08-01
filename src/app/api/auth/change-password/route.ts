@@ -30,13 +30,16 @@ function saveDb(data: any): boolean {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getSession(req);
-    const { userId, newPassword, confirmPassword } = await req.json();
-
-    const targetUserId = session?.userId || userId;
-    if (!targetUserId) {
-      return NextResponse.json({ error: "Sessão inválida ou não informada." }, { status: 401 });
+    const session = getSession(req);
+    if (!session) {
+      return NextResponse.json({ error: "Sessão inválida ou expirada. Faça login novamente." }, { status: 401 });
     }
+
+    const { newPassword, confirmPassword } = await req.json();
+
+    // O alvo vem SEMPRE da sessão. Aceitar userId do body permitiria a qualquer
+    // pessoa trocar a senha de outro usuário.
+    const targetUserId = session.userId;
 
     if (!newPassword || !confirmPassword) {
       return NextResponse.json({ error: "Nova senha e confirmação são obrigatórias." }, { status: 400 });
@@ -76,6 +79,10 @@ export async function POST(req: NextRequest) {
       passwordChangedAt: now,
       status: "Ativo"
     };
+    // Remove credenciais legadas em texto puro, senão a senha antiga continua aceita
+    delete employees[empIndex].password;
+    delete employees[empIndex].temporary_password;
+    delete employees[empIndex].temporaryPassword;
 
     db.employees = employees;
 

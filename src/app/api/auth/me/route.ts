@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       user: {
         id: session.userId,
@@ -28,6 +28,13 @@ export async function GET(req: NextRequest) {
         mustChangePassword: Boolean(session.mustChangePassword)
       }
     });
+    
+    // Completely disable caching for this endpoint to prevent session leaks
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    
+    return response;
   } catch {
     return NextResponse.json(
       { success: false, error: "Falha ao verificar sessão." },

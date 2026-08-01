@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { maskApiKey } from "@/lib/ai/providerResolver";
+import { getSession } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
 
@@ -30,6 +31,14 @@ function saveLocalDb(db: any): void {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = getSession(req);
+    if (!session) {
+      return NextResponse.json({ error: "Não autenticado.", code: "UNAUTHORIZED" }, { status: 401 });
+    }
+    if (session.role !== "super_adm") {
+      return NextResponse.json({ error: "Acesso negado. Apenas o administrador da plataforma gerencia chaves de API.", code: "FORBIDDEN" }, { status: 403 });
+    }
+
     const { companyId, apiKey } = await req.json();
 
     if (!companyId || !apiKey || apiKey.trim().length === 0) {
@@ -73,7 +82,7 @@ export async function POST(req: NextRequest) {
     db.audit_logs.unshift({
       id: `log_audit_${Date.now()}`,
       company_id: companyId,
-      user_name: "Super Admin",
+      user_name: session.name || "Super Admin",
       action: "SAVE_COMPANY_OPENROUTER_KEY",
       resource: `Empresa ${companyId}`,
       details: `Chave OpenRouter cadastrada (Masked: ${maskApiKey(trimmedKey)})`,

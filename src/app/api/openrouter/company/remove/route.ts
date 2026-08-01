@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { getSession } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
 
@@ -29,6 +30,14 @@ function saveLocalDb(db: any): void {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = getSession(req);
+    if (!session) {
+      return NextResponse.json({ error: "Não autenticado.", code: "UNAUTHORIZED" }, { status: 401 });
+    }
+    if (session.role !== "super_adm") {
+      return NextResponse.json({ error: "Acesso negado.", code: "FORBIDDEN" }, { status: 403 });
+    }
+
     const { companyId } = await req.json();
 
     if (!companyId) {
@@ -54,7 +63,7 @@ export async function POST(req: NextRequest) {
     db.audit_logs.unshift({
       id: `log_audit_${Date.now()}`,
       company_id: companyId,
-      user_name: "Super Admin",
+      user_name: session.name || "Super Admin",
       action: "REMOVE_COMPANY_OPENROUTER_KEY",
       resource: `Empresa ${companyId}`,
       details: "Chave OpenRouter removida. Empresa revertida para a API Master (Fallback).",

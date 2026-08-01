@@ -262,6 +262,47 @@ function saveLocalDbFile(db: DatabaseSchema): void {
 // Global tables that are NOT scoped to a single tenant
 const GLOBAL_TABLES = ["settings", "companies", "custom_job_roles", "audit_logs", "purchase_orders"];
 
+// Tabelas que só o super_adm pode ler/escrever (contêm credenciais ou dados de toda a plataforma)
+const SUPER_ADMIN_ONLY_TABLES = ["settings", "contaazul_config", "purchase_orders", "audit_logs"];
+
+// Campos sensíveis que nunca devem sair na resposta da API
+const SENSITIVE_FIELDS = [
+  "openrouter_api_key", "stripe_secret_key", "stripe_pub_key", "stripe_webhook_secret",
+  "evolution_api_key", "custom_ai_key", "lobehub_api_key",
+  "client_secret", "access_token", "refresh_token",
+  "password", "passwordHash", "password_hash", "temporary_password", "temporaryPassword"
+];
+
+// Apenas as tabelas declaradas no schema podem ser escritas. Isso bloqueia
+// prototype pollution (__proto__, constructor) e criação de tabelas arbitrárias.
+const WRITABLE_TABLES = new Set(Object.keys(DEFAULT_DB));
+
+function isWritableTable(table: string): boolean {
+  return WRITABLE_TABLES.has(table);
+}
+
+function maskSecret(value: unknown): string {
+  if (typeof value !== "string" || value.length === 0) return "";
+  return value.length <= 8 ? "********" : `${value.slice(0, 4)}...${value.slice(-4)}`;
+}
+
+// Substitui segredos por versão mascarada, recursivamente
+function redact<T>(input: T): T {
+  if (Array.isArray(input)) return input.map(item => redact(item)) as unknown as T;
+  if (input && typeof input === "object") {
+    const out: any = {};
+    for (const [key, val] of Object.entries(input as Record<string, unknown>)) {
+      if (SENSITIVE_FIELDS.includes(key)) {
+        out[key] = val ? maskSecret(val) : val;
+      } else {
+        out[key] = redact(val);
+      }
+    }
+    return out;
+  }
+  return input;
+}
+
 export async function GET(req: NextRequest) {
   const db = getLocalDbFile();
   const url = new URL(req.url);
@@ -287,11 +328,31 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // Dump do banco inteiro nunca é permitido — vazaria dados de todos os tenants
+  if (!table) {
+    return NextResponse.json(
+      { error: "Parâmetro 'table' é obrigatório.", code: "TABLE_REQUIRED" },
+      { status: 400 }
+    );
+  }
+
+  // Impede leitura de propriedades herdadas (__proto__, constructor, toString...)
+  if (!Object.prototype.hasOwnProperty.call(db, table) && table !== "payables_list") {
+    return NextResponse.json({ data: [] });
+  }
+
+  if (SUPER_ADMIN_ONLY_TABLES.includes(table) && !isSuperAdmin) {
+    return NextResponse.json(
+      { error: "Acesso negado. Recurso restrito ao administrador da plataforma.", code: "FORBIDDEN" },
+      { status: 403 }
+    );
+  }
+
   const effectiveCompanyId = isSuperAdmin
     ? (requestedCompanyId || "global")
     : session.companyId;
 
-  if (table) {
+  {
     let val = (db as any)[table];
 
     // Payables alias fallback
@@ -302,26 +363,25 @@ export async function GET(req: NextRequest) {
     // Special scoping for companies table: Non-super_adm only sees their assigned company
     if (table === "companies" && Array.isArray(val) && !isSuperAdmin) {
       const myCompany = val.filter((c: any) => c.id === session.companyId);
-      return NextResponse.json({ data: myCompany });
+      return NextResponse.json({ data: redact(myCompany) });
     }
 
     if (Array.isArray(val) && !GLOBAL_TABLES.includes(table)) {
       if (isSuperAdmin && (effectiveCompanyId === "global" || !effectiveCompanyId)) {
-        return NextResponse.json({ data: val });
+        return NextResponse.json({ data: redact(val) });
       }
 
-      // Filter strictly by company_id when a specific company is selected
+      // Filter strictly by company_id when a specific company is selected.
+      // Registros sem company_id são omitidos: sem dono definido, não pertencem a este tenant.
       const filtered = val.filter((item: any) => {
         const itemCompany = item.company_id || item.companyId;
         return itemCompany === effectiveCompanyId;
       });
-      return NextResponse.json({ data: filtered });
+      return NextResponse.json({ data: redact(filtered) });
     }
 
-    return NextResponse.json({ data: val !== undefined ? val : [] });
+    return NextResponse.json({ data: redact(val !== undefined ? val : []) });
   }
-
-  return NextResponse.json({ data: db });
 }
 
 export async function POST(req: NextRequest) {
@@ -338,6 +398,7 @@ export async function POST(req: NextRequest) {
     }
 
     const isSuperAdmin = session.role === "super_adm";
+    const canManageEmployees = session.role === "super_adm" || session.role === "gestor";
     const requestedCompanyId = req.headers.get("x-company-id");
 
     // Non-Super Admins cannot override tenant context
@@ -349,7 +410,7 @@ export async function POST(req: NextRequest) {
     }
 
     const effectiveCompanyId = isSuperAdmin
-      ? (requestedCompanyId || session.companyId || "comp_zenitus")
+      ? (requestedCompanyId || session.companyId)
       : session.companyId;
 
     if (action === "update_settings" && settings) {
@@ -366,6 +427,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "update_contaazul_config" && contaazul_config) {
+      if (!isSuperAdmin) {
+        return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+      }
       db.contaazul_config = {
         ...db.contaazul_config,
         ...contaazul_config,
@@ -379,18 +443,38 @@ export async function POST(req: NextRequest) {
       if (!isSuperAdmin) {
         return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
       }
+      if (!isWritableTable(table)) {
+        return NextResponse.json({ error: "Tabela inválida." }, { status: 400 });
+      }
       (db as any)[table] = record;
       saveLocalDbFile(db);
       return NextResponse.json({ success: true, record });
     }
 
     if (action === "insert" && table && record) {
+      if (!isWritableTable(table)) {
+        return NextResponse.json({ error: "Tabela inválida." }, { status: 400 });
+      }
+      if (SUPER_ADMIN_ONLY_TABLES.includes(table) && !isSuperAdmin) {
+        return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+      }
+      // Só o super_adm cria registros em tabelas globais (ex.: empresas da plataforma)
+      if (GLOBAL_TABLES.includes(table) && !isSuperAdmin) {
+        return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+      }
+      if (table === "employees" && !canManageEmployees) {
+        return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+      }
       if (!Array.isArray((db as any)[table])) {
         (db as any)[table] = [];
       }
       // Ensure company_id is attached to inserted records
       if (!GLOBAL_TABLES.includes(table)) {
         record.company_id = effectiveCompanyId;
+        delete record.companyId;
+      }
+      if (table === "employees" && !isSuperAdmin && record.role === "super_adm") {
+        return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
       }
 
       (db as any)[table].unshift(record);
@@ -399,36 +483,83 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "update" && table && record && record.id) {
+      if (!isWritableTable(table)) {
+        return NextResponse.json({ error: "Tabela inválida." }, { status: 400 });
+      }
+      if (SUPER_ADMIN_ONLY_TABLES.includes(table) && !isSuperAdmin) {
+        return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+      }
+      if (table === "employees" && !canManageEmployees) {
+        return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+      }
       const list = (db as any)[table];
       if (Array.isArray(list)) {
+        let denied = false;
         (db as any)[table] = list.map((item: any) => {
-          if (item.id === record.id) {
-            // Assert tenant ownership unless Super Admin
-            if (!isSuperAdmin && item.company_id && item.company_id !== effectiveCompanyId) {
-              return item; // Do not modify
+          if (item.id !== record.id) return item;
+
+          // Registro de outro tenant, ou sem dono definido, não pode ser tocado
+          if (!isSuperAdmin && !GLOBAL_TABLES.includes(table)) {
+            const owner = item.company_id || item.companyId;
+            if (owner !== effectiveCompanyId) {
+              denied = true;
+              return item;
             }
-            return { ...item, ...record };
           }
-          return item;
+
+          const merged = { ...item, ...record };
+          if (!isSuperAdmin) {
+            // Impede troca de dono e escalonamento de privilégio
+            merged.company_id = item.company_id;
+            merged.companyId = item.companyId;
+            if (table === "employees" && record.role === "super_adm") {
+              merged.role = item.role;
+            }
+            // Senha só muda pelas rotas dedicadas de autenticação
+            merged.password = item.password;
+            merged.passwordHash = item.passwordHash;
+            merged.password_hash = item.password_hash;
+          }
+          return merged;
         });
+        if (denied) {
+          return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+        }
       }
       saveLocalDbFile(db);
       return NextResponse.json({ success: true, record });
     }
 
     if (action === "delete" && table && record && record.id) {
+      if (!isWritableTable(table)) {
+        return NextResponse.json({ error: "Tabela inválida." }, { status: 400 });
+      }
+      if (SUPER_ADMIN_ONLY_TABLES.includes(table) && !isSuperAdmin) {
+        return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+      }
+      if (GLOBAL_TABLES.includes(table) && !isSuperAdmin) {
+        return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+      }
+      if (table === "employees" && !canManageEmployees) {
+        return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+      }
       const list = (db as any)[table];
       if (Array.isArray(list)) {
+        let denied = false;
         (db as any)[table] = list.filter((item: any) => {
-          if (item.id === record.id) {
-            // Assert tenant ownership unless Super Admin
-            if (!isSuperAdmin && item.company_id && item.company_id !== effectiveCompanyId) {
-              return true; // Keep record (unauthorized delete attempt)
+          if (item.id !== record.id) return true;
+          if (!isSuperAdmin) {
+            const owner = item.company_id || item.companyId;
+            if (owner !== effectiveCompanyId) {
+              denied = true;
+              return true; // Mantém o registro
             }
-            return false; // Remove
           }
-          return true;
+          return false; // Remove
         });
+        if (denied) {
+          return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+        }
       }
       saveLocalDbFile(db);
       return NextResponse.json({ success: true });

@@ -76,6 +76,10 @@ export async function POST(req: NextRequest) {
       status: "Primeiro acesso pendente",
       password_reset_at: now
     };
+    // Remove credenciais legadas em texto puro para invalidar a senha anterior
+    delete employees[empIndex].password;
+    delete employees[empIndex].temporary_password;
+    delete employees[empIndex].temporaryPassword;
 
     db.employees = employees;
 
