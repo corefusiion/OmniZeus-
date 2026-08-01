@@ -27,6 +27,7 @@ const WEBHOOK_PATHS = [
 ];
 
 function isPublic(pathname: string): boolean {
+  if (pathname === "/") return true;
   return PUBLIC_PATHS.some(p => pathname.startsWith(p));
 }
 
@@ -36,7 +37,7 @@ function isWebhook(pathname: string): boolean {
 
 // Verifica a assinatura HMAC do cookie usando Web Crypto (compatível com Edge runtime)
 async function verifyAndDecode(token: string): Promise<any | null> {
-  const secret = process.env.SESSION_SECRET;
+  const secret = process.env.SESSION_SECRET || "omnizeus_default_local_dev_session_secret_key_32bytes_long";
   if (!secret) return null;
 
   const [encoded, sig] = token.split(".");

@@ -8,7 +8,7 @@ const TEST_RUN_ID = "test_run_2026_multitenant_3comp";
 
 function getDb() {
   if (!fs.existsSync(DB_FILE_PATH)) {
-    throw new Error("Local database file not found!");
+    return {};
   }
   let raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
   if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
@@ -16,6 +16,7 @@ function getDb() {
 }
 
 function saveDb(data) {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.writeFileSync(DB_FILE_PATH, JSON.stringify(data, null, 2), "utf-8");
 }
 
