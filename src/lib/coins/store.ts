@@ -33,6 +33,12 @@ let inMemoryBalances: Record<string, number> = {};
 // In-memory transaction log (no mock data — all real)
 let inMemoryTransactions: CoinTransaction[] = [];
 
+// Limpa todo o cache de coins ao trocar de empresa (impede vazamento entre tenants)
+export function resetCoinStore(): void {
+  inMemoryBalances = {};
+  inMemoryTransactions = [];
+}
+
 // ─── Fetch balance for a specific company from server ──────────────────────
 
 export async function fetchCoinBalanceFromServer(companyId: string): Promise<number> {
@@ -42,29 +48,45 @@ export async function fetchCoinBalanceFromServer(companyId: string): Promise<num
       const json = await res.json();
       const companies: any[] = Array.isArray(json.data) ? json.data : [];
       const company = companies.find((c: any) => c.id === companyId);
-      if (company) {
-        const balance = typeof company.coins_franchise === 'number'
+      const balance = company
+        ? (typeof company.coins_franchise === 'number'
           ? company.coins_franchise
-          : (typeof company.coinsFranchise === 'number' ? company.coinsFranchise : 0);
-        inMemoryBalances[companyId] = balance;
-        return balance;
-      }
+          : (typeof company.coinsFranchise === 'number' ? company.coinsFranchise : 0))
+        : 0;
+      // Sempre popular o cache (mesmo quando a empresa não é encontrada),
+      // caso contrário o getCoinBalance() entra em loop infinito de fetch + evento.
+      inMemoryBalances[companyId] = balance;
+      return balance;
     }
   } catch (err) {
     console.error(`[Coins] Error fetching balance for company ${companyId}:`, err);
+  }
+  // Popula cache com fallback para evitar re-fetch infinito.
+  if (!(companyId in inMemoryBalances)) {
+    inMemoryBalances[companyId] = 0;
   }
   return inMemoryBalances[companyId] ?? 0;
 }
 
 // ─── Get cached balance (triggers async fetch on first call) ───────────────
 
-export function getCoinBalance(companyId: string = 'comp_zenitus'): number {
-  if (typeof window !== 'undefined' && !(companyId in inMemoryBalances)) {
-    fetchCoinBalanceFromServer(companyId).then(() => {
-      window.dispatchEvent(new Event('omnizeus_coins_change'));
+function resolveDefaultCompanyId(): string {
+  if (typeof window === 'undefined') return 'comp_zenitus';
+  return localStorage.getItem('omnizeus_active_company_id') || 'comp_zenitus';
+}
+
+export function getCoinBalance(companyId?: string): number {
+  const effectiveCompanyId = companyId || resolveDefaultCompanyId();
+  if (typeof window !== 'undefined' && !(effectiveCompanyId in inMemoryBalances)) {
+    fetchCoinBalanceFromServer(effectiveCompanyId).then((balance) => {
+      // Só notifica os listeners quando o saldo realmente muda, evitando
+      // cascatas de re-render e re-fetch no Header.
+      if (inMemoryBalances[effectiveCompanyId] !== balance) {
+        window.dispatchEvent(new Event('omnizeus_coins_change'));
+      }
     }).catch(() => {});
   }
-  return inMemoryBalances[companyId] ?? 0;
+  return inMemoryBalances[effectiveCompanyId] ?? 0;
 }
 
 // ─── Get usage logs, optionally filtered by company ────────────────────────
@@ -129,7 +151,7 @@ export async function deductCoinsFromCompany(
 // ─── Legacy sync shim — components not yet updated can still call deductCoins
 
 export function deductCoins(amount: number, actionName: string, meta?: { agent?: string; model?: string; tokens?: number }): boolean {
-  const companyId = 'comp_zenitus';
+  const companyId = resolveDefaultCompanyId();
   deductCoinsFromCompany(companyId, amount, actionName, meta).catch(() => {});
   const current = inMemoryBalances[companyId] ?? 0;
   inMemoryBalances[companyId] = Math.max(0, current - amount);
@@ -177,7 +199,7 @@ export async function addCoinsToCompany(companyId: string, amount: number): Prom
 
 // Legacy shim
 export function addCoins(amount: number): void {
-  addCoinsToCompany('comp_zenitus', amount).catch(() => {});
+  addCoinsToCompany(resolveDefaultCompanyId(), amount).catch(() => {});
 }
 
 

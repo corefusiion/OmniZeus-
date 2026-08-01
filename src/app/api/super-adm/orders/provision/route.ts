@@ -79,6 +79,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Segurança contábil: só provisiona após pagamento confirmado.
+    // Impede que uma empresa não paga entre como "Ativa" no MRR do Dashboard Master.
+    if (order.status !== "PAGAMENTO_CONFIRMADO") {
+      return NextResponse.json(
+        {
+          error: "Este pedido não pode ser provisionado: o pagamento ainda não foi confirmado. Aguarde o webhook do Stripe confirmar o pagamento (status PAGAMENTO_CONFIRMADO)."
+        },
+        { status: 400 }
+      );
+    }
+
     const newCompanyId = `company_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const newGestorId = `emp_gestor_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const tempPassword = generateSecureTempPassword();

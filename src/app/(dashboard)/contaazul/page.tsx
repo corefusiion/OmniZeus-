@@ -10,7 +10,7 @@ import * as XLSX from "xlsx";
 import { 
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend, PieChart, Pie, Cell 
 } from "recharts";
-import { getActiveRole, UserRole } from "@/lib/auth/roles";
+import { getActiveRole, getActiveTenantId, UserRole } from "@/lib/auth/roles";
 import { 
   fetchContaAzulConfig, updateContaAzulConfig, 
   fetchContaAzulClients, saveContaAzulClients, 
@@ -20,6 +20,7 @@ import {
 } from "@/lib/db/serverDb";
 
 export interface ContaAzulConfig {
+  companyId?: string;
   clientId: string;
   clientSecret: string;
   redirectUri: string;
@@ -297,9 +298,10 @@ export default function ContaAzulPage() {
   }, [chatMessages, isAiProcessing]);
 
   const loadContaAzulData = async () => {
+    const activeCompanyId = getActiveTenantId() || localStorage.getItem("omnizeus_active_company_id") || "";
     try {
       const [cfg, clients, suppliers, entries, categories] = await Promise.all([
-        fetchContaAzulConfig(),
+        fetchContaAzulConfig(activeCompanyId),
         fetchContaAzulClients(),
         fetchContaAzulSuppliers(),
         fetchContaAzulEntries(),
@@ -346,7 +348,10 @@ export default function ContaAzulPage() {
     const activeAccToken = token || accessToken;
     const activeRefToken = refresh || refreshToken;
 
+    const activeCompanyId = getActiveTenantId() || localStorage.getItem("omnizeus_active_company_id") || "";
+
     const cfg: ContaAzulConfig = {
+      companyId: activeCompanyId,
       clientId,
       clientSecret,
       redirectUri,
@@ -466,7 +471,8 @@ export default function ContaAzulPage() {
 
   const fetchConversations = async () => {
     try {
-      const res = await fetch("/api/bpo-chat/conversations?userId=super_adm&companyId=default_company");
+      const companyId = getActiveTenantId() || "";
+      const res = await fetch(`/api/bpo-chat/conversations?userId=super_adm${companyId ? `&companyId=${encodeURIComponent(companyId)}` : ""}`);
       const data = await res.json();
       if (res.ok && data.success) {
         setConversations(data.conversations || []);
@@ -484,8 +490,8 @@ export default function ContaAzulPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: "super_adm",
-          companyId: "default_company",
-          tenantId: "default_tenant",
+          companyId: getActiveTenantId() || "",
+          tenantId: getActiveTenantId() || "",
           title: "Nova Conversa BPO",
           model: selectedModel,
           provider: "openrouter"
@@ -550,6 +556,7 @@ export default function ContaAzulPage() {
   const exchangeCodeForToken = async (codeToUse: string) => {
     setIsConnecting(true);
     setNoticeMessage(null);
+    const activeCompanyId = getActiveTenantId() || localStorage.getItem("omnizeus_active_company_id") || "";
     try {
       const res = await fetch("/api/contaazul/callback", {
         method: "POST",
@@ -558,7 +565,8 @@ export default function ContaAzulPage() {
           code: codeToUse,
           clientId,
           clientSecret,
-          redirectUri
+          redirectUri,
+          companyId: activeCompanyId
         })
       });
       const data = await res.json();
@@ -644,7 +652,7 @@ export default function ContaAzulPage() {
 
     setNoticeMessage(null);
 
-    const activeCompanyId = typeof window !== 'undefined' ? (localStorage.getItem("omnizeus_active_company_id") || "comp_zenitus") : "comp_zenitus";
+    const activeCompanyId = typeof window !== 'undefined' ? (localStorage.getItem("omnizeus_active_company_id") || getActiveTenantId() || "") : (getActiveTenantId() || "");
 
     try {
       const res = await fetch("/api/contaazul/auto-sync", {
@@ -824,6 +832,7 @@ export default function ContaAzulPage() {
           refreshToken,
           clientId,
           clientSecret,
+          companyId: getActiveTenantId() || localStorage.getItem("omnizeus_active_company_id") || "",
           name: newClientName,
           tradeName: newClientTradeName,
           document: newClientDoc,
@@ -862,8 +871,10 @@ export default function ContaAzulPage() {
 
       if (res.ok && data.success) {
         const caId = data.customer?.id || null;
+        const activeCompanyId = getActiveTenantId() || localStorage.getItem("omnizeus_active_company_id") || "";
         const newClientObj = {
           id: caId,
+          company_id: activeCompanyId,
           name: newClientName,
           nome: newClientName,
           trade_name: newClientTradeName,
@@ -872,16 +883,21 @@ export default function ContaAzulPage() {
           email: newClientEmail,
           phone: newClientPhone,
           whatsapp: newClientWhatsapp,
-          status: "API v2 Real"
+          status: "API v2 Real",
+          synced_at: new Date().toISOString()
         };
 
-        const updated = [newClientObj, ...syncedClients];
-        setSyncedClients(updated);
-        await saveContaAzulClients(updated);
+        // Optimistic update local — o servidor já gravou o cliente no DB via rota /customers.
+        // Não usamos set_table (overwrite destrutivo) para não apagar outros registros.
+        // Em vez disso, atualizamos o estado React e recarregamos do banco para consistência.
+        setSyncedClients(prev => [newClientObj, ...prev]);
 
         setIsAddClientOpen(false);
         resetCustomerForm();
         setNoticeMessage({ type: 'success', text: `Cliente '${newClientName}' cadastrado com sucesso no ERP ContaAzul!` });
+
+        // Recarregar do banco para garantir sincronismo com dados reais
+        await loadContaAzulData();
       } else {
         const errMsg = data.error || (res.status === 401 
           ? "Sua sessão OAuth da ContaAzul precisa ser autorizada. Acesse a aba 'Credenciais & OAuth 2.0' e clique em 'Autorizar via Navegador'."
@@ -915,6 +931,7 @@ export default function ContaAzulPage() {
           refreshToken,
           clientId,
           clientSecret,
+          companyId: getActiveTenantId() || localStorage.getItem("omnizeus_active_company_id") || "",
           supplier: {
             name: newSupplierName,
             tradeName: newSupplierName,
@@ -938,20 +955,21 @@ export default function ContaAzulPage() {
 
       if (res.ok && data.success) {
         const caId = data.supplier?.id || null;
+        const activeCompanyId = getActiveTenantId() || localStorage.getItem("omnizeus_active_company_id") || "";
         const newSuppObj = {
           id: caId,
+          company_id: activeCompanyId,
           name: newSupplierName,
           nome: newSupplierName,
           cpf_cnpj: newSupplierDoc.replace(/\D/g, ""),
           document: newSupplierDoc.replace(/\D/g, ""),
           email: newSupplierEmail,
           phone: newSupplierPhone,
-          status: "API v2 Real"
+          status: "API v2 Real",
+          synced_at: new Date().toISOString()
         };
 
-        const updated = [newSuppObj, ...syncedSuppliers];
-        setSyncedSuppliers(updated);
-        await saveContaAzulSuppliers(updated);
+        setSyncedSuppliers(prev => [newSuppObj, ...prev]);
 
         setIsAddSupplierOpen(false);
         // Reset form
@@ -961,6 +979,9 @@ export default function ContaAzulPage() {
         setNewSupplierPhone("");
         setNewSupplierPersonType("Jurídica");
         setNoticeMessage({ type: 'success', text: `Fornecedor '${newSupplierName}' cadastrado com sucesso!` });
+
+        // Recarregar do banco para garantir consistência
+        await loadContaAzulData();
       } else {
         const rawErr = data.raw ? (data.raw.message || JSON.stringify(data.raw)) : "";
         const errMsg = data.error || rawErr || "Erro ao criar fornecedor na ContaAzul. Verifique se o CPF/CNPJ é válido e se a sessão OAuth está autorizada.";

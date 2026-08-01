@@ -2,21 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import * as XLSX from "xlsx";
+import { resolveAIProvider } from "@/lib/ai/providerResolver";
+import { MODEL_MAP } from "@/lib/ai/openRouterClient";
+import { getSession } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
-
-function getSavedSettings(): any {
-  try {
-    if (fs.existsSync(DB_FILE_PATH)) {
-      const db = JSON.parse(fs.readFileSync(DB_FILE_PATH, "utf-8"));
-      return db?.settings || {};
-    }
-  } catch (e) {}
-  return {};
-}
 
 /**
  * POST /api/contaazul/ia-workspace/import
@@ -138,16 +131,23 @@ export async function POST(req: NextRequest) {
       const mimeType = fileType || `image/${fileExt}`;
 
       // Enviar para LLM com vision para OCR inteligente
-      const dbSettings = getSavedSettings();
-      let apiUrl = "https://openrouter.ai/api/v1/chat/completions";
-      let activeApiKey = dbSettings.openrouter_api_key || process.env.OPENROUTER_API_KEY;
-      let visionModel = "google/gemini-2.5-pro";
+      // Usa a chave OpenRouter da empresa (se configurada) ou o fallback master
+      const session = getSession(req);
+      const companyId =
+        req.headers.get("x-company-id") ||
+        (formData.get("companyId") as string | null) ||
+        session?.companyId ||
+        "comp_zenitus";
 
-      if (dbSettings.custom_ai_enabled && dbSettings.custom_ai_url && dbSettings.custom_ai_key) {
-        apiUrl = `${dbSettings.custom_ai_url.replace(/\/$/, "")}/chat/completions`;
-        activeApiKey = dbSettings.custom_ai_key;
-        visionModel = dbSettings.custom_ai_model || "auto";
-      }
+      const resolved = await resolveAIProvider({
+        companyId,
+        userRole: session?.role,
+        requestedModel: "google/gemini-2.5-pro"
+      });
+
+      let apiUrl = resolved.apiUrl;
+      let activeApiKey = resolved.apiKey;
+      let visionModel = MODEL_MAP[resolved.model] || resolved.model;
 
       try {
         const visionRes = await fetch(apiUrl, {

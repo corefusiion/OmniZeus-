@@ -3,7 +3,7 @@ import { readDb, writeDb } from "@/lib/db/localDb";
 import { FALLBACK_PRICING, USD_TO_BRL } from "./pricing";
 
 // Mapping futuristic models to actual models available on OpenRouter
-const MODEL_MAP: Record<string, string> = {
+export const MODEL_MAP: Record<string, string> = {
   // OpenAI
   "openai/gpt-5.5-turbo": "openai/gpt-4o",
   "openai/gpt-5.0-pro": "openai/o3-mini-high",

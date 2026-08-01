@@ -72,6 +72,14 @@ let inMemoryEmployees: EmployeeUser[] = [...INITIAL_EMPLOYEES];
 let companiesFetched = false;
 let employeesFetched = false;
 
+// Limpa o cache de empresas/funcionários ao trocar de tenant (impede vazamento entre empresas)
+export function resetCompanyStore(): void {
+  inMemoryCompanies = [...INITIAL_COMPANIES];
+  inMemoryEmployees = [...INITIAL_EMPLOYEES];
+  companiesFetched = false;
+  employeesFetched = false;
+}
+
 export async function fetchCompaniesFromServer(): Promise<CompanyProfile[]> {
   try {
     const records = await fetchServerTable<any>('companies');
@@ -286,7 +294,7 @@ export function saveEmployee(empData: Omit<EmployeeUser, 'id' | 'createdAt'>): E
     last_login_at: newEmp.lastLoginAt || '',
     birth_date: newEmp.birthDate || '',
     created_at: newEmp.createdAt
-  }).catch(() => {});
+  }, newEmp.companyId).catch(() => {});
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('omnizeus_employees_change'));

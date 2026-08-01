@@ -8,6 +8,7 @@ export interface UserProfile {
   companyId: string;
   companyName: string;
   avatarUrl?: string;
+  allowedModules?: string[];
 }
 
 export const PRODUCTION_USERS: UserProfile[] = [
@@ -37,9 +38,11 @@ let activeUserSession: UserProfile = {
 };
 
 // Master Admin Active Tenant Context Switcher
-let activeTenantContextId: string = typeof window !== 'undefined'
-  ? (localStorage.getItem('omnizeus_active_company_id') || 'global')
-  : 'global';
+// null = modo SaaS (Super ADM no centro de controle da plataforma)
+// string = tenant ativo (Super ADM "entrou" na empresa / Tenant sempre na sua empresa)
+let activeTenantContextId: string | null = typeof window !== 'undefined'
+  ? (localStorage.getItem('omnizeus_active_company_id') || null)
+  : null;
 
 export function getCurrentUser(): UserProfile {
   return activeUserSession;
@@ -49,11 +52,35 @@ export function getActiveRole(): UserRole {
   return activeUserSession.role;
 }
 
+export function getAllowedModules(): string[] {
+  return activeUserSession.allowedModules || [];
+}
+
 export function getActiveCompanyId(): string {
   if (activeUserSession.role === 'super_adm') {
     return activeTenantContextId || 'global';
   }
   return activeUserSession.companyId || '';
+}
+
+/**
+ * Contexto oficial do tenant ativo.
+ * - super_adm: null = modo SaaS (plataforma), string = empresa "entrada".
+ * - gestor/funcionario: sempre sua própria empresa.
+ */
+export function getActiveTenantId(): string | null {
+  if (activeUserSession.role === 'super_adm') {
+    if (!activeTenantContextId || activeTenantContextId === 'global') return null;
+    return activeTenantContextId;
+  }
+  return activeUserSession.companyId || null;
+}
+
+export function isInTenantMode(): boolean {
+  if (activeUserSession.role === 'super_adm') {
+    return activeTenantContextId !== null && activeTenantContextId !== 'global';
+  }
+  return true;
 }
 
 export async function rehydrateSession(): Promise<UserProfile | null> {
@@ -73,20 +100,26 @@ export async function rehydrateSession(): Promise<UserProfile | null> {
   return null;
 }
 
-export function setActiveCompanyContext(companyId: string, companyName?: string): void {
+export function setActiveCompanyContext(companyId: string | null, companyName?: string): void {
   // Only Super Admin can change company context
   if (activeUserSession.role !== 'super_adm') return;
 
   activeTenantContextId = companyId;
   if (typeof window !== 'undefined') {
-    localStorage.setItem('omnizeus_active_company_id', companyId);
-    if (companyName) {
-      localStorage.setItem('omnizeus_active_company_name', companyName);
+    if (companyId && companyId !== 'global') {
+      localStorage.setItem('omnizeus_active_company_id', companyId);
+      if (companyName) {
+        localStorage.setItem('omnizeus_active_company_name', companyName);
+      }
+    } else {
+      // Sair da empresa = voltar ao modo SaaS
+      localStorage.removeItem('omnizeus_active_company_id');
+      localStorage.removeItem('omnizeus_active_company_name');
     }
   }
   if (companyName) {
     activeUserSession.companyName = companyName;
-  } else if (companyId === 'global') {
+  } else if (!companyId || companyId === 'global') {
     activeUserSession.companyName = 'Visão Global SaaS Master';
   }
 
@@ -100,8 +133,39 @@ export function setActiveCompanyContext(companyId: string, companyName?: string)
 
 export function setCurrentUser(userProfile: UserProfile): void {
   activeUserSession = userProfile;
-  activeTenantContextId = userProfile.companyId;
+
+  // Normaliza o contexto do Super ADM:
+  // - Sessão diz "global" (super_adm na plataforma): preserva o tenant ativo em
+  //   localStorage (se o usuário estava dentro de uma empresa), para que um F5
+  //   não o expulse da empresa. Se não houver tenant persistido, fica em SaaS.
+  // - Sessão diz uma empresa concreta: usa essa empresa.
+  // Jamais deixar "global" como tenant ativo — isso causaria vazamento de dados consolidados.
+  let effectiveCompanyId: string | null;
+  if (userProfile.role === 'super_adm') {
+    if (userProfile.companyId && userProfile.companyId !== 'global') {
+      effectiveCompanyId = userProfile.companyId;
+    } else {
+      const persisted = typeof window !== 'undefined'
+        ? localStorage.getItem('omnizeus_active_company_id')
+        : null;
+      effectiveCompanyId = persisted && persisted !== 'global' ? persisted : null;
+    }
+  } else {
+    effectiveCompanyId = userProfile.companyId;
+  }
+
+  activeTenantContextId = effectiveCompanyId;
+
   if (typeof window !== 'undefined') {
+    if (effectiveCompanyId) {
+      localStorage.setItem('omnizeus_active_company_id', effectiveCompanyId);
+      if (userProfile.companyName) {
+        localStorage.setItem('omnizeus_active_company_name', userProfile.companyName);
+      }
+    } else {
+      localStorage.removeItem('omnizeus_active_company_id');
+      localStorage.removeItem('omnizeus_active_company_name');
+    }
     window.dispatchEvent(new Event('omnizeus_role_change'));
     window.dispatchEvent(new Event('omnizeus_user_change'));
     window.dispatchEvent(new Event('omnizeus_company_context_change'));

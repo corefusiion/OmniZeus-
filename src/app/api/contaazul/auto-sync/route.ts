@@ -33,7 +33,13 @@ export async function POST(req: NextRequest) {
     const dbData = getLocalDb();
 
     if (!Array.isArray(dbData.contaazul_config)) {
-      dbData.contaazul_config = [];
+      // Migração: objeto legado → array preservando dados existentes
+      const existing = dbData.contaazul_config || {};
+      if (existing.access_token || existing.client_id) {
+        dbData.contaazul_config = [{ ...existing, company_id: existing.company_id || targetCompanyId || "comp_zenitus" }];
+      } else {
+        dbData.contaazul_config = [];
+      }
     }
 
     if (!Array.isArray(dbData.companies)) {
@@ -51,19 +57,29 @@ export async function POST(req: NextRequest) {
       return true;
     });
 
-    if (connectedConfigs.length === 0 && (!dbData.contaazul_config.length || targetCompanyId === "comp_zenitus")) {
-      // Fallback for default Zenitus company if token is stored in tokens file
-      const defaultTokens = getContaAzulTokens("comp_zenitus");
-      if (defaultTokens.accessToken) {
+    // Buscar tokens no arquivo per-company como fallback se nenhuma config conectada no DB
+    if (connectedConfigs.length === 0 && targetCompanyId) {
+      const fileTokens = getContaAzulTokens(targetCompanyId);
+      if (fileTokens.accessToken) {
         connectedConfigs.push({
-          company_id: "comp_zenitus",
-          client_id: defaultTokens.clientId,
-          client_secret: defaultTokens.clientSecret,
-          access_token: defaultTokens.accessToken,
-          refresh_token: defaultTokens.refreshToken,
+          company_id: targetCompanyId,
+          client_id: fileTokens.clientId,
+          client_secret: fileTokens.clientSecret,
+          access_token: fileTokens.accessToken,
+          refresh_token: fileTokens.refreshToken,
           is_connected: true
         });
       }
+    }
+
+    // Aviso explícito: nenhuma empresa com integração ativa encontrada
+    if (connectedConfigs.length === 0) {
+      return NextResponse.json({
+        success: false,
+        error: "Nenhuma integração Conta Azul ativa encontrada. Acesse a aba 'Credenciais & OAuth 2.0' e clique em 'Autorizar via Navegador' para conectar.",
+        results: [],
+        synced_at: new Date().toISOString()
+      }, { status: 400 });
     }
 
     const syncResults: any[] = [];

@@ -4,19 +4,22 @@ import { useState, useEffect, useMemo } from "react";
 import { 
   Shield, Key, TrendingUp, AlertTriangle, Save, CheckCircle2, Crown, 
   CreditCard, Cpu, DollarSign, Users, Building2, Plus, Link as LinkIcon, MessageSquare, Trash2, Bot, Sparkles, RefreshCw, Check, X,
-  Briefcase, ShieldCheck, UserPlus, Globe, Server, Coins, Activity, BarChart2, Layers, FileText, Zap, Play, Calculator, AlertCircle, ArrowUpDown
+  Briefcase, ShieldCheck, UserPlus, Globe, Server, Coins, Activity, BarChart2, Layers, FileText, Zap, Play, Calculator, AlertCircle, ArrowUpDown,
+  KeyRound, Copy
 } from "lucide-react";
 import { 
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, 
   CartesianGrid, Tooltip, PieChart, Pie, Cell 
 } from "recharts";
-import { getActiveRole, UserRole } from "@/lib/auth/roles";
+import { getActiveRole, getCurrentUser, UserRole } from "@/lib/auth/roles";
 import { 
   getCompanies, saveCompany, CompanyProfile, 
   getEmployees, saveEmployee, EmployeeUser, ALL_SYSTEM_MODULES 
 } from "@/lib/company/store";
 import { fetchServerSettings, updateServerSettings, fetchServerTable, fetchCustomJobRoles, saveCustomJobRoles } from "@/lib/db/serverDb";
+import { generateTemporaryPassword, hashPassword } from "@/lib/auth/passwordUtils";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import BatchUserUpload from "@/components/employees/BatchUserUpload";
 
 const DEFAULT_JOB_ROLES = [
   "Diretoria Contábil",
@@ -30,7 +33,7 @@ const DEFAULT_JOB_ROLES = [
 ];
 
 export default function SuperADMPage() {
-  const [role, setRole] = useState<UserRole>("funcionario");
+  const [role, setRole] = useState<UserRole | null>(null);
   const [activeTab, setActiveTab] = useState<'economia_ia' | 'infraestrutura' | 'pedidos_compra'>('pedidos_compra');
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
@@ -38,6 +41,9 @@ export default function SuperADMPage() {
   const [provisionResult, setProvisionResult] = useState<{ success: boolean; message: string; credentials?: any } | null>(null);
   const [selectedOrderForView, setSelectedOrderForView] = useState<any | null>(null);
   const [copiedPassword, setCopiedPassword] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState<any | null>(null);
+  const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Purchase Orders Filter & Search State
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>("ALL");
@@ -162,7 +168,8 @@ export default function SuperADMPage() {
   const [stripeSuccess, setStripeSuccess] = useState(false);
   const [customAiSuccess, setCustomAiSuccess] = useState(false);
   const [companySuccess, setCompanySuccess] = useState(false);
-  const [userSuccess, setUserSuccess] = useState(false);
+  const [createdUserTempPassModal, setCreatedUserTempPassModal] = useState<{ password: string; name: string; email: string } | null>(null);
+  const [copyPassSuccess, setCopyPassSuccess] = useState(false);
 
   // Multi-Tenant Company Creation State
   const [companies, setCompanies] = useState<CompanyProfile[]>([]);
@@ -225,7 +232,7 @@ export default function SuperADMPage() {
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    setRole(getActiveRole());
+    if (getCurrentUser().id) setRole(getActiveRole());
     const listComp = getCompanies();
     setCompanies(listComp);
     if (listComp.length > 0) setTargetCompanyId(listComp[0].id);
@@ -338,6 +345,31 @@ export default function SuperADMPage() {
       setWarningMessage(err.message || "Falha na conexão de provisionamento.");
     } finally {
       setProvisioningOrderId(null);
+    }
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    setDeletingOrderId(orderId);
+    try {
+      const res = await fetch("/api/super-adm/orders/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: orderId })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setWarningMessage(null);
+        setSuccessMessage(data.message || "Pedido excluído com sucesso.");
+        setTimeout(() => setSuccessMessage(null), 4000);
+        await loadPurchaseOrders();
+      } else {
+        setWarningMessage(data.error || "Erro ao excluir pedido.");
+      }
+    } catch (err: any) {
+      setWarningMessage(err.message || "Falha na conexão ao excluir pedido.");
+    } finally {
+      setDeletingOrderId(null);
+      setOrderToDelete(null);
     }
   };
 
@@ -781,7 +813,7 @@ export default function SuperADMPage() {
   };
 
 
-  const handleCreateUserForCompany = () => {
+  const handleCreateUserForCompany = async () => {
     if (!newUserName.trim() || !newUserEmail.trim() || !targetCompanyId) {
       setWarningMessage("Por favor, preencha a empresa destinatária, o nome e o e-mail do usuário.");
       return;
@@ -789,9 +821,13 @@ export default function SuperADMPage() {
     setSavingUser(true);
 
     const targetComp = companies.find(c => c.id === targetCompanyId);
-    const defaultPassword = "Zen@2026"; // senha padrão para novos usuários
 
-    saveEmployee({
+    // Gera senha temporária aleatória, armazena o hash e exibe a senha em
+    // texto puro ao Super ADM (a senha original não é recuperável depois).
+    const tempPass = generateTemporaryPassword();
+    const hashedPass = await hashPassword(tempPass);
+
+    const newEmp = saveEmployee({
       companyId: targetCompanyId,
       companyName: targetComp?.tradeName || targetComp?.corporateName || targetCompanyId,
       name: newUserName.trim(),
@@ -800,16 +836,28 @@ export default function SuperADMPage() {
       role: newUserRole,
       birthDate: newUserBirthDate || undefined,
       allowedModules: selectedUserModules,
-      status: 'Ativo',
-      passwordHash: defaultPassword,
+      status: 'Primeiro acesso pendente',
+      passwordHash: hashedPass,
+      mustChangePassword: true,
     } as any);
 
     setSavingUser(false);
     setNewUserName("");
     setNewUserEmail("");
     setNewUserBirthDate("");
-    setUserSuccess(true);
-    setTimeout(() => setUserSuccess(false), 2500);
+
+    // Modal profissional com a senha temporária para repassar ao colaborador
+    setCreatedUserTempPassModal({
+      password: tempPass,
+      name: newEmp.name,
+      email: newEmp.email
+    });
+  };
+
+  const copyPasswordToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopyPassSuccess(true);
+    setTimeout(() => setCopyPassSuccess(false), 2000);
   };
 
   const handleRun100CallsTest = async () => {
@@ -827,6 +875,20 @@ export default function SuperADMPage() {
       setIsTesting100Calls(false);
     }
   };
+
+  if (role === null) {
+    return (
+      <div className="p-12 bg-white border border-slate-200 rounded-xl text-center shadow-xs">
+        <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
+          <RefreshCw className="w-6 h-6 animate-spin" />
+        </div>
+        <h2 className="text-base font-bold text-slate-900">Carregando sessão...</h2>
+        <p className="text-xs text-slate-500 mt-2 max-w-sm mx-auto leading-relaxed">
+          Confirmando suas permissões de acesso à plataforma.
+        </p>
+      </div>
+    );
+  }
 
   if (role !== "super_adm") {
     return (
@@ -904,6 +966,32 @@ export default function SuperADMPage() {
         cancelText="Fechar"
         variant="warning"
       />
+
+      {/* Excluir Pedido de Compra — Confirmation */}
+      <ConfirmModal
+        isOpen={orderToDelete !== null}
+        onClose={() => setOrderToDelete(null)}
+        onCancel={() => setOrderToDelete(null)}
+        onConfirm={() => orderToDelete && handleDeleteOrder(orderToDelete.id)}
+        title="Excluir Pedido de Compra?"
+        description={`O pedido ${orderToDelete?.order_number || orderToDelete?.id || ""} (${orderToDelete?.empresa_nome || ""}) será removido permanentemente. Somente pedidos ainda não provisionados podem ser excluídos.`}
+        confirmText="Excluir Pedido"
+        cancelText="Cancelar"
+        variant="danger"
+      />
+
+      {/* Success Message */}
+      {successMessage && (
+        <div className="flex items-center justify-between gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-lg px-4 py-3">
+          <span className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4" />
+            {successMessage}
+          </span>
+          <button onClick={() => setSuccessMessage(null)} className="text-emerald-500 hover:text-emerald-700">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Header Limpo */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 lg:p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1313,7 +1401,7 @@ export default function SuperADMPage() {
                             Detalhes
                           </button>
 
-                          {ord.status !== "PROVISIONADO" && (
+                          {ord.status === "PAGAMENTO_CONFIRMADO" && (
                             <button
                               onClick={() => handleProvisionOrder(ord.id)}
                               disabled={provisioningOrderId === ord.id}
@@ -1327,6 +1415,18 @@ export default function SuperADMPage() {
                                   <span>Provisionar Empresa</span>
                                 </>
                               )}
+                            </button>
+                          )}
+
+                          {ord.status !== "PROVISIONADO" && (
+                            <button
+                              onClick={() => setOrderToDelete(ord)}
+                              disabled={deletingOrderId === ord.id}
+                              className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 text-[11px] font-semibold rounded-lg transition-all inline-flex items-center gap-1 disabled:opacity-50"
+                              title="Excluir pedido (apenas antes do provisionamento)"
+                            >
+                              <Trash2 size={12} />
+                              <span>{deletingOrderId === ord.id ? "Excluindo..." : "Excluir"}</span>
                             </button>
                           )}
                         </td>
@@ -2150,9 +2250,9 @@ export default function SuperADMPage() {
               <div>
                 <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                   <Play className="w-4 h-4 text-emerald-600" />
-                  <span>Suite de Validação com 100 Chamadas Reais de IA</span>
+                  <span>Suite de Simulação com 100 Chamadas de IA</span>
                 </h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">Executar auditoria contínua de 100 requisições para medir tokens, custos e recomendar precificação</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Simulação sintética de 100 requisições para estimar tokens, custos e precificação. Os dados gerados são fictícios (sem consumo real de OpenRouter).</p>
               </div>
 
               <button
@@ -2161,7 +2261,7 @@ export default function SuperADMPage() {
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg flex items-center gap-2 transition-all disabled:opacity-50 shadow-xs"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isTesting100Calls ? 'animate-spin' : ''}`} />
-                <span>{isTesting100Calls ? 'Executando 100 Chamadas...' : 'Executar Validação de 100 Chamadas'}</span>
+                <span>{isTesting100Calls ? 'Simulando 100 Chamadas...' : 'Executar Simulação de 100 Chamadas'}</span>
               </button>
             </div>
 
@@ -2169,9 +2269,9 @@ export default function SuperADMPage() {
               <div className="p-4 bg-slate-900 text-white rounded-xl space-y-3">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                   <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4" /> Relatório Sintético de Validação (100 Requisições Auditadas)
+                    <CheckCircle2 className="w-4 h-4" /> Relatório Sintético de Validação (100 Requisições Simuladas)
                   </span>
-                  <span className="text-[10px] text-slate-400 font-mono">Status: 100/100 OK</span>
+                  <span className="text-[10px] text-slate-400 font-mono">Status: Simulação 100/100</span>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
@@ -2829,6 +2929,16 @@ export default function SuperADMPage() {
                   <span className="text-[10px] text-slate-400 block">Vincular acesso à empresa contratante</span>
                 </div>
               </div>
+              <BatchUserUpload
+                companyId={targetCompanyId}
+                companyName={companies.find(c => c.id === targetCompanyId)?.tradeName || companies.find(c => c.id === targetCompanyId)?.corporateName}
+                jobRoles={jobRoles}
+                defaultRole={newUserRole}
+                defaultModules={selectedUserModules}
+                onCreated={() => {
+                  setAllEmployees(getEmployees());
+                }}
+              />
             </div>
 
             <div className="space-y-3">
@@ -2967,12 +3077,6 @@ export default function SuperADMPage() {
           </div>
 
           <div className="pt-3 border-t border-slate-100 mt-auto space-y-2">
-            {userSuccess && (
-              <div className="p-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold rounded-md flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Usuário vinculado com sucesso!</span>
-              </div>
-            )}
             <button
               onClick={handleCreateUserForCompany}
               disabled={savingUser}
@@ -3121,6 +3225,56 @@ export default function SuperADMPage() {
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-all shadow-xs disabled:opacity-50 cursor-pointer"
               >
                 {removingCompKey ? 'Removendo...' : 'Confirmar Remoção'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL SENHA TEMPORÁRIA DO USUÁRIO CRIADO */}
+      {createdUserTempPassModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl border border-slate-200 p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-5 h-5 text-amber-600" />
+                <h3 className="text-base font-bold text-slate-900">Senha Temporária Gerada para Cadastro</h3>
+              </div>
+              <button onClick={() => setCreatedUserTempPassModal(null)} className="text-slate-400 hover:text-slate-700">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 font-medium space-y-1">
+              <p><strong>Colaborador:</strong> {createdUserTempPassModal.name} ({createdUserTempPassModal.email})</p>
+              <p className="text-[11px] text-amber-700">O colaborador deverá trocar essa senha obrigatoriamente no primeiro acesso.</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Senha Temporária Gerada:</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={createdUserTempPassModal.password}
+                  className="w-full h-10 px-3 bg-slate-100 border border-slate-300 rounded-lg font-mono text-sm font-bold text-slate-900 tracking-wider text-center"
+                />
+                <button
+                  onClick={() => copyPasswordToClipboard(createdUserTempPassModal.password)}
+                  className="px-4 h-10 bg-primary hover:bg-primary/90 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 shrink-0 transition-colors shadow-xs"
+                >
+                  <Copy className="w-4 h-4" />
+                  <span>{copyPassSuccess ? "Copiado!" : "Copiar"}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 flex justify-end">
+              <button
+                onClick={() => setCreatedUserTempPassModal(null)}
+                className="px-4 py-2 bg-slate-900 text-white font-bold text-xs rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                Concluir & Fechar
               </button>
             </div>
           </div>

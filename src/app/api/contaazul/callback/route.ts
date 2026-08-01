@@ -25,7 +25,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { code, clientId, clientSecret, redirectUri } = await req.json();
+    const { code, clientId, clientSecret, redirectUri, companyId } = await req.json();
 
     if (!code || !clientId || !clientSecret) {
       return NextResponse.json(
@@ -83,8 +83,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // PERSIST PERMANENTLY ON DISK!
-    saveContaAzulTokens({
+    // PERSIST tokens isolados por empresa (companyId) — NUNCA default comp_zenitus
+    saveContaAzulTokens(companyId || "comp_zenitus", {
       accessToken: tokenData.access_token,
       refreshToken: tokenData.refresh_token,
       clientId: clientId.trim(),

@@ -10,8 +10,7 @@ import {
   MessageCircle, Sparkles
 } from "lucide-react";
 import { 
-  getActiveRole, getCurrentUser, UserRole, UserProfile, 
-  setActiveCompanyContext, getActiveCompanyId 
+  getActiveRole, getCurrentUser, UserRole, UserProfile 
 } from "@/lib/auth/roles";
 import { 
   getCompanies, saveCompany, CompanyProfile, 
@@ -209,10 +208,6 @@ export default function EmpresasPage() {
     setSelectedTenant(comp);
     setNewFranchiseValue(comp.coinsFranchise);
     setActiveTab('overview');
-    
-    if (isMasterAdmin) {
-      setActiveCompanyContext(comp.id, comp.tradeName || comp.corporateName);
-    }
   };
 
   const handleBackToGlobalCenter = () => {

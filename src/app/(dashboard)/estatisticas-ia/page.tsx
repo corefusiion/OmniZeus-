@@ -10,7 +10,7 @@ import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, 
   CartesianGrid, Tooltip, PieChart, Pie, Cell 
 } from "recharts";
-import { getActiveRole, UserRole } from "@/lib/auth/roles";
+import { getActiveRole, getActiveTenantId, UserRole } from "@/lib/auth/roles";
 import { getCoinBalance } from "@/lib/coins/store";
 import { fetchServerTable, fetchServerSettings } from "@/lib/db/serverDb";
 import { getCompanies, CompanyProfile } from "@/lib/company/store";
@@ -59,7 +59,8 @@ export default function EstatisticasIAPage() {
     setLoading(true);
     try {
       const companies = getCompanies();
-      const currentComp = companies[0] || null;
+      const activeTenantId = getActiveTenantId();
+      const currentComp = activeTenantId ? (companies.find(c => c.id === activeTenantId) || null) : (companies[0] || null);
       setActiveCompany(currentComp);
 
       const settings = await fetchServerSettings();
@@ -101,18 +102,10 @@ export default function EstatisticasIAPage() {
     };
   }, []);
 
-  if (role === "funcionario") {
-    return (
-      <div className="p-6 text-center text-slate-500 font-medium">
-        Acesso restrito a Gestores.
-      </div>
-    );
-  }
-
   // Filter logs by active company
-  const activeCompanyId = activeCompany?.id || "comp_zenitus";
+  const activeCompanyId = getActiveTenantId() || activeCompany?.id || "";
   const companyLogs = useMemo(() => {
-    return logs.filter(log => !log.company_id || log.company_id === activeCompanyId);
+    return activeCompanyId ? logs.filter(log => !log.company_id || log.company_id === activeCompanyId) : [];
   }, [logs, activeCompanyId]);
 
   // Dynamic KPI Calculations from Real Database Logs
@@ -323,6 +316,14 @@ export default function EstatisticasIAPage() {
     const start = (currentPage - 1) * itemsPerPage;
     return filteredHistory.slice(start, start + itemsPerPage);
   }, [filteredHistory, currentPage, itemsPerPage]);
+
+  if (role === "funcionario") {
+    return (
+      <div className="p-6 text-center text-slate-500 font-medium">
+        Acesso restrito a Gestores.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 text-slate-900 font-sans pb-12">

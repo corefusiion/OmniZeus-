@@ -6,10 +6,12 @@ import {
   Search, Plus, Pin, Trash2, Send, Paperclip, X,
   FileSpreadsheet, ArrowRight, Loader2, Coins, Bot, User as UserIcon,
   Sparkles, Check, Edit2, ChevronDown, CheckCircle, RefreshCw, History,
-  ChevronRight, HelpCircle, BarChart3, TrendingUp
+  ChevronRight, HelpCircle, BarChart3, TrendingUp, Cpu
 } from "lucide-react";
 import { deductCoins } from "@/lib/coins/store";
+import { getActiveTenantId } from "@/lib/auth/roles";
 import { fetchServerTable } from "@/lib/db/serverDb";
+import { runCaiJob, CAI_JOB_EVENT, isCaiProcessing } from "@/lib/ai/contaazulChatSession";
 import { DynamicTable } from '@/components/contaazul/DynamicTable';
 import { ActionConfirmCard } from '@/components/contaazul/ActionConfirmCard';
 import { KPIStrip } from '@/components/contaazul/KPIStrip';
@@ -33,49 +35,12 @@ interface ConversationItem {
   isPinned: boolean;
 }
 
-// 15 Newest Frontier LLMs organized by Providers
-const modelGroups = [
-  {
-    provider: "OpenAI",
-    models: [
-      { id: "openai/gpt-5.5-turbo", name: "GPT-5.5 Turbo (OpenAI)", badge: "Flagship 2026" },
-      { id: "openai/gpt-5.0-pro", name: "GPT-5.0 Pro (OpenAI)", badge: "Raciocínio SPED" },
-      { id: "openai/o4-mini", name: "o4-mini (OpenAI)", badge: "Alta Velocidade" },
-    ]
-  },
-  {
-    provider: "Anthropic",
-    models: [
-      { id: "anthropic/claude-4.8-sonnet", name: "Claude 4.8 Sonnet (Anthropic)", badge: "Recomendado Fiscal" },
-      { id: "anthropic/claude-4.7-opus", name: "Claude 4.7 Opus (Anthropic)", badge: "Auditoria e-CAC" },
-      { id: "anthropic/claude-3.7-sonnet", name: "Claude 3.7 Sonnet (Anthropic)", badge: "Redação Contratos" },
-    ]
-  },
-  {
-    provider: "Google",
-    models: [
-      { id: "google/gemini-3.6-pro", name: "Gemini 3.6 Pro (Google)", badge: "Análise SPED" },
-      { id: "google/gemini-3.5-flash", name: "Gemini 3.5 Flash (Google)", badge: "Latência Ultrabaixa" },
-      { id: "google/gemini-3.0-ultra", name: "Gemini 3.0 Ultra (Google)", badge: "Contexto Massivo" },
-    ]
-  },
-  {
-    provider: "DeepSeek",
-    models: [
-      { id: "deepseek/deepseek-v4", name: "DeepSeek V4 (DeepSeek)", badge: "Nova Geração" },
-      { id: "deepseek/deepseek-r2", name: "DeepSeek R2 (DeepSeek)", badge: "Raciocínio Tributário" },
-      { id: "deepseek/deepseek-v3.5", name: "DeepSeek V3.5 (DeepSeek)", badge: "Eficiência Extrema" },
-    ]
-  },
-  {
-    provider: "Outras IAs & Open Source",
-    models: [
-      { id: "moonshotai/moonshot-v2-256k", name: "Kimi Moonshot 256k (Moonshot)", badge: "Leitura Livros Fiscais" },
-      { id: "meta-llama/llama-4-405b-instruct", name: "Llama 4 405B (Meta)", badge: "Open Source Enterprise" },
-      { id: "qwen/qwen-3-72b-instruct", name: "Qwen 3 72B (Alibaba Qwen)", badge: "Multilíngue & Contábil" },
-    ]
-  }
-];
+// Agente único do Omni Conta Azul IA — sem seletor de modelo.
+// Claude 4.8 Sonnet (mapeado para anthropic/claude-3.7-sonnet no OpenRouter via MODEL_MAP)
+// é o modelo mais robusto para análise de dados estruturados do ERP, geração de
+// gráficos JSON e respostas conversacionais precisas.
+const CONTAAZUL_AI_MODEL_ID = "anthropic/claude-4.8-sonnet";
+const CONTAAZUL_AI_MODEL_LABEL = "Claude 4.8 Sonnet (Anthropic)";
 
 const SUGGESTION_POOLS = [
   [
@@ -346,7 +311,6 @@ function parseAIMessageContent(rawText: string): { text: string; chart?: any; ta
 }
 
 export default function OmniContaAzulIAPage() {
-  const [selectedModel, setSelectedModel] = useState<string>("anthropic/claude-4.8-sonnet");
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [currentConvId, setCurrentConvId] = useState<string>("");
   const currentConvIdRef = useRef<string>("");
@@ -432,6 +396,13 @@ export default function OmniContaAzulIAPage() {
 
             setCurrentConvId(targetId);
             currentConvIdRef.current = targetId;
+
+            // Restaura o indicador de processamento se um job global ainda estiver rodando
+            // (ex.: o usuário trocou de tela enquanto processava e voltou).
+            if (isCaiProcessing(targetId)) {
+              setProcessingConvId(targetId);
+            }
+
             loadConversationMessages(targetId);
             return;
           }
@@ -447,10 +418,25 @@ export default function OmniContaAzulIAPage() {
 
     loadInitialData();
 
+    // Re-sincroniza mensagens/processamento quando um job de chat global termina
+    // (ex.: o usuário trocou de tela enquanto processava e voltou).
+    const handleCaiJobChange = () => {
+      const convId = currentConvIdRef.current;
+      if (convId) {
+        if (isCaiProcessing(convId)) {
+          setProcessingConvId(convId);
+        } else {
+          setProcessingConvId(prev => prev === convId ? null : prev);
+        }
+        loadConversationMessages(convId);
+      }
+    };
+    window.addEventListener(CAI_JOB_EVENT, handleCaiJobChange);
     window.addEventListener("omnizeus_company_context_change", loadInitialData);
     window.addEventListener("omnizeus_sql_db_change", loadInitialData);
 
     return () => {
+      window.removeEventListener(CAI_JOB_EVENT, handleCaiJobChange);
       window.removeEventListener("omnizeus_company_context_change", loadInitialData);
       window.removeEventListener("omnizeus_sql_db_change", loadInitialData);
     };
@@ -571,19 +557,27 @@ export default function OmniContaAzulIAPage() {
     setInputText("");
     setProcessingConvId(activeId);
 
+    // Processamento delegado ao módulo global (contaazulChatSession). O fetch
+    // continua rodando mesmo se o usuário trocar de tela; o componente re-sincroniza
+    // via CAI_JOB_EVENT ao voltar.
     try {
-      const response = await fetch('/api/contaazul/ia-workspace', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: text,
-          conversationId: activeId,
-          model: selectedModel,
-          attachmentData: fileData
-        })
+      const { ok, data } = await runCaiJob({
+        conversationId: activeId,
+        prompt: text,
+        model: CONTAAZUL_AI_MODEL_ID,
+        fileData
       });
 
-      const data = await response.json();
+      if (!ok) {
+        setMessages(prev => [...prev, {
+          id: `err_${Date.now()}`,
+          sender: 'ai',
+          text: 'Desculpe, ocorreu um erro temporário ao conectar ao servidor. Tente novamente em alguns segundos.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }]);
+        return;
+      }
+
       const responseText = data.message || "Consulta processada com sucesso.";
 
       const aiMsg: Message = {
@@ -610,7 +604,7 @@ export default function OmniContaAzulIAPage() {
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }]);
     } finally {
-      setProcessingConvId(null);
+      setProcessingConvId(isCaiProcessing(activeId) ? activeId : null);
     }
   };
 
@@ -707,6 +701,7 @@ export default function OmniContaAzulIAPage() {
       try {
         const res = await fetch('/api/contaazul/ia-workspace/import', {
           method: 'POST',
+          headers: { 'x-company-id': getActiveTenantId() || '' },
           body: formData
         });
         if (res.ok) {
@@ -777,21 +772,14 @@ export default function OmniContaAzulIAPage() {
           </div>
 
           <div className="flex items-center gap-2.5">
-            <select
-              value={selectedModel}
-              onChange={e => setSelectedModel(e.target.value)}
-              className="bg-slate-50 border border-[#E2E8F0] hover:border-emerald-300 text-xs font-medium text-slate-700 rounded-lg px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-emerald-500 transition-all cursor-pointer max-w-[260px] truncate"
+            <div
+              className="flex items-center gap-1.5 bg-white border border-[#E2E8F0] hover:border-emerald-300 text-xs font-semibold text-slate-700 rounded-lg px-2.5 py-1.5 transition-all"
+              title="Modelo fixo do agente Omni Conta Azul IA"
             >
-              {modelGroups.map(group => (
-                <optgroup key={group.provider} label={group.provider}>
-                  {group.models.map(m => (
-                    <option key={m.id} value={m.id}>
-                      ⚡ {m.name}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+              <Cpu className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="hidden md:inline">{CONTAAZUL_AI_MODEL_LABEL}</span>
+              <span className="md:hidden">Claude 4.8</span>
+            </div>
 
             <div className="flex items-center gap-1 bg-amber-50 border border-amber-200/60 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-amber-700">
               <Coins className="w-3.5 h-3.5 text-amber-500" />

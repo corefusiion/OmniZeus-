@@ -155,7 +155,8 @@ export async function POST(req: NextRequest) {
         role: emp.role,
         companyId: emp.company_id || emp.companyId,
         companyName,
-        mustChangePassword
+        mustChangePassword,
+        allowedModules: emp.allowed_modules || emp.allowedModules || []
       });
     }
 

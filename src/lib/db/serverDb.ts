@@ -232,12 +232,20 @@ export async function insertCustomAgent(agent: any) { return insertServerTable('
 export async function updateCustomAgent(agent: any) { return updateServerTableRecord('custom_agents', agent); }
 export async function deleteCustomAgent(id: string) { return deleteServerTableRecord('custom_agents', id); }
 
-export async function fetchContaAzulConfig() {
+export async function fetchContaAzulConfig(companyId?: string) {
   try {
-    const res = await fetch("/api/db?table=contaazul_config", { cache: "no-store" });
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (companyId) {
+      headers["x-company-id"] = companyId;
+    }
+    const res = await fetch("/api/db?table=contaazul_config", { cache: "no-store", headers });
     if (res.ok) {
       const json = await res.json();
-      const dbCfg = json.data;
+      const raw = json.data;
+
+      // contaazul_config pode ser array (multi-tenant) ou objeto (legado)
+      const dbCfg = Array.isArray(raw) ? (raw[0] || null) : (raw || null);
+
       if (dbCfg) {
         return {
           clientId: dbCfg.client_id,
@@ -265,6 +273,7 @@ export async function updateContaAzulConfig(config: any) {
       body: JSON.stringify({
         action: "update_contaazul_config",
         contaazul_config: {
+          company_id: config.companyId || config.company_id,
           client_id: config.clientId,
           client_secret: config.clientSecret,
           access_token: config.accessToken,
@@ -329,6 +338,9 @@ export async function saveCustomJobRoles(roles: string[]) {
 
 export async function fetchDashboardMetrics() { return fetchServerTable('dashboard_metrics'); }
 export async function insertDashboardMetric(metric: any) { return insertServerTable('dashboard_metrics', metric); }
+
+export async function fetchAIUsageLogs() { return fetchServerTable('ai_usage_logs'); }
+export async function insertAIUsageLog(log: any) { return insertServerTable('ai_usage_logs', log); }
 
 export async function fetchAIStressTestLogs() { return fetchServerTable('ai_stress_test_logs'); }
 export async function insertAIStressTestLog(log: any) { return insertServerTable('ai_stress_test_logs', log); }

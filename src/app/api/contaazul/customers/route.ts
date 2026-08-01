@@ -30,7 +30,8 @@ export async function POST(req: Request) {
       name, tradeName, document, email, phone, whatsapp, personType,
       code, roles, roleIsClient, roleIsSupplier, roleIsCarrier,
       isSimples, isPublicOrg, stateRegistration, cityRegistration, suframa,
-      zipCode, street, number, neighborhood, city, state, complement, notes
+      zipCode, street, number, neighborhood, city, state, complement, notes,
+      companyId
     } = await req.json();
 
     if (!name || !document) {
@@ -145,21 +146,36 @@ export async function POST(req: Request) {
     if (!Array.isArray(db.contaazul_clients)) db.contaazul_clients = [];
     db.contaazul_clients.push({
       id: data.id || `cliente_${Date.now()}`,
+      company_id: companyId || "comp_zenitus",
       nome: name.trim(),
+      name: name.trim(),
       cpf_cnpj: cleanDoc,
+      document: cleanDoc,
       email: email ? email.trim() : "",
       telefone: (whatsapp || phone) ? (whatsapp || phone).trim() : "",
+      synced_at: new Date().toISOString(),
       ativo: true
     });
     
-    // Atualiza os tokens caso tenham sido renovados no auto-refresh
+    // Atualiza tokens sem destruir o formato array do contaazul_config
     if (newAccessToken && newRefreshToken) {
-      db.contaazul_config = {
-        ...db.contaazul_config,
-        access_token: newAccessToken,
-        refresh_token: newRefreshToken,
-        updated_at: new Date().toISOString()
-      };
+      if (Array.isArray(db.contaazul_config)) {
+        // Formato array (multi-tenant): atualizar a entrada da empresa
+        const cfgIdx = db.contaazul_config.findIndex((c: any) => c.company_id === (companyId || "comp_zenitus"));
+        if (cfgIdx !== -1) {
+          db.contaazul_config[cfgIdx].access_token = newAccessToken;
+          db.contaazul_config[cfgIdx].refresh_token = newRefreshToken;
+          db.contaazul_config[cfgIdx].updated_at = new Date().toISOString();
+        }
+      } else {
+        // Legado objeto plano
+        db.contaazul_config = {
+          ...db.contaazul_config,
+          access_token: newAccessToken,
+          refresh_token: newRefreshToken,
+          updated_at: new Date().toISOString()
+        };
+      }
     }
     
     saveLocalDbFile(db);

@@ -6,12 +6,13 @@ import { useState, useEffect } from "react";
 import {
   LayoutDashboard, Sparkles, DollarSign, MessageSquare, CheckSquare,
   FileText, Presentation, Settings, Shield, ChevronLeft, ChevronRight, X,
-  Link as LinkIcon, FileCheck, Briefcase, Bell, Calendar, Bot, History,
-  Activity, PenTool, Users, Building2, ChevronDown, User, Network,
-  Layers, ShieldAlert, Cpu, Share2, ScrollText, BrainCircuit
+  Link as LinkIcon, FileCheck, Briefcase, Bell, Bot, History,
+  Activity, Users, Building2, ChevronDown,
+  ShieldAlert, Cpu, BrainCircuit, Wallet,
+  CreditCard, Globe, Server, GitBranch
 } from "lucide-react";
-import { getActiveRole, UserRole, getCurrentUser } from "@/lib/auth/roles";
-import { getEmployees, EmployeeUser } from "@/lib/company/store";
+import { UserRole, getCurrentUser, getAllowedModules } from "@/lib/auth/roles";
+import { useTenant } from "@/lib/tenant/TenantContext";
 
 interface NavItem {
   href: string;
@@ -19,6 +20,7 @@ interface NavItem {
   icon: React.ElementType;
   isFuture?: boolean;
   badge?: number;
+  module?: string;
 }
 
 interface NavGroup {
@@ -28,7 +30,11 @@ interface NavGroup {
   items: NavItem[];
 }
 
-const mainNavGroups: NavGroup[] = [
+// ─────────────────────────────────────────────────────────────
+// MENUS DA EMPRESA (Tenant) — exclusivos do modo Empresa.
+// Super ADM dentro de uma empresa vê exatamente isto (como o Gestor).
+// ─────────────────────────────────────────────────────────────
+const tenantNavGroups: NavGroup[] = [
   {
     id: "visao-geral",
     category: "Visão Geral",
@@ -43,10 +49,10 @@ const mainNavGroups: NavGroup[] = [
     category: "Inteligência Artificial",
     icon: Sparkles,
     items: [
-      { href: "/omni-ia", label: "Omni IA Hub", icon: Sparkles },
-      { href: "/omni-contaazul-ia", label: "Omni Conta Azul IA", icon: BrainCircuit },
-      { href: "/treinar-agente", label: "Meus Agentes IA", icon: Bot },
-      { href: "/estatisticas-ia", label: "Consumo & Métricas IA", icon: Cpu },
+      { href: "/omni-ia", label: "Omni IA Hub", icon: Sparkles, module: "omni-ia" },
+      { href: "/omni-contaazul-ia", label: "Omni Conta Azul IA", icon: BrainCircuit, module: "contaazul" },
+      { href: "/treinar-agente", label: "Meus Agentes IA", icon: Bot, module: "omni-ia" },
+      { href: "/estatisticas-ia", label: "Consumo & Métricas IA", icon: Cpu, module: "omni-ia" },
     ],
   },
   {
@@ -54,10 +60,10 @@ const mainNavGroups: NavGroup[] = [
     category: "Operação Financeira",
     icon: DollarSign,
     items: [
-      { href: "/financeiro", label: "Contas a Pagar", icon: DollarSign },
-      { href: "/contratos", label: "Contratos de Honorários", icon: Briefcase },
-      { href: "/solicitacoes", label: "Solicitações & Compras", icon: FileCheck },
-      { href: "/contaazul", label: "Integração Conta Azul", icon: LinkIcon },
+      { href: "/financeiro", label: "Contas a Pagar", icon: DollarSign, module: "financeiro" },
+      { href: "/contratos", label: "Contratos de Honorários", icon: Briefcase, module: "financeiro" },
+      { href: "/solicitacoes", label: "Solicitações & Compras", icon: FileCheck, module: "financeiro" },
+      { href: "/contaazul", label: "Integração Conta Azul", icon: LinkIcon, module: "contaazul" },
     ],
   },
 
@@ -66,8 +72,8 @@ const mainNavGroups: NavGroup[] = [
     category: "Operação",
     icon: CheckSquare,
     items: [
-      { href: "/tarefas", label: "Tarefas Operacionais", icon: CheckSquare },
-      { href: "#", label: "WhatsApp Bot Chat", icon: MessageSquare, isFuture: true },
+      { href: "/tarefas", label: "Tarefas Operacionais", icon: CheckSquare, module: "tarefas" },
+      { href: "#", label: "WhatsApp Bot Chat", icon: MessageSquare, isFuture: true, module: "whatsapp-bot" },
     ],
   },
   {
@@ -75,8 +81,8 @@ const mainNavGroups: NavGroup[] = [
     category: "Documentos",
     icon: FileText,
     items: [
-      { href: "/documentos", label: "Gerador de Documentos A4", icon: FileText },
-      { href: "/apresentacoes", label: "Apresentações Executivas", icon: Presentation },
+      { href: "/documentos", label: "Gerador de Documentos A4", icon: FileText, module: "documentos" },
+      { href: "/apresentacoes", label: "Apresentações Executivas", icon: Presentation, module: "apresentacoes" },
     ],
   },
   {
@@ -91,16 +97,53 @@ const mainNavGroups: NavGroup[] = [
   },
 ];
 
-const masterGroup: NavGroup = {
-  id: "master-saas",
-  category: "Master Configs",
-  icon: ShieldAlert,
-  items: [
-    { href: "/empresas", label: "Empresas (Centro de Comando)", icon: Building2 },
-    { href: "/super-adm", label: "Configurações da Plataforma", icon: Settings },
-    { href: "/super-adm?tab=integrations", label: "Integrações Globais", icon: Share2 },
-  ],
-};
+// ─────────────────────────────────────────────────────────────
+// MENUS DA PLATAFORMA (SaaS) — exclusivos do Super ADM em modo
+// Plataforma (fora de qualquer empresa). Nenhum menu operacional
+// de empresa aparece aqui.
+// ─────────────────────────────────────────────────────────────
+const saasNavGroups: NavGroup[] = [
+  {
+    id: "saas-visao-geral",
+    category: "Visão Geral SaaS",
+    icon: Globe,
+    items: [
+      { href: "/dashboard-master", label: "Dashboard Master SaaS", icon: LayoutDashboard },
+    ],
+  },
+  {
+    id: "saas-empresas",
+    category: "Empresas & Comercial",
+    icon: Building2,
+    items: [
+      { href: "/empresas", label: "Centro de Comando Multi-Finance", icon: Building2 },
+      { href: "/super-adm", label: "Pedidos de Compra", icon: FileText },
+      { href: "#", label: "Planos & Preços", icon: Wallet, isFuture: true },
+      { href: "#", label: "Provisionamento", icon: GitBranch, isFuture: true },
+    ],
+  },
+  {
+    id: "saas-financeiro",
+    category: "Financeiro da Plataforma",
+    icon: DollarSign,
+    items: [
+      { href: "#", label: "Stripe", icon: CreditCard, isFuture: true },
+    ],
+  },
+  {
+    id: "saas-ops",
+    category: "Operação & Segurança",
+    icon: ShieldAlert,
+    items: [
+      { href: "#", label: "Logs & Auditoria", icon: History, isFuture: true },
+      { href: "#", label: "Monitoramento", icon: Activity, isFuture: true },
+      { href: "#", label: "Usuários da Plataforma", icon: Users, isFuture: true },
+      { href: "#", label: "Alertas", icon: Bell, isFuture: true },
+      { href: "#", label: "Segurança & LGPD", icon: Shield, isFuture: true },
+      { href: "#", label: "Backups", icon: Server, isFuture: true },
+    ],
+  },
+];
 
 export function Sidebar({
   isCollapsed,
@@ -114,9 +157,11 @@ export function Sidebar({
   setIsMobileOpen: (val: boolean) => void;
 }) {
   const pathname = usePathname();
-  const [role, setRole] = useState<UserRole>("gestor");
-  const [currentUserEmail, setCurrentUserEmail] = useState("");
-  
+  const [role, setRole] = useState<UserRole | null>(
+    () => (getCurrentUser().id ? getCurrentUser().role : null)
+  );
+  const { isSaaSMode } = useTenant();
+
   // Accordion State
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     "visao-geral": true,
@@ -125,32 +170,27 @@ export function Sidebar({
     "operacao": false,
     "documentos": false,
     "admin": false,
-    "master-saas": true
+    "saas-visao-geral": true,
+    "saas-empresas": true,
+    "saas-financeiro": true,
+    "saas-ops": false
   });
-
-  const [employees, setEmployees] = useState<EmployeeUser[]>([]);
 
   useEffect(() => {
     const user = getCurrentUser();
     setRole(user.role);
-    setCurrentUserEmail(user.email);
-    setEmployees(getEmployees('comp_zenitus').filter(e => e.status === 'Ativo'));
 
     const handleRoleChange = () => {
       const u = getCurrentUser();
       setRole(u.role);
-      setCurrentUserEmail(u.email);
     };
-    const handleEmp = () => setEmployees(getEmployees('comp_zenitus').filter(e => e.status === 'Ativo'));
 
     window.addEventListener("omnizeus_role_change", handleRoleChange);
     window.addEventListener("omnizeus_user_change", handleRoleChange);
-    window.addEventListener("omnizeus_employees_change", handleEmp);
 
     return () => {
       window.removeEventListener("omnizeus_role_change", handleRoleChange);
       window.removeEventListener("omnizeus_user_change", handleRoleChange);
-      window.removeEventListener("omnizeus_employees_change", handleEmp);
     };
   }, []);
 
@@ -163,17 +203,33 @@ export function Sidebar({
 
   const isMasterAdmin = role === "super_adm";
 
-  const displayedGroups = mainNavGroups.filter(group => {
-    // Hide "Administração" category for operational employees (funcionario)
-    if (group.id === "admin" && role === "funcionario") {
-      return false;
-    }
-    return true;
-  });
-
-  if (isMasterAdmin) {
-    displayedGroups.push(masterGroup);
-  }
+  // ── Modo SaaS (Super ADM na plataforma): APENAS menus do SaaS.
+  // ── Modo Empresa (super_adm dentro de empresa OU gestor/funcionário): APENAS menus da empresa.
+  // Os dois conjuntos NUNCA se misturam.
+  // Enquanto a sessão não é reidratada (role === null), o sidebar fica neutro
+  // (sem itens), evitando piscar o menu de empresa para o Super ADM no 1º render.
+  const showSaaS = role !== null && isMasterAdmin && isSaaSMode;
+  // Funcionários operacionais têm o menu filtrado pelos módulos liberados
+  // (allowedModules). Gestores e Super ADM veem todos os menus do tenant.
+  const allowedModules = role === "funcionario" ? getAllowedModules() : null;
+  const displayedGroups = role === null
+    ? []
+    : showSaaS
+      ? saasNavGroups
+      : tenantNavGroups
+          .filter(group => {
+            // Hide "Administração" category for operational employees (funcionario)
+            if (group.id === "admin" && role === "funcionario") {
+              return false;
+            }
+            return true;
+          })
+          .map(group => {
+            if (!allowedModules) return group;
+            const items = group.items.filter(item => !item.module || allowedModules.includes(item.module));
+            return { ...group, items };
+          })
+          .filter(group => group.items.length > 0);
 
 
   return (
@@ -254,7 +310,7 @@ export function Sidebar({
                   title={isCollapsed ? group.category : undefined}
                 >
                   <div className={`flex items-center gap-2 ${
-                    group.id === 'master-saas' ? 'text-primary font-semibold' : 'text-slate-500 group-hover/header:text-slate-700'
+                    group.id.startsWith('saas-') ? 'text-primary font-semibold' : 'text-slate-500 group-hover/header:text-slate-700'
                   }`}>
                     {isCollapsed && <group.icon className="w-4 h-4" />}
                     {!isCollapsed && (

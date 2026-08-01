@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Lock, Mail, Eye, EyeOff, ArrowRight, KeyRound, CheckCircle2, XCircle, ShieldAlert, Check } from "lucide-react";
-import { setCurrentUser } from "@/lib/auth/roles";
+import { setCurrentUser, setActiveCompanyContext } from "@/lib/auth/roles";
 import { validatePasswordRequirements } from "@/lib/auth/passwordUtils";
 
 export default function LoginPage() {
@@ -48,12 +48,20 @@ export default function LoginPage() {
         // Sync client-side roles module
         setCurrentUser(data.user);
 
+        // Todo login novo do Super ADM começa no modo SaaS (centro de controle),
+        // descartando qualquer resíduo de tenant de sessão anterior.
+        if (data.user.role === "super_adm") {
+          setActiveCompanyContext(null);
+        }
+
         // Check if mandatory first login password change is required
         if (data.mustChangePassword === true || data.user.mustChangePassword === true) {
           setLoggedUser(data.user);
           setMustChangePasswordMode(true);
         } else {
-          window.location.href = "/dashboard";
+          // Super ADM entra direto no Dashboard Master SaaS (plataforma).
+          // Gestores/funcionários vão para o Dashboard Executivo da empresa.
+          window.location.href = data.user.role === "super_adm" ? "/dashboard-master" : "/dashboard";
         }
       } else {
         setErrorMsg(data.error || "Credenciais inválidas.");
@@ -101,8 +109,11 @@ export default function LoginPage() {
       if (res.ok && data.success) {
         if (data.user) {
           setCurrentUser(data.user);
+          if (data.user.role === "super_adm") {
+            setActiveCompanyContext(null);
+          }
         }
-        window.location.href = "/dashboard";
+        window.location.href = data.user?.role === "super_adm" ? "/dashboard-master" : "/dashboard";
       } else {
         setChangeErrorMsg(data.error || "Erro ao definir nova senha.");
       }

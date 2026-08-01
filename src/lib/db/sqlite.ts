@@ -61,6 +61,12 @@ const defaultSeedDb: DbSchema = {
 let inMemoryDb: DbSchema = { ...defaultSeedDb };
 let dbFetched = false;
 
+// Limpa o espelho local SQL ao trocar de tenant (impede vazamento de chats/tarefas entre empresas)
+export function resetSqliteDb(): void {
+  inMemoryDb = { ...defaultSeedDb };
+  dbFetched = false;
+}
+
 export async function syncSqlDbWithServer(): Promise<DbSchema> {
   try {
     const tasks = await fetchServerTable<any>('tasks');

@@ -25,6 +25,12 @@ export interface TaskItem {
 let inMemoryTasks: TaskItem[] = [];
 let tasksFetched = false;
 
+// Limpa o cache de tarefas ao trocar de tenant (impede vazamento entre empresas)
+export function resetTaskStore(): void {
+  inMemoryTasks = [];
+  tasksFetched = false;
+}
+
 export async function fetchStoredTasksFromServer(): Promise<TaskItem[]> {
   try {
     const records = await fetchTasks();

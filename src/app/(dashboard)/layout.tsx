@@ -1,22 +1,54 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { getCurrentUser, getActiveCompanyId, rehydrateSession } from "@/lib/auth/roles";
 import { getCompanies, CompanyProfile } from "@/lib/company/store";
+import { TenantProvider, useTenant } from "@/lib/tenant/TenantContext";
 import { AlertTriangle, Lock, ExternalLink, ShieldAlert, CreditCard } from "lucide-react";
 
-export default function DashboardLayout({
+// Rotas exclusivas da PLATAFORMA SaaS (visíveis apenas para Super ADM em modo SaaS)
+const SAAS_ROUTES = ["/dashboard-master", "/empresas", "/super-adm"];
+// Rotas operacionais da EMPRESA (tenant). Quando Super ADM estiver em modo SaaS,
+// essas rotas redirecionam para o Dashboard Master — dados de empresa nunca misturam.
+const TENANT_ROUTES = [
+  "/dashboard", "/omni-ia", "/omni-contaazul-ia", "/treinar-agente",
+  "/estatisticas-ia", "/financeiro", "/contratos", "/solicitacoes",
+  "/contaazul", "/tarefas", "/documentos", "/apresentacoes",
+  "/configuracoes", "/usuarios", "/whatsapp-bot", "/permissoes"
+];
+
+function isRouteMatch(pathname: string, routes: string[]): boolean {
+  return routes.some(r => pathname === r || pathname.startsWith(r + "/"));
+}
+
+function DashboardShell({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+  const router = useRouter();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [activeCompany, setActiveCompany] = useState<CompanyProfile | null>(null);
   const [currentUser, setCurrentUser] = useState(getCurrentUser());
   const [openingPortal, setOpeningPortal] = useState(false);
+
+  const { isTenantMode, canSwitchCompany } = useTenant();
+
+  // ── Guard de modo: Plataforma SaaS vs Empresa ──
+  // Nunca misturar: rotas de empresa não são acessíveis em modo SaaS e vice-versa.
+  useEffect(() => {
+    if (!canSwitchCompany) return; // apenas Super ADM alterna modos
+    if (isTenantMode && isRouteMatch(pathname, SAAS_ROUTES)) {
+      router.replace("/dashboard");
+    } else if (!isTenantMode && isRouteMatch(pathname, TENANT_ROUTES)) {
+      router.replace("/dashboard-master");
+    }
+  }, [isTenantMode, pathname, router, canSwitchCompany]);
 
   const checkCompanyStatus = () => {
     setCurrentUser(getCurrentUser());
@@ -72,6 +104,9 @@ export default function DashboardLayout({
   const isSuperAdmin = currentUser.role === "super_adm" || currentUser.email === "jsgleisson@gmail.com";
   const isCompanySuspended = activeCompany && activeCompany.status === "Suspenso" && !isSuperAdmin;
   const isPastDueGrace = activeCompany && activeCompany.subscription_status === "past_due" && !isCompanySuspended;
+
+  // Header com banner fixo fica mais alto quando o Super ADM está dentro de uma empresa
+  const headerOffset = isTenantMode && canSwitchCompany ? "pt-[92px]" : "pt-16";
 
   // Render Suspended Access Screen for non-super_adm users
   if (isCompanySuspended) {
@@ -137,7 +172,7 @@ export default function DashboardLayout({
       />
 
       <main 
-        className={`pt-16 min-h-screen transition-all duration-300 ${
+        className={`${headerOffset} min-h-screen transition-all duration-300 ${
           isCollapsed ? "lg:pl-16" : "lg:pl-64"
         }`}
       >
@@ -169,6 +204,18 @@ export default function DashboardLayout({
         </div>
       </main>
     </div>
+  );
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <TenantProvider>
+      <DashboardShell>{children}</DashboardShell>
+    </TenantProvider>
   );
 }
 

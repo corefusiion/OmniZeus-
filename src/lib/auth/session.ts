@@ -25,6 +25,7 @@ export interface SessionPayload {
   companyId: string;
   companyName: string;
   mustChangePassword?: boolean;
+  allowedModules?: string[];
   issuedAt: number;
   expiresAt: number;
 }

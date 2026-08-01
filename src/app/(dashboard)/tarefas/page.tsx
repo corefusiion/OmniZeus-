@@ -38,7 +38,7 @@ import {
   Tooltip, 
   Legend 
 } from "recharts";
-import { getActiveRole, UserRole } from "@/lib/auth/roles";
+import { getActiveRole, getActiveTenantId, UserRole } from "@/lib/auth/roles";
 import {
   fetchTasks,
   insertTask,
@@ -106,7 +106,7 @@ const INITIAL_MOCK_TASKS: Omit<TaskRecord, 'isTimerRunning'>[] = [
     duration_sec: null,
     execution_report: null,
     created_at: new Date(Date.now() - 3600000).toISOString(),
-    company_id: "comp_zenitus"
+    company_id: "",
   },
   {
     id: "task_102",
@@ -122,7 +122,7 @@ const INITIAL_MOCK_TASKS: Omit<TaskRecord, 'isTimerRunning'>[] = [
     duration_sec: null,
     execution_report: null,
     created_at: new Date(Date.now() - 7200000).toISOString(),
-    company_id: "comp_zenitus"
+    company_id: "",
   },
   {
     id: "task_103",
@@ -138,7 +138,7 @@ const INITIAL_MOCK_TASKS: Omit<TaskRecord, 'isTimerRunning'>[] = [
     duration_sec: 1800,
     execution_report: "Relatório de transmissão emitido com sucesso. Transmitido recibo de entrega nº 49102-A sem inconformidades de retenções na fonte.",
     created_at: new Date(Date.now() - 90000000).toISOString(),
-    company_id: "comp_zenitus"
+    company_id: "",
   },
   {
     id: "task_104",
@@ -154,7 +154,7 @@ const INITIAL_MOCK_TASKS: Omit<TaskRecord, 'isTimerRunning'>[] = [
     duration_sec: null,
     execution_report: null,
     created_at: new Date(Date.now() - 100000000).toISOString(),
-    company_id: "comp_zenitus"
+    company_id: "",
   }
 ];
 
@@ -245,7 +245,7 @@ export default function TarefasPage() {
             execution_report: r.execution_report || r.executionReport || null,
             updates_history: Array.isArray(r.updates_history) ? r.updates_history : [],
             created_at: r.created_at || new Date().toISOString(),
-            company_id: r.company_id || "comp_zenitus",
+            company_id: r.company_id || r.companyId || getActiveTenantId() || "",
             isTimerRunning: false
           };
           uniqueMap.set(norm.id, norm);
@@ -320,7 +320,7 @@ function normalizeTaskStatus(rawStatus: any): 'pendente' | 'em_andamento' | 'con
       execution_report: null,
       updates_history: [],
       created_at: new Date().toISOString(),
-      company_id: "comp_zenitus",
+      company_id: getActiveTenantId() || "",
       isTimerRunning: false
     };
 

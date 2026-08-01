@@ -15,6 +15,7 @@ import {
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { fetchCustomJobRoles, saveCustomJobRoles, insertAuditLog } from "@/lib/db/serverDb";
 import { generateTemporaryPassword, hashPassword } from "@/lib/auth/passwordUtils";
+import BatchUserUpload from "@/components/employees/BatchUserUpload";
 
 const DEFAULT_JOB_ROLES = [
   "Gestor de Escritório",
@@ -720,11 +721,22 @@ export default function UsuariosPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Form Cadastrar Novo Colaborador */}
         <div className="lg:col-span-4 bg-white p-5 lg:p-6 rounded-xl border border-slate-200/80 shadow-xs space-y-4">
-          <div className="border-b border-slate-100 pb-3">
+          <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
             <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <UserPlus className="w-4 h-4 text-primary" />
               <span>Cadastrar Novo Colaborador</span>
             </h2>
+            <BatchUserUpload
+              companyId={activeCompanyId === 'global' ? 'comp_default' : activeCompanyId}
+              companyName={activeCompanyId === 'global' ? 'Empresa Padrão' : undefined}
+              jobRoles={jobRoles}
+              defaultRole={newEmpRole}
+              defaultModules={selectedModules}
+              onCreated={() => {
+                const compId = getActiveCompanyId();
+                setEmployees(getEmployees(compId === 'global' ? undefined : compId));
+              }}
+            />
           </div>
 
           <div className="space-y-3.5">

@@ -97,8 +97,8 @@ export async function middleware(req: NextRequest) {
 
   const userRole = decoded.role;
 
-  // 1. /super-adm & /empresas -> Only super_adm
-  if ((pathname.startsWith("/super-adm") || pathname.startsWith("/empresas")) && userRole !== "super_adm") {
+  // 1. /super-adm & /empresas & /dashboard-master -> Only super_adm
+  if ((pathname.startsWith("/super-adm") || pathname.startsWith("/empresas") || pathname.startsWith("/dashboard-master")) && userRole !== "super_adm") {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 

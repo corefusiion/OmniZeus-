@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { resolveAIProvider } from "@/lib/ai/providerResolver";
+import { MODEL_MAP } from "@/lib/ai/openRouterClient";
+import { getSession } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
 
@@ -23,11 +26,6 @@ function saveLocalDbFile(db: any): void {
   } catch (err) {
     console.error("[IA-Workspace] Erro ao salvar DB local:", err);
   }
-}
-
-function getSavedSettings(): any {
-  const db = getLocalDbFile();
-  return db?.settings || {};
 }
 
 /**
@@ -78,19 +76,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Escopo multi-tenant: a chave OpenRouter da empresa (se configurada) tem
+    // prioridade; caso contrário, cai no fallback da chave master.
+    const session = getSession(req);
+    const activeCompanyId =
+      req.headers.get("x-company-id") ||
+      (body.companyId as string | undefined) ||
+      session?.companyId ||
+      "comp_zenitus";
+
     let parsedResponse: any = null;
 
     if (!parsedResponse) {
-      const dbSettings = getSavedSettings();
-      let apiUrl = "https://openrouter.ai/api/v1/chat/completions";
-      let activeApiKey = dbSettings.openrouter_api_key || process.env.OPENROUTER_API_KEY;
-      let activeModel = model || "google/gemini-2.5-pro";
+      const resolved = await resolveAIProvider({
+        companyId: activeCompanyId,
+        userRole: session?.role,
+        requestedModel: model || "google/gemini-2.5-pro"
+      });
 
-      if (dbSettings.custom_ai_enabled && dbSettings.custom_ai_url && dbSettings.custom_ai_key) {
-        apiUrl = `${dbSettings.custom_ai_url.replace(/\/$/, "")}/chat/completions`;
-        activeApiKey = dbSettings.custom_ai_key;
-        activeModel = dbSettings.custom_ai_model || "auto";
-      }
+      let apiUrl = resolved.apiUrl;
+      let activeApiKey = resolved.apiKey;
+      let activeModel = MODEL_MAP[resolved.model] || resolved.model;
 
       if (activeApiKey && !activeApiKey.includes("sk-or-v1-master-****") && activeApiKey.length > 10) {
         try {
@@ -307,8 +313,8 @@ DIRETRIZES DE RESPOSTA (OBRIGATÓRIO):
     if (!Array.isArray(db.contaazul_ia_audit_logs)) db.contaazul_ia_audit_logs = [];
     db.contaazul_ia_audit_logs.unshift({
       id: `audit_${Date.now()}`,
-      userId: "super_adm",
-      companyId: "comp_zenitus",
+      userId: session?.userId || "super_adm",
+      companyId: activeCompanyId,
       timestamp: now,
       prompt,
       documentsAttached: attachmentData ? ["arquivo_importado"] : [],

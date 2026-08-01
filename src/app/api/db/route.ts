@@ -195,14 +195,15 @@ const DEFAULT_DB: DatabaseSchema = {
   messages: [],
   contaazul_customers: [],
   custom_agents: [],
-  contaazul_config: {
+  contaazul_config: [{
+    company_id: "comp_zenitus",
     client_id: "",
     client_secret: "",
     access_token: "",
     refresh_token: "",
     is_connected: false,
     updated_at: new Date().toISOString()
-  },
+  }],
   contaazul_clients: [],
   contaazul_suppliers: [],
   contaazul_entries: [],
@@ -430,13 +431,36 @@ export async function POST(req: NextRequest) {
       if (!isSuperAdmin) {
         return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
       }
-      db.contaazul_config = {
-        ...db.contaazul_config,
+
+      // Garantir formato ARRAY (legado gravava como objeto plano — incompatível com auto-sync multi-tenant)
+      if (!Array.isArray(db.contaazul_config)) {
+        const existing = db.contaazul_config || {};
+        if (existing.access_token || existing.client_id) {
+          db.contaazul_config = [{ ...existing, company_id: existing.company_id || effectiveCompanyId }];
+        } else {
+          db.contaazul_config = [];
+        }
+      }
+
+      // Upsert: atualiza a entrada da empresa específica ou cria nova
+      const compId = contaazul_config.company_id || effectiveCompanyId;
+      const cfgIdx = db.contaazul_config.findIndex((c: any) => c.company_id === compId);
+
+      const merged = {
+        ...(cfgIdx !== -1 ? db.contaazul_config[cfgIdx] : {}),
         ...contaazul_config,
+        company_id: compId,
         updated_at: new Date().toISOString()
       };
+
+      if (cfgIdx !== -1) {
+        db.contaazul_config[cfgIdx] = merged;
+      } else {
+        db.contaazul_config.push(merged);
+      }
+
       saveLocalDbFile(db);
-      return NextResponse.json({ success: true, contaazul_config: db.contaazul_config });
+      return NextResponse.json({ success: true, contaazul_config: merged });
     }
 
     if (action === "set_table" && table && record !== undefined) {

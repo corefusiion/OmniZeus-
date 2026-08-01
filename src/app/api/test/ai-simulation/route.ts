@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
         agente_id: agent.id,
         agente_nome: agent.name,
         modelo: modelObj.name,
-        funcionalidade: `Validação Teste IA #${i}`,
+        funcionalidade: `Simulação IA #${i} (dado sintético)`,
         tipo_operacao: agent.category,
         input_tokens: inputTokens,
         output_tokens: outputTokens,

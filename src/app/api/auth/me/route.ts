@@ -25,7 +25,8 @@ export async function GET(req: NextRequest) {
         role: session.role,
         companyId: session.companyId,
         companyName: session.companyName,
-        mustChangePassword: Boolean(session.mustChangePassword)
+        mustChangePassword: Boolean(session.mustChangePassword),
+        allowedModules: session.allowedModules || []
       }
     });
     

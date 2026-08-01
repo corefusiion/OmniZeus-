@@ -2,14 +2,16 @@
 
 import { useState, useEffect, useRef } from "react";
 import { 
-  Sparkles, Send, Bot, User, RefreshCw, Cpu, BookOpen, Coins, 
-  Copy, Trash2, Plus, History, ChevronRight, Layers, Pin, Edit2, Check, X, ArrowRight, MessageSquare
+  Sparkles, Send, RefreshCw, Cpu, BookOpen, Coins, 
+  Copy, Trash2, Plus, History, ChevronRight, Pin, Edit2, Check, X
 } from "lucide-react";
 import { fetchCoinBalanceFromServer } from "@/lib/coins/store";
 import { sqlDb } from "@/lib/db/sqlite";
 import { getCustomAgents, CustomAgent } from "@/lib/agents/store";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { fetchServerSettings, fetchServerTable, insertServerTable } from "@/lib/db/serverDb";
+import { getActiveTenantId } from "@/lib/auth/roles";
+import { runChatJob, OMNIIA_JOB_EVENT, OMNIIA_MESSAGE_EVENT, isConversationProcessing, getProcessingConversationIds } from "@/lib/ai/chatSession";
 
 interface Message {
   id: string;
@@ -17,6 +19,7 @@ interface Message {
   text: string;
   timestamp: string;
   model?: string;
+  pending?: boolean;
 }
 
 interface ConversationItem {
@@ -142,6 +145,9 @@ export default function OmniIAPage() {
 
   useEffect(() => {
     activeConvIdRef.current = activeConvId;
+    if (typeof window !== "undefined" && activeConvId) {
+      localStorage.setItem("omnizeus_omniia_active_conv", activeConvId);
+    }
   }, [activeConvId]);
 
   const [editingConvId, setEditingConvId] = useState<string | null>(null);
@@ -158,6 +164,10 @@ export default function OmniIAPage() {
   // async loader from wiping optimistic (in-flight) messages.
   const [messagesByConv, setMessagesByConv] = useState<Record<string, Message[]>>({});
   const messages = activeConvId ? (messagesByConv[activeConvId] || []) : [];
+  // Se há mensagem "Processando análise..." pendente no cache, a conversa está
+  // em processamento (reflete estado persistido, sobrevive à navegação).
+  const hasPendingMessage = messages.some(m => m.pending);
+  const isActiveConvLoading = Boolean(loadingConvIds[activeConvId]) || hasPendingMessage;
 
   const activeModelObj = allModelsList.find(m => m.id === selectedModel) || allModelsList[0];
   const activePersonaObj = personas.find(p => p.id === selectedPersona) || personas.find(p => p.id === "agente_geral") || personas[0] || {
@@ -168,6 +178,9 @@ export default function OmniIAPage() {
   };
 
   useEffect(() => {
+    setPersonas(getCustomAgents());
+    const handleAgentsChange = () => setPersonas(getCustomAgents());
+
     const loadConversationsFromSql = async () => {
       try {
         const convRecords = await fetchServerTable('conversations');
@@ -180,10 +193,16 @@ export default function OmniIAPage() {
               model: c.model || "Claude 4.8 Sonnet",
               isPinned: Boolean(c.pinned)
             })));
-            setActiveConvId(activeConvs[0].id);
-            activeConvIdRef.current = activeConvs[0].id;
-            if (activeConvs[0].persona) {
-              setSelectedPersona(activeConvs[0].persona);
+
+            // Restaura a última conversa ativa (se ainda existir), senão a primeira
+            const savedActive = typeof window !== "undefined"
+              ? localStorage.getItem("omnizeus_omniia_active_conv")
+              : null;
+            const restored = activeConvs.find((c: any) => c.id === savedActive) || activeConvs[0];
+            setActiveConvId(restored.id);
+            activeConvIdRef.current = restored.id;
+            if (restored.persona) {
+              setSelectedPersona(restored.persona);
             }
           } else {
             setConversations([]);
@@ -205,25 +224,96 @@ export default function OmniIAPage() {
 
     loadConversationsFromSql();
 
-    setPersonas(getCustomAgents());
-    const handleAgentsChange = () => setPersonas(getCustomAgents());
+    // Re-sincroniza conversas/mensagens quando um job de chat global muda
+    // (ex.: o usuário trocou de tela enquanto processava e voltou).
+    const handleJobChange = () => {
+      const processingIds = getProcessingConversationIds?.() ?? [];
+      setLoadingConvIds(prev => {
+        const next: Record<string, boolean> = {};
+        processingIds.forEach((id) => { next[id] = true; });
+        // Preserva jobs de conversas já abertas
+        Object.keys(prev).forEach((k) => { if (prev[k]) next[k] = true; });
+        return next;
+      });
+    };
+    const handleMessagePersisted = () => {
+      // Recarrega as mensagens da conversa ativa para refletir a resposta
+      // (placeholder → texto final) sem depender de estado do componente.
+      const convId = activeConvIdRef.current;
+      if (convId) {
+        loadMessagesFromSql(convId, true);
+      }
+    };
+
+    window.addEventListener(OMNIIA_JOB_EVENT, handleJobChange);
+    window.addEventListener(OMNIIA_MESSAGE_EVENT, handleMessagePersisted);
     window.addEventListener("omnizeus_agents_change", handleAgentsChange);
-    return () => window.removeEventListener("omnizeus_agents_change", handleAgentsChange);
+    return () => {
+      window.removeEventListener(OMNIIA_JOB_EVENT, handleJobChange);
+      window.removeEventListener(OMNIIA_MESSAGE_EVENT, handleMessagePersisted);
+      window.removeEventListener("omnizeus_agents_change", handleAgentsChange);
+    };
   }, []);
 
-  // Load messages from DB when switching to a conversation that isn't hydrated
-  // locally yet. Conversations already in the cache (including in-flight ones)
-  // are never destructively overwritten here.
+  // Load messages from DB (shared between the hydration effect and the global
+  // job events). Handles pending placeholders (__PROCESSING__) so navigation
+  // back shows "Processando análise..." instead of losing the in-flight state.
+  const loadMessagesFromSql = async (convId?: string, force = false) => {
+    const targetId = convId || activeConvId;
+    if (!targetId) return;
+    try {
+      const convRecords = await fetchServerTable('conversations');
+      const conv = convRecords.find((c: any) => c.id === targetId);
+      if (conv && conv.persona) {
+        setSelectedPersona(conv.persona);
+      }
+
+      const msgRecords = await fetchServerTable('messages');
+      const msgs = msgRecords.filter((m: any) => m.conversation_id === targetId);
+
+      const sortedMsgs = [...msgs].sort((a, b) => new Date(a.created_at || Date.now()).getTime() - new Date(b.created_at || Date.now()).getTime());
+      const mapped: Message[] = sortedMsgs.map((m: any) => {
+        // Placeholder de processamento persistido pelo chatSession global
+        if (m.pending && m.text === "__PROCESSING__") {
+          return {
+            id: m.id,
+            sender: 'ai' as const,
+            text: "Processando análise...",
+            timestamp: new Date(m.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            model: m.model || activeModelObj.name,
+            pending: true
+          };
+        }
+        return {
+          id: m.id,
+          sender: m.sender as 'user' | 'ai',
+          text: m.sender === 'ai' ? sanitizeAiText(m.text) : m.text,
+          timestamp: new Date(m.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          model: m.model || activeModelObj.name
+        };
+      });
+
+      // Guard contra race: em hidratação normal não sobrescreve cache com
+      // mensagens em vôo. Com force=true (evento global) sempre atualiza.
+      setMessagesByConv(prev => {
+        if (!force && prev[targetId] !== undefined && !mapped.some(m => m.pending)) return prev;
+        return { ...prev, [targetId]: mapped };
+      });
+    } catch (err) {
+      console.error("Erro ao carregar mensagens da conversa:", err);
+    }
+  };
+
   useEffect(() => {
     if (!activeConvId) return;
 
     // Already hydrated locally (has an entry, or is currently loading a response) → skip DB reload.
-    if (messagesByConv[activeConvId] !== undefined || loadingConvIds[activeConvId]) {
+    if (messagesByConv[activeConvId] !== undefined && !loadingConvIds[activeConvId]) {
       return;
     }
 
     let cancelled = false;
-    const loadMessagesFromSql = async () => {
+    const run = async () => {
       try {
         const convRecords = await fetchServerTable('conversations');
         const conv = convRecords.find((c: any) => c.id === activeConvId);
@@ -237,18 +327,30 @@ export default function OmniIAPage() {
         if (cancelled) return;
 
         const sortedMsgs = [...msgs].sort((a, b) => new Date(a.created_at || Date.now()).getTime() - new Date(b.created_at || Date.now()).getTime());
-        const mapped: Message[] = sortedMsgs.map((m: any) => ({
-          id: m.id,
-          sender: m.sender as 'user' | 'ai',
-          text: m.sender === 'ai' ? sanitizeAiText(m.text) : m.text,
-          timestamp: new Date(m.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          model: m.model || activeModelObj.name
-        }));
+        const mapped: Message[] = sortedMsgs.map((m: any) => {
+          if (m.pending && m.text === "__PROCESSING__") {
+            return {
+              id: m.id,
+              sender: 'ai' as const,
+              text: "Processando análise...",
+              timestamp: new Date(m.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              model: m.model || activeModelObj.name,
+              pending: true
+            };
+          }
+          return {
+            id: m.id,
+            sender: m.sender as 'user' | 'ai',
+            text: m.sender === 'ai' ? sanitizeAiText(m.text) : m.text,
+            timestamp: new Date(m.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            model: m.model || activeModelObj.name
+          };
+        });
 
         // Guard against a race: if the conversation got hydrated while we were
         // fetching (e.g. user sent a message), don't clobber it.
         setMessagesByConv(prev => {
-          if (prev[activeConvId] !== undefined) return prev;
+          if (prev[activeConvId] !== undefined && !mapped.some(m => m.pending)) return prev;
           return { ...prev, [activeConvId]: mapped };
         });
       } catch (err) {
@@ -259,9 +361,9 @@ export default function OmniIAPage() {
       }
     };
 
-    loadMessagesFromSql();
+    run();
     return () => { cancelled = true; };
-  }, [activeConvId, activeModelObj, messagesByConv, loadingConvIds]);
+  }, [activeConvId, messagesByConv, loadingConvIds]);
 
   const executeChatQuery = async (textToSend: string, overridePersonaId?: string) => {
     const promptText = textToSend.trim();
@@ -271,13 +373,15 @@ export default function OmniIAPage() {
     const personaObj = personas.find(p => p.id === activePersona) || activePersonaObj;
 
     // Verifica saldo ANTES de enviar (sem debitar aqui). O débito real dos 5
-    // OmniCoins acontece uma única vez no servidor (/api/chat → recordChatMetrics),
-    // que possui a sessão e o tenant corretos. Debitar também no cliente causava
-    // cobrança dupla.
+    // OmniCoins acontece uma única vez no servidor (/api/chat → recordChatMetrics).
     const selectedCompanyId = typeof window !== "undefined"
       ? (localStorage.getItem("omnizeus_active_company_id") || "")
       : "";
-    const activeCompany = selectedCompanyId || "comp_zenitus";
+    const activeCompany = selectedCompanyId || getActiveTenantId() || "";
+    if (!activeCompany) {
+      setShowNoCoinsModal(true);
+      return;
+    }
     const currentBalance = await fetchCoinBalanceFromServer(activeCompany);
     if (currentBalance < 5) {
       setShowNoCoinsModal(true);
@@ -342,78 +446,29 @@ export default function OmniIAPage() {
     setInputMessage("");
     setLoadingConvIds(prev => ({ ...prev, [targetConvId]: true }));
 
+    // Processamento delegado ao módulo global (chatSession). O fetch continua
+    // rodando mesmo se o usuário trocar de tela; a resposta é persistida no DB
+    // e o componente re-sincroniza via eventos OMNIIA_JOB_EVENT / OMNIIA_MESSAGE_EVENT.
     try {
-      const settings = await fetchServerSettings();
-      const savedKey = settings?.openrouter_api_key || null;
-      const activeCompanyId = selectedCompanyId;
-
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(savedKey ? { "x-openrouter-key": savedKey } : {}),
-          ...(activeCompanyId ? { "x-company-id": activeCompanyId } : {})
-        },
-        body: JSON.stringify({
-          messages: [
-            ...priorMessages.map(m => ({
-              role: m.sender === 'user' ? 'user' : 'assistant',
-              content: m.text
-            })),
-            { role: "user", content: promptText }
-          ],
-          model: personaObj.modelLlm || selectedModel,
-          temperature: personaObj.temperature !== undefined ? personaObj.temperature : undefined,
-          persona: activePersona,
-          personaPrompt: personaObj.systemPrompt,
-          clientApiKey: savedKey || undefined,
-          conversationId: targetConvId
-        }),
+      await runChatJob({
+        conversationId: targetConvId,
+        messages: [
+          ...priorMessages.map(m => ({
+            role: (m.sender === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+            content: m.text
+          })),
+          { role: "user" as const, content: promptText }
+        ],
+        prompt: promptText,
+        model: personaObj.modelLlm || selectedModel,
+        persona: activePersona,
+        personaPrompt: personaObj.systemPrompt,
+        temperature: personaObj.temperature !== undefined ? personaObj.temperature : undefined,
+        activeCompanyId: activeCompany
       });
-
-      let aiResponseText = "";
-      if (res.ok) {
-        aiResponseText = await res.text();
-      } else {
-        throw new Error("Falha na rota de streaming");
-      }
-
-      // O servidor debitou os 5 coins; sincroniza o saldo em cache para a UI refletir.
-      fetchCoinBalanceFromServer(activeCompany)
-        .then(() => window.dispatchEvent(new Event("omnizeus_coins_change")))
-        .catch(() => {});
-
-      const aiMsg: Message = {
-        id: res.headers.get("x-omni-message-id") || `msg_${Date.now() + 1}`,
-        sender: "ai",
-        text: sanitizeAiText(aiResponseText),
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        model: activeModelObj.name
-      };
-
-      // Append to the correct conversation cache regardless of which conversation
-      // the user is currently viewing (so responses never get lost).
-      setMessagesByConv(prev => ({
-        ...prev,
-        [targetConvId]: [...(prev[targetConvId] || []), aiMsg]
-      }));
-    } catch (err) {
-      const fallbackText = `Estamos enfrentando uma instabilidade temporária no servidor de IA.`;
-
-      const aiMsg: Message = {
-        id: `msg_${Date.now() + 1}`,
-        sender: "ai",
-        text: fallbackText,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        model: activeModelObj.name
-      };
-
-      setMessagesByConv(prev => ({
-        ...prev,
-        [targetConvId]: [...(prev[targetConvId] || []), aiMsg]
-      }));
     } finally {
-      setLoadingConvIds(prev => ({ ...prev, [targetConvId]: false }));
+      // O job é global; o loading local reflete o estado global para a UI.
+      setLoadingConvIds(prev => ({ ...prev, [targetConvId]: isConversationProcessing(targetConvId) }));
     }
   };
 
@@ -483,7 +538,7 @@ export default function OmniIAPage() {
   const sortedConversations = [...conversations].sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
 
   return (
-    <div className="h-[calc(100vh-7rem)] flex bg-white rounded-xl border border-slate-200/80 overflow-hidden shadow-xs relative">
+    <div className="-m-4 sm:-m-6 lg:-m-8 flex flex-col h-[calc(100vh-64px)] bg-[#F8FAFC] overflow-hidden">
       <ConfirmModal
         isOpen={deletingConvId !== null}
         onClose={() => setDeletingConvId(null)}
@@ -506,315 +561,348 @@ export default function OmniIAPage() {
         variant="warning"
       />
 
-      {/* History Drawer Sidebar */}
-      {showHistorySidebar && (
-        <div className="w-72 border-r border-slate-200/80 bg-slate-50 flex flex-col z-20">
-          <div className="p-3 border-b border-slate-200/80 flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-              <History className="w-3.5 h-3.5 text-primary" />
-              Histórico
-            </span>
+      {/* Header Superior Principal — FIXO NO TOPO */}
+      <div className="shrink-0 bg-white border-b border-[#E2E8F0] px-5 py-3 flex flex-col gap-3 shadow-2xs z-20">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => setShowHistorySidebar(false)}
-              className="p-1 hover:bg-slate-200 rounded text-slate-500 transition-colors"
-              title="Recolher histórico"
+              onClick={() => setShowHistorySidebar(!showHistorySidebar)}
+              title={showHistorySidebar ? "Recolher histórico" : "Expandir histórico"}
+              className="p-1.5 text-slate-500 hover:text-primary hover:bg-slate-100 rounded-lg transition-colors border border-transparent hover:border-slate-200"
             >
-              <ChevronRight className="w-4 h-4" />
+              <History className="w-4 h-4" />
             </button>
-          </div>
 
-          <div className="p-3 border-b border-slate-200/80 bg-slate-100/50 space-y-3">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Nova Conversa</label>
-              
-              {/* Model Selector Dropdown Grouped by Provider */}
-              <div className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200/80 text-[11px] font-medium hover:border-slate-300 transition-colors">
-                <Cpu className="w-3.5 h-3.5 text-primary shrink-0" />
-                <select
-                  value={selectedModel}
-                  onChange={(e) => setSelectedModel(e.target.value)}
-                  className="bg-transparent font-bold text-slate-900 focus:outline-none flex-1 min-w-0 truncate cursor-pointer"
-                >
-                  {modelGroups.map(group => (
-                    <optgroup key={group.provider} label={`--- ${group.provider} ---`}>
-                      {group.models.map(m => (
-                        <option key={m.id} value={m.id}>
-                          {m.name} [{m.badge}]
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </div>
-
-              {/* Persona Selector */}
-              <div className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200/80 text-[11px] font-medium hover:border-slate-300 transition-colors">
-                <BookOpen className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                <select
-                  value={selectedPersona}
-                  onChange={(e) => setSelectedPersona(e.target.value)}
-                  className="bg-transparent font-bold text-slate-900 focus:outline-none flex-1 min-w-0 cursor-pointer"
-                >
-                  {personas.map(p => (
-                    <option key={p.id} value={p.id}>{p.label}</option>
-                  ))}
-                </select>
-              </div>
+            <div className="p-2 bg-blue-50 border border-blue-100/80 rounded-lg text-primary">
+              <Sparkles className="w-5 h-5" />
             </div>
-
-            <button
-              onClick={handleNewConversation}
-              className="w-full py-2 px-3 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-2 shadow-xs transition-all"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Iniciar Nova Consulta</span>
-            </button>
-          </div>
-          
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {sortedConversations.length === 0 ? (
-              <div className="p-4 text-center text-xs text-slate-400">
-                Nenhuma consulta salva. Clique acima em "Iniciar Nova Consulta".
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base font-bold text-[#0F172A] tracking-tight">Workspace Omni IA Hub</h1>
+                <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-semibold rounded-md border border-slate-200">
+                  Chat Especialistas
+                </span>
               </div>
-            ) : (
-              sortedConversations.map(c => {
-                const isConvLoading = Boolean(loadingConvIds[c.id]);
-                return (
-                  <div
-                    key={c.id}
-                    onClick={() => {
-                      setActiveConvId(c.id);
-                      activeConvIdRef.current = c.id;
-                    }}
-                    className={`group relative p-2.5 rounded-lg text-xs font-medium cursor-pointer transition-all border ${
-                      activeConvId === c.id 
-                        ? 'bg-white border-slate-200/90 text-slate-900 shadow-xs font-bold' 
-                        : 'bg-transparent border-transparent text-slate-600 hover:bg-white hover:border-slate-200/60'
-                    }`}
-                  >
-                    {editingConvId === c.id ? (
-                      <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="text"
-                          value={editingTitle}
-                          onChange={(e) => setEditingTitle(e.target.value)}
-                          className="w-full px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs font-medium focus:outline-none focus:border-primary"
-                          autoFocus
-                          onKeyDown={(e) => e.key === 'Enter' && saveEditedTitle(c.id, e as any)}
-                        />
-                        <button 
-                          onClick={(e) => saveEditedTitle(c.id, e)} 
-                          className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"
-                          title="Salvar"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                        </button>
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); setEditingConvId(null); }} 
-                          className="p-1 text-slate-400 hover:bg-slate-100 rounded"
-                          title="Cancelar"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center justify-between gap-1">
-                          <div className="truncate flex-1 pr-2 flex items-center gap-1.5">
-                            {c.isPinned && (
-                              <Pin className="w-3 h-3 text-primary fill-[#1E6FD9] shrink-0" strokeWidth={1.75} />
-                            )}
-                            <span className="truncate">{c.title}</span>
-                            {isConvLoading && (
-                              <span className="relative flex h-2 w-2 shrink-0 ml-1" title="Processando análise em segundo plano...">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-normal mt-0.5">{c.model}</div>
-
-                        <div className="absolute right-2 top-2 hidden group-hover:flex items-center gap-1 bg-white/90 backdrop-blur-xs px-1 py-0.5 rounded border border-slate-200 shadow-xs">
-                          <button
-                            onClick={(e) => togglePinConversation(c.id, e)}
-                            className={`p-1 rounded hover:bg-slate-100 transition-colors ${c.isPinned ? 'text-primary' : 'text-slate-400 hover:text-slate-700'}`}
-                            title={c.isPinned ? "Desafixar" : "Fixar no Topo"}
-                          >
-                            <Pin className="w-3 h-3" strokeWidth={1.75} />
-                          </button>
-                          <button
-                            onClick={(e) => startEditingTitle(c.id, c.title, e)}
-                            className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
-                            title="Renomear Chat"
-                          >
-                            <Edit2 className="w-3 h-3" strokeWidth={1.75} />
-                          </button>
-                          <button
-                            onClick={(e) => openDeleteModal(c.id, e)}
-                            className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Excluir Chat"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" strokeWidth={1.75} />
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Toolbar */}
-        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
-            {!showHistorySidebar && (
-              <button
-                onClick={() => setShowHistorySidebar(true)}
-                className="p-2.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors text-xs font-semibold flex items-center justify-center shadow-xs"
-                title="Abrir histórico de conversas"
-              >
-                <div className="flex flex-col justify-center items-center gap-[3px] w-4 h-4">
-                  <span className="w-full h-[2px] bg-slate-600 rounded-full"></span>
-                  <span className="w-full h-[2px] bg-slate-600 rounded-full"></span>
-                  <span className="w-full h-[2px] bg-slate-600 rounded-full"></span>
-                </div>
-              </button>
-            )}
+              <p className="text-[11px] text-slate-500">Consulte especialistas em contabilidade, fiscal/SPED, contratos e apresentações com IA de ponta.</p>
+            </div>
           </div>
 
           <div className="flex items-center gap-2.5">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200/60">
-              <Coins className="w-3.5 h-3.5 text-amber-600" />
+            <div
+              className="flex items-center gap-1.5 bg-white border border-[#E2E8F0] hover:border-primary/40 text-xs font-semibold text-slate-700 rounded-lg px-2.5 py-1.5 transition-all"
+              title={`Modelo em uso: ${activeModelObj.name}`}
+            >
+              <Cpu className="w-3.5 h-3.5 text-primary" />
+              <span className="hidden md:inline">{activeModelObj.name}</span>
+              <span className="md:hidden truncate max-w-[120px]">{activeModelObj.name}</span>
+            </div>
+
+            <div className="flex items-center gap-1 bg-amber-50 border border-amber-200/60 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-amber-700">
+              <Coins className="w-3.5 h-3.5 text-amber-500" />
               <span>5 Coins / Consulta</span>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Main Content Area: Welcome Cards Grid when no active chat/empty, or Chat Messages when active */}
-        {!activeConvId || messages.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-xl mx-auto space-y-6 my-auto">
-            <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center shadow-2xs">
-              <Sparkles className="w-8 h-8 text-primary" />
-            </div>
-
-            <div className="space-y-1.5">
-              <h2 className="text-lg font-bold text-[#0F172A]">Workspace Omni IA Hub</h2>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Consulte especialistas em contabilidade, fiscal/SPED, contratos e apresentações em linguagem natural com modelos de IA de ponta.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full pt-2">
-              {SPECIALIST_CARDS.map(agent => (
-                <button
-                  key={agent.id}
-                  onClick={() => handleStartAgentChat(agent.id, agent.samplePrompt)}
-                  className="p-3 bg-white border border-[#E2E8F0] hover:border-blue-300 hover:bg-blue-50/30 rounded-xl text-left flex items-start gap-2.5 group transition-all shadow-2xs"
-                >
-                  <BookOpen className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-xs font-semibold text-slate-800 block truncate group-hover:text-blue-700">
-                      {agent.label}
-                    </span>
-                    <span className="text-[10px] text-slate-400 block truncate">{agent.category} • Clique para consultar</span>
-                  </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 shrink-0 mt-0.5" />
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="flex-1 px-4 sm:px-6 py-5 overflow-y-auto space-y-5 bg-[#FAFBFC]">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex gap-3 max-w-2xl ${msg.sender === 'user' ? 'ml-auto flex-row-reverse' : ''}`}
+      {/* Área Principal: Sidebar + Chat */}
+      <div className="flex flex-1 overflow-hidden relative">
+        {showHistorySidebar && (
+          <div className="w-[260px] bg-white border-r border-[#E2E8F0] flex flex-col h-full shrink-0 shadow-2xs z-10">
+            <div className="p-3 border-b border-[#E2E8F0] flex flex-col gap-2.5">
+              <button
+                onClick={handleNewConversation}
+                className="w-full flex items-center justify-center gap-2 bg-primary hover:opacity-90 text-white rounded-lg py-2 text-xs font-semibold shadow-2xs transition-all active:scale-[0.98]"
               >
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs shrink-0 shadow-xs ${
-                  msg.sender === 'user' ? 'bg-primary text-white' : 'bg-slate-900 text-white'
-                }`}>
-                  {msg.sender === 'user' ? <User className="w-3.5 h-3.5" /> : <Sparkles className="w-3.5 h-3.5" />}
-                </div>
+                <Plus className="w-4 h-4" /> Nova Consulta
+              </button>
 
-                <div className="min-w-0 flex-1">
-                  <div className={`p-4 rounded-xl text-sm leading-relaxed ${
-                    msg.sender === 'user'
-                      ? 'bg-primary text-white rounded-tr-sm'
-                      : 'bg-white border border-slate-200/80 text-slate-800 rounded-tl-sm shadow-xs'
-                  }`}>
-                    <p className="whitespace-pre-wrap">{msg.text}</p>
-                  </div>
-
-                  <div className={`flex items-center gap-2.5 mt-1.5 text-[10px] text-slate-400 font-medium ${
-                    msg.sender === 'user' ? 'justify-end' : ''
-                  }`}>
-                    <span>{msg.timestamp}</span>
-                    {msg.model && (
-                      <>
-                        <span className="w-0.5 h-0.5 rounded-full bg-slate-300" />
-                        <span>{msg.model}</span>
-                      </>
-                    )}
-                    <button onClick={() => navigator.clipboard.writeText(msg.text)} className="p-1 hover:bg-slate-100 rounded transition-colors ml-2" title="Copiar texto">
-                      <Copy className="w-3 h-3" />
-                    </button>
-                  </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                  Agente Especialista
+                </label>
+                <div className="flex items-center gap-2 bg-slate-50 border border-[#E2E8F0] px-2.5 py-1.5 rounded-md text-[11px] font-medium focus-within:ring-1 focus-within:ring-primary">
+                  <BookOpen className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                  <select
+                    value={selectedPersona}
+                    onChange={(e) => setSelectedPersona(e.target.value)}
+                    className="bg-transparent font-semibold text-slate-800 focus:outline-none flex-1 min-w-0 truncate cursor-pointer"
+                  >
+                    {personas.map(p => (
+                      <option key={p.id} value={p.id}>{p.label}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
-            ))}
 
-            {Boolean(loadingConvIds[activeConvId]) && (
-              <div className="flex gap-3 max-w-2xl">
-                <div className="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center text-xs shrink-0 shadow-xs">
-                  <Sparkles className="w-3.5 h-3.5" />
-                </div>
-                <div className="p-4 rounded-xl bg-white border border-slate-200/80 text-xs text-slate-500 flex items-center gap-2 shadow-xs rounded-tl-sm">
-                  <span className="flex gap-1 items-center h-4">
-                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"></span>
-                  </span>
-                  <span className="ml-1 text-slate-400 font-medium">Processando análise...</span>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                  Modelo de IA
+                </label>
+                <div className="flex items-center gap-2 bg-slate-50 border border-[#E2E8F0] px-2.5 py-1.5 rounded-md text-[11px] font-medium focus-within:ring-1 focus-within:ring-primary">
+                  <Cpu className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <select
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    className="bg-transparent font-semibold text-slate-800 focus:outline-none flex-1 min-w-0 truncate cursor-pointer"
+                  >
+                    {modelGroups.map(group => (
+                      <optgroup key={group.provider} label={`--- ${group.provider} ---`}>
+                        {group.models.map(m => (
+                          <option key={m.id} value={m.id}>
+                            {m.name} [{m.badge}]
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
                 </div>
               </div>
-            )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {sortedConversations.length === 0 ? (
+                <div className="p-4 text-center text-xs text-slate-400 font-medium">
+                  Nenhuma consulta gravada. Clique acima em "+ Nova Consulta".
+                </div>
+              ) : (
+                sortedConversations.map(c => {
+                  const isConvLoading = Boolean(loadingConvIds[c.id]);
+                  return (
+                    <div
+                      key={c.id}
+                      onClick={() => {
+                        setActiveConvId(c.id);
+                        activeConvIdRef.current = c.id;
+                      }}
+                      className={`group relative p-2 rounded-lg text-xs font-medium cursor-pointer transition-all border ${
+                        activeConvId === c.id
+                          ? 'bg-blue-50 border border-blue-200 text-blue-900 font-semibold shadow-2xs'
+                          : 'hover:bg-slate-50 border border-transparent text-slate-700'
+                      }`}
+                    >
+                      {editingConvId === c.id ? (
+                        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="text"
+                            value={editingTitle}
+                            onChange={(e) => setEditingTitle(e.target.value)}
+                            className="w-full px-2 py-1 bg-white border border-primary rounded text-[11px] font-medium focus:outline-none"
+                            autoFocus
+                            onKeyDown={(e) => e.key === 'Enter' && saveEditedTitle(c.id, e as any)}
+                          />
+                          <button
+                            onClick={(e) => saveEditedTitle(c.id, e)}
+                            className="p-0.5 text-emerald-600 hover:bg-emerald-50 rounded"
+                            title="Salvar"
+                          >
+                            <Check className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setEditingConvId(null); }}
+                            className="p-0.5 text-slate-400 hover:bg-slate-100 rounded"
+                            title="Cancelar"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2 overflow-hidden flex-1 mr-1.5">
+                            {c.isPinned && (
+                              <Pin className="w-3 h-3 text-primary fill-[#1E6FD9] shrink-0" strokeWidth={1.75} />
+                            )}
+                            <div className="flex flex-col truncate">
+                              <span className="text-[11px] truncate leading-snug flex items-center gap-1">
+                                {c.title}
+                                {isConvLoading && (
+                                  <span className="relative flex h-2 w-2 shrink-0 ml-0.5" title="Processando análise em segundo plano...">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                  </span>
+                                )}
+                              </span>
+                              <span className="text-[9px] text-slate-400 font-normal">{c.model}</span>
+                            </div>
+                          </div>
+
+                          <div className="absolute right-2 top-2 hidden group-hover:flex items-center gap-0.5 bg-white/90 backdrop-blur-xs px-1 py-0.5 rounded border border-slate-200 shadow-xs">
+                            <button
+                              onClick={(e) => togglePinConversation(c.id, e)}
+                              className={`p-1 rounded hover:bg-slate-100 transition-colors ${c.isPinned ? 'text-primary' : 'text-slate-400 hover:text-slate-700'}`}
+                              title={c.isPinned ? "Desafixar" : "Fixar no Topo"}
+                            >
+                              <Pin className="w-3 h-3" strokeWidth={1.75} />
+                            </button>
+                            <button
+                              onClick={(e) => startEditingTitle(c.id, c.title, e)}
+                              className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
+                              title="Renomear Chat"
+                            >
+                              <Edit2 className="w-3 h-3" strokeWidth={1.75} />
+                            </button>
+                            <button
+                              onClick={(e) => openDeleteModal(c.id, e)}
+                              className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                              title="Excluir Chat"
+                            >
+                              <Trash2 className="w-3 h-3" strokeWidth={1.75} />
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
         )}
 
-        {/* Input Form Bar */}
-        <div className="p-4 bg-white border-t border-slate-100">
-          <div className="flex items-center gap-2.5">
-            <div className="flex-1 relative">
-              <input
-                type="text"
-                value={inputMessage}
-                disabled={Boolean(loadingConvIds[activeConvId])}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !loadingConvIds[activeConvId] && inputMessage.trim()) {
-                    handleSendMessage();
-                  }
-                }}
-                placeholder={loadingConvIds[activeConvId] ? "Processando resposta... por favor aguarde." : "Digite sua dúvida tributária, fiscal ou operacional..."}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-primary focus:bg-white transition-all placeholder:text-slate-400 disabled:bg-slate-100 disabled:cursor-not-allowed"
-              />
+      {/* Área Principal de Chat & Resultados */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#F8FAFC]">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col gap-5">
+          {!activeConvId || messages.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-xl mx-auto space-y-6 my-auto">
+              <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100 text-primary flex items-center justify-center shadow-2xs">
+                <Sparkles className="w-8 h-8" />
+              </div>
+
+              <div className="space-y-1.5">
+                <h2 className="text-lg font-bold text-[#0F172A]">Workspace Omni IA Hub</h2>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Consulte especialistas em contabilidade, fiscal/SPED, contratos e apresentações em linguagem natural com modelos de IA de ponta.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full pt-2">
+                {SPECIALIST_CARDS.map(agent => (
+                  <button
+                    key={agent.id}
+                    onClick={() => handleStartAgentChat(agent.id, agent.samplePrompt)}
+                    className="p-3 bg-white border border-[#E2E8F0] hover:border-blue-300 hover:bg-blue-50/30 rounded-xl text-left flex items-start gap-2.5 group transition-all shadow-2xs"
+                  >
+                    <BookOpen className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-xs font-semibold text-slate-800 block truncate group-hover:text-blue-700">
+                        {agent.label}
+                      </span>
+                      <span className="text-[10px] text-slate-400 block truncate">{agent.category} • Clique para consultar</span>
+                    </div>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-primary shrink-0 mt-0.5" />
+                  </button>
+                ))}
+              </div>
             </div>
-            <button
-              onClick={handleSendMessage}
-              disabled={Boolean(loadingConvIds[activeConvId]) || !inputMessage.trim()}
-              className="px-4 py-2.5 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-xs"
-            >
-              <span className="hidden sm:inline">{loadingConvIds[activeConvId] ? "Gerando..." : "Enviar"}</span>
-              <Send className="w-3.5 h-3.5" />
-            </button>
+          ) : (
+            <>
+              {/* Barra de contexto da conversa */}
+              <div className="flex items-center gap-2.5 shrink-0">
+                <div className="w-7 h-7 rounded-lg bg-blue-50 text-primary flex items-center justify-center shrink-0">
+                  <BookOpen className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-900 truncate">
+                    {activePersonaObj.label || "Conversa Omni IA"}
+                  </p>
+                  <p className="text-[11px] text-slate-400 truncate flex items-center gap-1.5">
+                    <Cpu className="w-3 h-3" />
+                    {activeModelObj.name}
+                  </p>
+                </div>
+              </div>
+
+              {messages.map((msg) => (
+                <div key={msg.id} className={`flex gap-2.5 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  {msg.sender === 'ai' && (
+                    <div className="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0 shadow-2xs mt-1">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                  )}
+
+                  <div className={`max-w-[85%] rounded-xl p-4 shadow-2xs ${
+                    msg.sender === 'user'
+                      ? 'bg-primary text-white rounded-tr-none'
+                      : 'bg-white border border-[#E2E8F0] text-[#0F172A] rounded-tl-none'
+                  }`}>
+                    <div className="text-xs md:text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</div>
+
+                    <div className={`flex items-center gap-2.5 mt-2 text-[10px] text-slate-400 font-medium ${
+                      msg.sender === 'user' ? 'justify-end text-white/70' : ''
+                    }`}>
+                      <span>{msg.timestamp}</span>
+                      {msg.model && (
+                        <>
+                          <span className="w-0.5 h-0.5 rounded-full bg-slate-300" />
+                          <span>{msg.model}</span>
+                        </>
+                      )}
+                      <button onClick={() => navigator.clipboard.writeText(msg.text)} className="p-0.5 hover:opacity-70 rounded transition-opacity ml-1" title="Copiar texto">
+                        <Copy className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {Boolean(isActiveConvLoading) && (
+                <div className="flex justify-start items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                    <Sparkles className="w-4 h-4 animate-spin" />
+                  </div>
+                  <div className="bg-white border border-[#E2E8F0] rounded-xl rounded-tl-none p-3 shadow-2xs flex items-center gap-2.5">
+                    <div className="flex gap-1">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce"></div>
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{animationDelay: '150ms'}}></div>
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{animationDelay: '300ms'}}></div>
+                    </div>
+                    <span className="text-xs font-medium text-slate-600">Processando análise...</span>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Input Form Bar */}
+        <div className="p-3 md:p-4 bg-white border-t border-[#E2E8F0] shrink-0">
+          <div className="max-w-4xl mx-auto bg-white border border-[#E2E8F0] rounded-xl shadow-2xs p-2.5 flex flex-col gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  value={inputMessage}
+                  disabled={Boolean(isActiveConvLoading)}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !isActiveConvLoading && inputMessage.trim()) {
+                      handleSendMessage();
+                    }
+                  }}
+                  placeholder={isActiveConvLoading ? "Processando resposta... por favor aguarde." : "Digite sua dúvida tributária, fiscal ou operacional..."}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-primary focus:bg-white transition-all placeholder:text-slate-400 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                />
+              </div>
+              <button
+                onClick={handleSendMessage}
+                disabled={Boolean(isActiveConvLoading) || !inputMessage.trim()}
+                className="px-4 py-2.5 bg-primary hover:opacity-90 text-white text-xs font-semibold rounded-lg flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-xs"
+              >
+                <span className="hidden sm:inline">{isActiveConvLoading ? "Gerando..." : "Enviar"}</span>
+                <Send className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                <Coins className="w-3 h-3 text-amber-500" />
+                ⚡ 5 OmniCoins / Consulta
+              </span>
+              <span className="text-[10px] text-slate-400">{activeModelObj.name}</span>
+            </div>
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }
