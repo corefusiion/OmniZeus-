@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
@@ -117,7 +118,16 @@ const departments = [
   "Controladoria"
 ];
 
+// Gera o hash PBKDF2-SHA256 (mesmo formato de src/lib/auth/passwordUtils.ts):
+// pbkdf2$210000$<salt hex>$<derived hex>
+function hashTestPassword(password) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const derived = crypto.pbkdf2Sync(password, salt, 210000, 32, "sha256").toString("hex");
+  return `pbkdf2$210000$${salt}$${derived}`;
+}
+
 const generatedEmployees = [];
+const TEST_PASSWORD_HASH = hashTestPassword("Design20");
 testCompanies.forEach((comp, cIdx) => {
   const suffix = cIdx === 0 ? "alpha" : cIdx === 1 ? "beta" : "gamma";
   const tag = cIdx === 0 ? "Alpha" : cIdx === 1 ? "Beta" : "Gamma";
@@ -137,9 +147,10 @@ testCompanies.forEach((comp, cIdx) => {
         "omni-ia", "financeiro", "contaazul", "whatsapp-bot", "tarefas", "documentos", "apresentacoes"
       ],
       status: "Ativo",
-      password: "Design20",
-      passwordHash: "Design20",
-      password_hash: "Design20",
+      // Senhas SEMPRE hasheadas (PBKDF2-SHA256, 210k iterações) — nunca texto puro
+      password: TEST_PASSWORD_HASH,
+      passwordHash: TEST_PASSWORD_HASH,
+      password_hash: TEST_PASSWORD_HASH,
       mustChangePassword: false,
       test_run_id: TEST_RUN_ID,
       is_test_data: true,

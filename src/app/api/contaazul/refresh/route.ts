@@ -7,12 +7,19 @@ export async function POST(req: Request) {
     const stored = getContaAzulTokens();
 
     const activeRefreshToken = body.refreshToken || stored.refreshToken;
-    const activeClientId = body.clientId || stored.clientId || "1mbtg7ok5lp46p0j9oir48fda0";
-    const activeClientSecret = body.clientSecret || stored.clientSecret || "m3mgshckslvubnraqf0d50hcggm4tn6mnlpa7ancvo3m8t5f93l";
+    // Credenciais OAuth movidas para variáveis de ambiente (nunca hardcoded no código).
+    const activeClientId = body.clientId || stored.clientId || process.env.CONTA_AZUL_CLIENT_ID || "";
+    const activeClientSecret = body.clientSecret || stored.clientSecret || process.env.CONTA_AZUL_CLIENT_SECRET || "";
 
     if (!activeRefreshToken) {
       return NextResponse.json(
         { success: false, error: "Refresh Token ausente e não encontrado no banco em disco." },
+        { status: 400 }
+      );
+    }
+    if (!activeClientId || !activeClientSecret) {
+      return NextResponse.json(
+        { success: false, error: "Credenciais OAuth da ContaAzul não configuradas (CONTA_AZUL_CLIENT_ID / CONTA_AZUL_CLIENT_SECRET)." },
         { status: 400 }
       );
     }

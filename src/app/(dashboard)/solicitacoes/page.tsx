@@ -4,9 +4,9 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { 
   FileCheck, Plus, CheckCircle2, XCircle, Clock, Search, Filter, 
-  ShoppingBag, Coins, ShieldAlert, ArrowUpRight, Check, X, FileText, Edit2, MessageSquare, Trash2
+  ShoppingBag, Coins, ShieldAlert, ArrowUpRight, Check, X, FileText, Edit2, MessageSquare, Trash2, Sparkles, Loader2
 } from "lucide-react";
-import { getActiveRole, UserRole } from "@/lib/auth/roles";
+import { getActiveRole, getActiveTenantId, UserRole } from "@/lib/auth/roles";
 import { addCoins } from "@/lib/coins/store";
 import { fetchPurchaseRequests, insertPurchaseRequest, updatePurchaseRequest, deletePurchaseRequest } from "@/lib/db/serverDb";
 
@@ -139,6 +139,10 @@ export default function SolicitacoesPage() {
 
   // Success Notification
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
+
+  // AI Draft (Auto-resposta de Solicitação)
+  const [aiDraftLoading, setAiDraftLoading] = useState<null | "aprovar" | "recusar">(null);
+  const [aiDraftError, setAiDraftError] = useState<{ decision: "aprovar" | "recusar"; message: string } | null>(null);
 
   useEffect(() => {
     setRole(getActiveRole());
@@ -321,6 +325,39 @@ export default function SolicitacoesPage() {
     setTimeout(() => setNoticeMessage(null), 3000);
   };
 
+  // Auto-resposta de Solicitação: IA redige o rascunho, o gestor revisa antes de enviar.
+  const handleGenerateAiDraft = async (decision: "aprovar" | "recusar") => {
+    const reqId = decision === "aprovar" ? approvingReqId : rejectingReqId;
+    if (!reqId) return;
+    setAiDraftLoading(decision);
+    setAiDraftError(null);
+    try {
+      const tenantId = getActiveTenantId();
+      const res = await fetch("/api/solicitacoes/draft-response", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(tenantId ? { "x-company-id": tenantId } : {})
+        },
+        body: JSON.stringify({ reqId, decision })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAiDraftError({ decision, message: data.error || "Falha ao gerar rascunho com IA." });
+        return;
+      }
+      if (decision === "aprovar") {
+        setManagerObservationInput(data.draft);
+      } else {
+        setRejectionReasonInput(data.draft);
+      }
+    } catch {
+      setAiDraftError({ decision, message: "Erro de conexão ao gerar rascunho com IA." });
+    } finally {
+      setAiDraftLoading(null);
+    }
+  };
+
   // RBAC Filtering Rules:
   // - Funcionario: Views their requests (Juliana Lima or role 'funcionario')
   // - Gestor: Views ALL requests
@@ -386,9 +423,36 @@ export default function SolicitacoesPage() {
             </p>
 
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
-                Observação do Gestor (Opcional):
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Observação do Gestor (Opcional):
+                </label>
+                <button
+                  type="button"
+                  onClick={() => handleGenerateAiDraft("aprovar")}
+                  disabled={aiDraftLoading !== null}
+                  className="flex items-center gap-1 px-2 py-1 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg text-[10px] font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Gerar rascunho de aprovação com IA (5 OmniCoins)"
+                >
+                  {aiDraftLoading === "aprovar" ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3 h-3" />
+                  )}
+                  {aiDraftLoading === "aprovar" ? "Gerando rascunho..." : "Gerar com IA (5 Coins)"}
+                </button>
+              </div>
+              {aiDraftLoading === "aprovar" && (
+                <p className="text-[10px] text-primary font-semibold mb-1.5 flex items-center gap-1.5">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Analisando a solicitação e redigindo a resposta de aprovação...
+                </p>
+              )}
+              {aiDraftError?.decision === "aprovar" && (
+                <p className="text-[10px] text-red-600 font-semibold mb-1.5 bg-red-50 border border-red-200 rounded-lg px-2 py-1.5">
+                  {aiDraftError.message}
+                </p>
+              )}
               <textarea
                 rows={3}
                 placeholder="Ex: Aprovado conforme orçamento do setor de TI. Liberado para faturamento."
@@ -397,6 +461,11 @@ export default function SolicitacoesPage() {
                 className="w-full p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium focus:outline-none focus:border-emerald-600"
                 autoFocus
               />
+              {managerObservationInput && aiDraftLoading === null && (
+                <p className="text-[10px] text-slate-400 mt-1 font-medium">
+                  Revise o texto antes de confirmar a aprovação.
+                </p>
+              )}
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
@@ -824,7 +893,34 @@ export default function SolicitacoesPage() {
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Motivo da Reprovação * (Obrigatório)</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-bold text-slate-700">Motivo da Reprovação * (Obrigatório)</label>
+                  <button
+                    type="button"
+                    onClick={() => handleGenerateAiDraft("recusar")}
+                    disabled={aiDraftLoading !== null}
+                    className="flex items-center gap-1 px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-[10px] font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Gerar rascunho do motivo de reprovação com IA (5 OmniCoins)"
+                  >
+                    {aiDraftLoading === "recusar" ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3 h-3" />
+                    )}
+                    {aiDraftLoading === "recusar" ? "Gerando rascunho..." : "Gerar com IA (5 Coins)"}
+                  </button>
+                </div>
+                {aiDraftLoading === "recusar" && (
+                  <p className="text-[10px] text-red-500 font-semibold mb-1 flex items-center gap-1.5">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Analisando a solicitação e redigindo o motivo de reprovação...
+                  </p>
+                )}
+                {aiDraftError?.decision === "recusar" && (
+                  <p className="text-[10px] text-red-600 font-semibold mb-1 bg-red-50 border border-red-200 rounded-lg px-2 py-1.5">
+                    {aiDraftError.message}
+                  </p>
+                )}
                 <textarea
                   rows={3}
                   placeholder="Informe o motivo da recusa (ex: Verba orçamentária excedida para o setor)..."

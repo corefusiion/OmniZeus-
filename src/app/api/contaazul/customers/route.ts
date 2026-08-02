@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchWithAutoRefresh } from "@/lib/contaazul/store";
+import { decryptContaAzulFields, encryptContaAzulFields } from "@/lib/crypto/atRest";
 
 export async function POST(req: Request) {
   const fs = require("fs");
@@ -78,7 +79,11 @@ export async function POST(req: Request) {
     };
 
     const db = getLocalDbFile();
-    const config = db.contaazul_config || {};
+    // Tokens podem estar criptografados em repouso (enc:v1:) — descriptografa antes de usar
+    const configRaw = db.contaazul_config || {};
+    const config = Array.isArray(configRaw)
+      ? (decryptContaAzulFields(configRaw.find((c: any) => c.company_id === (companyId || "comp_zenitus")) || {}) as any)
+      : decryptContaAzulFields(configRaw);
 
     const finalAccessToken = accessToken || config.access_token;
     const finalRefreshToken = refreshToken || config.refresh_token;
@@ -157,22 +162,26 @@ export async function POST(req: Request) {
       ativo: true
     });
     
-    // Atualiza tokens sem destruir o formato array do contaazul_config
+    // Atualiza tokens sem destruir o formato array do contaazul_config (criptografados em repouso)
     if (newAccessToken && newRefreshToken) {
+      const encryptedTokens = encryptContaAzulFields({
+        access_token: newAccessToken,
+        refresh_token: newRefreshToken
+      });
       if (Array.isArray(db.contaazul_config)) {
         // Formato array (multi-tenant): atualizar a entrada da empresa
         const cfgIdx = db.contaazul_config.findIndex((c: any) => c.company_id === (companyId || "comp_zenitus"));
         if (cfgIdx !== -1) {
-          db.contaazul_config[cfgIdx].access_token = newAccessToken;
-          db.contaazul_config[cfgIdx].refresh_token = newRefreshToken;
+          db.contaazul_config[cfgIdx].access_token = encryptedTokens.access_token;
+          db.contaazul_config[cfgIdx].refresh_token = encryptedTokens.refresh_token;
           db.contaazul_config[cfgIdx].updated_at = new Date().toISOString();
         }
       } else {
         // Legado objeto plano
         db.contaazul_config = {
           ...db.contaazul_config,
-          access_token: newAccessToken,
-          refresh_token: newRefreshToken,
+          access_token: encryptedTokens.access_token,
+          refresh_token: encryptedTokens.refresh_token,
           updated_at: new Date().toISOString()
         };
       }

@@ -49,6 +49,7 @@ import {
   Cell 
 } from "recharts";
 import { getActiveRole, UserRole } from "@/lib/auth/roles";
+import AiUsageByUser from "@/components/dashboard/AiUsageByUser";
 import { 
   fetchPayables, 
   fetchContracts, 
@@ -942,6 +943,9 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Consumo de IA por colaborador (funcionário vê o próprio uso) */}
+      <AiUsageByUser />
 
       {/* Grid of Productive Modules */}
       <div>

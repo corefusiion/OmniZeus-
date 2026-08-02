@@ -63,17 +63,17 @@ function AppPreview() {
       style={{ boxShadow: "0 20px 50px -10px rgba(15, 23, 42, 0.12), 0 0 1px rgba(15, 23, 42, 0.15)" }}
     >
       {/* Window Top Bar */}
-      <div className="h-10 bg-slate-100 border-b border-slate-200 flex items-center px-4 justify-between select-none">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-rose-400" />
-          <div className="w-3 h-3 rounded-full bg-amber-400" />
-          <div className="w-3 h-3 rounded-full bg-emerald-400" />
-          <div className="ml-3 px-3 py-1 rounded bg-white border border-slate-200 text-slate-700 font-mono text-[11px] flex items-center gap-2 shadow-2xs">
-            <Lock className="w-3 h-3 text-emerald-600" />
-            <span>app.omnizeus.com.br/dashboard</span>
+      <div className="h-10 bg-slate-100 border-b border-slate-200 flex items-center px-3 sm:px-4 justify-between select-none">
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+          <div className="w-3 h-3 rounded-full bg-rose-400 shrink-0" />
+          <div className="w-3 h-3 rounded-full bg-amber-400 shrink-0" />
+          <div className="w-3 h-3 rounded-full bg-emerald-400 shrink-0" />
+          <div className="ml-1.5 sm:ml-3 px-2 sm:px-3 py-1 rounded bg-white border border-slate-200 text-slate-700 font-mono text-[10px] sm:text-[11px] flex items-center gap-1.5 sm:gap-2 shadow-2xs min-w-[150px] max-w-[58vw]">
+            <Lock className="w-3 h-3 text-emerald-600 shrink-0" />
+            <span className="truncate">app.omnizeus.com.br/dashboard</span>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-slate-500 text-xs">
+        <div className="hidden lg:flex items-center gap-2 text-slate-500 text-xs shrink-0">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           <span className="font-mono text-[10px] uppercase tracking-wider text-slate-600 font-semibold">Ambiente Seguro Multi-Tenant</span>
         </div>
@@ -292,12 +292,12 @@ function AppPreview() {
         )}
 
         {/* Footer Note inside Preview */}
-        <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-400">
-          <span className="flex items-center gap-1.5 text-slate-500 font-medium">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            Engine de IA Nativamente Integrada ao Banco de Dados & ERP.
+        <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-2 text-[11px] text-slate-400 flex-wrap">
+          <span className="flex items-center gap-1.5 text-slate-500 font-medium min-w-0">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <span>Engine de IA Nativamente Integrada ao Banco de Dados & ERP.</span>
           </span>
-          <span className="font-semibold text-primary">OmniZeus v2.5 Enterprise</span>
+          <span className="font-semibold text-primary shrink-0">OmniZeus v2.5 Enterprise</span>
         </div>
       </div>
     </div>
@@ -333,7 +333,7 @@ function Navbar() {
         scrolled ? "bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs py-2.5" : "bg-white border-b border-slate-100 py-3.5"
       }`}
     >
-      <div className="max-w-[1400px] mx-auto px-6 lg:px-8 flex items-center justify-between">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5 group">
           <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center group-hover:opacity-90 transition-opacity shadow-xs">
             <span className="text-white font-bold text-xs tracking-tight">Z</span>
@@ -378,7 +378,7 @@ function Navbar() {
       </div>
 
       {open && (
-        <div className="lg:hidden border-t border-slate-200 bg-white px-6 py-5 flex flex-col gap-3 shadow-xl">
+        <div className="lg:hidden border-t border-slate-200 bg-white px-4 sm:px-6 py-5 flex flex-col gap-3 shadow-xl">
           {NAV_LINKS.map((l) => (
             <a
               key={l.label}
@@ -417,8 +417,8 @@ function Hero() {
   return (
     <section className="pt-32 pb-20 lg:pt-36 lg:pb-28 bg-gradient-to-b from-slate-50/80 via-white to-white border-b border-slate-100">
       <div className="max-w-[1400px] mx-auto px-6 lg:px-8">
-        <div className="grid lg:grid-cols-12 gap-12 lg:gap-8 items-center">
-          <div className="lg:col-span-6 space-y-6 text-left">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+          <div className="lg:col-span-6 space-y-6 text-left min-w-0">
             <div className="inline-flex items-center px-3.5 py-1 bg-primary/10 border border-primary/20 rounded-full text-primary text-[11px] font-bold tracking-wide uppercase">
               <span>Plataforma Integrada de Operação & IA</span>
             </div>
@@ -466,7 +466,7 @@ function Hero() {
             </div>
           </div>
 
-          <div className="lg:col-span-6" id="produto">
+          <div className="lg:col-span-6 min-w-0" id="produto">
             <AppPreview />
           </div>
         </div>
@@ -560,7 +560,7 @@ function FeaturesModules() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {modules.map((m) => {
             const Icon = m.icon;
             return (
@@ -589,8 +589,8 @@ function AIDifferential() {
   return (
     <section className="py-24 bg-slate-50/70 border-b border-slate-200/80" id="ia">
       <div className="max-w-[1400px] mx-auto px-6 lg:px-8">
-        <div className="grid lg:grid-cols-12 gap-12 items-center">
-          <div className="lg:col-span-5 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+          <div className="lg:col-span-5 space-y-6 min-w-0">
             <span className="text-xs font-bold text-primary uppercase tracking-widest bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
               Diferencial da IA
             </span>
@@ -628,7 +628,7 @@ function AIDifferential() {
             </div>
           </div>
 
-          <div className="lg:col-span-7 bg-white p-6 lg:p-8 rounded-2xl border border-slate-200 shadow-lg space-y-6">
+          <div className="lg:col-span-7 bg-white p-6 lg:p-8 rounded-2xl border border-slate-200 shadow-lg space-y-6 min-w-0">
             <div className="border-b border-slate-100 pb-4">
               <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Arquitetura do Motor de IA Contextual</h3>
               <p className="text-xs text-slate-500">Como o motor proprietário garante respostas precisas</p>
@@ -728,8 +728,8 @@ function OmniCoinsSection() {
   return (
     <section className="py-24 bg-slate-50/70 border-b border-slate-200/80" id="omnicoins">
       <div className="max-w-[1400px] mx-auto px-6 lg:px-8">
-        <div className="grid lg:grid-cols-12 gap-12 items-center">
-          <div className="lg:col-span-6 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+          <div className="lg:col-span-6 space-y-6 min-w-0">
             <span className="text-xs font-bold text-amber-800 uppercase tracking-widest bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
               Sistema OmniCoins
             </span>
@@ -754,7 +754,7 @@ function OmniCoinsSection() {
             </div>
           </div>
 
-          <div className="lg:col-span-6 bg-white p-6 lg:p-8 rounded-2xl border border-slate-200 shadow-lg space-y-4">
+          <div className="lg:col-span-6 bg-white p-6 lg:p-8 rounded-2xl border border-slate-200 shadow-lg space-y-4 min-w-0">
             <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3 uppercase tracking-wider">
               Consumo Típico por Recurso de IA
             </h3>
@@ -789,7 +789,7 @@ function OmniCoinsSection() {
 ───────────────────────────────────────── */
 const FaqCard = ({ question, answer }: { question: string; answer: string }) => {
   return (
-    <div className="flex flex-col justify-between gap-3 p-6 bg-white rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all w-[320px] sm:w-[380px] flex-shrink-0 text-left">
+    <div className="flex flex-col justify-between gap-3 p-6 bg-white rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all w-[280px] sm:w-[380px] flex-shrink-0 text-left">
       <div className="space-y-2">
         <span className="text-[10px] font-extrabold text-primary uppercase tracking-wider bg-primary/10 px-2.5 py-0.5 rounded-full border border-primary/20">
           Dúvida Frequente
@@ -1053,7 +1053,7 @@ function PricingSection({
         </div>
 
         {/* Pricing Cards Grid */}
-        <div className="grid md:grid-cols-3 gap-8 items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
           {plans.map((p) => (
             <div
               key={p.name}
@@ -1231,7 +1231,7 @@ function TransformationSection() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Before */}
           <div className="bg-white p-8 rounded-2xl border border-rose-200 shadow-sm space-y-4">
             <div className="flex items-center gap-2 text-rose-700 font-bold text-sm border-b border-rose-100 pb-3">
@@ -1327,7 +1327,7 @@ function WhyChooseSection() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {pillars.map((p) => (
             <div key={p.title} className="p-6 bg-slate-50/80 rounded-2xl border border-slate-200/80 space-y-2">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
@@ -1370,7 +1370,7 @@ function HowItWorksSection() {
           </p>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {steps.map((s) => (
             <div key={s.num} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
               <span className="text-2xl font-black text-primary font-mono block">{s.num}</span>
@@ -1522,10 +1522,10 @@ function Footer() {
   ];
 
   const legalLinks = [
-    { label: "Termos de Uso", href: "/login" },
-    { label: "Política de Privacidade", href: "/login" },
-    { label: "Conformidade LGPD", href: "/login" },
-    { label: "Segurança & Criptografia", href: "/login" }
+    { label: "Termos de Uso", href: "/legal/termos-de-uso" },
+    { label: "Política de Privacidade", href: "/legal/politica-de-privacidade" },
+    { label: "Conformidade LGPD", href: "/legal/conformidade-lgpd" },
+    { label: "Segurança & Criptografia", href: "/legal/seguranca-criptografia" }
   ];
 
   return (

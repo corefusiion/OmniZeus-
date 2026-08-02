@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { 
   Link as LinkIcon, Download, RefreshCw, CheckCircle2, DollarSign, FileText, ArrowUpRight, 
@@ -43,6 +43,25 @@ export interface ContaAzulCategory {
 const DEFAULT_CATEGORIES: ContaAzulCategory[] = [];
 
 export default function ContaAzulPage() {
+  // useSearchParams exige Suspense boundary no prerender estático do Next.js 14
+  return (
+    <Suspense fallback={
+      <div className="min-h-[70vh] flex flex-col items-center justify-center gap-4 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center animate-pulse">
+          <Database className="w-6 h-6 text-primary" strokeWidth={1.5} />
+        </div>
+        <div className="space-y-1">
+          <p className="text-sm font-semibold text-slate-800">Carregando Integração Conta Azul...</p>
+          <p className="text-xs text-slate-400">Sincronizando conexão e dados financeiros</p>
+        </div>
+      </div>
+    }>
+      <ContaAzulContent />
+    </Suspense>
+  );
+}
+
+function ContaAzulContent() {
   const searchParams = useSearchParams();
   const codeFromUrl = searchParams?.get("code");
   const errorFromUrl = searchParams?.get("error");

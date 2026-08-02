@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchWithAutoRefresh, getContaAzulTokens, saveContaAzulTokens } from "@/lib/contaazul/store";
+import { decryptContaAzulFields, encryptContaAzulFields } from "@/lib/crypto/atRest";
 import fs from "fs";
 import path from "path";
 
@@ -51,11 +52,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Filter companies to sync: if targetCompanyId is provided, sync only that company; otherwise sync all connected companies
-    const connectedConfigs = dbData.contaazul_config.filter((cfg: any) => {
-      if (!cfg.is_connected || !cfg.access_token) return false;
-      if (targetCompanyId && targetCompanyId !== "global" && cfg.company_id !== targetCompanyId) return false;
-      return true;
-    });
+    // Tokens podem estar criptografados em repouso (enc:v1:) — descriptografa antes de usar.
+    const connectedConfigs = dbData.contaazul_config
+      .map((cfg: any) => decryptContaAzulFields(cfg))
+      .filter((cfg: any) => {
+        if (!cfg.is_connected || !cfg.access_token) return false;
+        if (targetCompanyId && targetCompanyId !== "global" && cfg.company_id !== targetCompanyId) return false;
+        return true;
+      });
 
     // Buscar tokens no arquivo per-company como fallback se nenhuma config conectada no DB
     if (connectedConfigs.length === 0 && targetCompanyId) {
@@ -285,10 +289,14 @@ export async function POST(req: NextRequest) {
 
         const cfgIdx = dbData.contaazul_config.findIndex((c: any) => c.company_id === companyId);
         if (cfgIdx !== -1) {
+          const encryptedCfg = encryptContaAzulFields({
+            access_token: activeToken,
+            refresh_token: activeRefresh
+          });
           dbData.contaazul_config[cfgIdx].last_sync_at = now.toISOString();
           dbData.contaazul_config[cfgIdx].next_sync_at = nextSync.toISOString();
-          dbData.contaazul_config[cfgIdx].access_token = activeToken;
-          dbData.contaazul_config[cfgIdx].refresh_token = activeRefresh;
+          dbData.contaazul_config[cfgIdx].access_token = encryptedCfg.access_token;
+          dbData.contaazul_config[cfgIdx].refresh_token = encryptedCfg.refresh_token;
         }
 
         // Log Sync Execution

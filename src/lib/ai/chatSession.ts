@@ -13,6 +13,7 @@ export interface ChatJobParams {
   model: string;
   persona: string;
   personaPrompt?: string;
+  personaName?: string;
   temperature?: number;
   activeCompanyId: string;
   userId?: string;
@@ -85,6 +86,7 @@ export async function runChatJob(params: ChatJobParams): Promise<void> {
         model: params.model,
         temperature: params.temperature !== undefined ? params.temperature : undefined,
         persona: params.persona,
+        personaName: params.personaName,
         personaPrompt: params.personaPrompt,
         clientApiKey: savedKey || undefined
         // NOTA: NÃO enviamos conversationId para o servidor. Assim o /api/chat

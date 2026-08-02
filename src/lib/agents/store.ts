@@ -1,6 +1,7 @@
 import {
   fetchServerTable,
   insertServerTable,
+  updateServerTableRecord,
   deleteServerTableRecord
 } from "../db/serverDb";
 
@@ -31,6 +32,11 @@ export interface CustomAgent {
   createdAt: string;
   updatedAt?: string;
 }
+
+export type AgentInput = Omit<CustomAgent, 'id' | 'createdAt'> & { id?: string; createdAt?: string };
+
+export const AGENT_STATUS_ATIVO = "Ativo";
+export const AGENT_STATUS_ARQUIVADO = "Arquivado";
 
 export const BUILTIN_PERSONAS: CustomAgent[] = [
   {
@@ -149,6 +155,12 @@ Você é o Diretor de Arte Executivo e especialista em Storytelling de Apresenta
 let customAgentsList: CustomAgent[] = [];
 let agentsFetched = false;
 
+function notifyAgentsChanged() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("omnizeus_agents_change"));
+  }
+}
+
 export async function fetchCustomAgentsFromServer(): Promise<CustomAgent[]> {
   try {
     const records = await fetchServerTable<any>('custom_agents');
@@ -173,10 +185,10 @@ export async function fetchCustomAgentsFromServer(): Promise<CustomAgent[]> {
         allowedTools: r.allowedTools || r.allowed_tools,
         mcpsEnabled: r.mcpsEnabled || r.mcps_enabled,
         permissions: r.permissions,
-        status: r.status,
+        status: r.status || AGENT_STATUS_ATIVO,
         createdBy: r.createdBy || r.created_by,
         companyId: r.companyId || r.company_id,
-        isCustom: true,
+        isCustom: Boolean(r.isCustom || r.is_custom),
         createdAt: r.createdAt || r.created_at || new Date().toISOString(),
         updatedAt: r.updatedAt || r.updated_at
       }));
@@ -192,75 +204,132 @@ export function getCustomAgents(): CustomAgent[] {
   if (typeof window !== 'undefined' && !agentsFetched) {
     agentsFetched = true;
     fetchCustomAgentsFromServer().then(() => {
-      window.dispatchEvent(new Event('omnizeus_agents_change'));
+      notifyAgentsChanged();
     }).catch(() => {});
   }
   return [...BUILTIN_PERSONAS, ...customAgentsList];
 }
 
-export function saveCustomAgent(agent: Omit<CustomAgent, 'id' | 'createdAt'>): CustomAgent {
+export function getCompanyCustomAgents(): CustomAgent[] {
+  return customAgentsList;
+}
+
+// Payload canônico (apenas camelCase) para persistência no banco
+function buildDbPayload(agent: CustomAgent): Record<string, any> {
+  return {
+    id: agent.id,
+    label: agent.label,
+    description: agent.description || "",
+    specialty: agent.specialty || "",
+    category: agent.category,
+    avatar: agent.avatar || "",
+    color: agent.color,
+    icon: agent.icon || "",
+    modelLlm: agent.modelLlm || "",
+    provider: agent.provider || "",
+    temperature: agent.temperature,
+    context: agent.context || "",
+    objective: agent.objective || "",
+    systemPrompt: agent.systemPrompt,
+    initialPrompt: agent.initialPrompt || "",
+    instructions: agent.instructions || "",
+    allowedTools: agent.allowedTools || [],
+    mcpsEnabled: agent.mcpsEnabled || [],
+    permissions: agent.permissions || [],
+    status: agent.status || AGENT_STATUS_ATIVO,
+    createdBy: agent.createdBy || "",
+    companyId: agent.companyId || "",
+    isCustom: true,
+    createdAt: agent.createdAt,
+    updatedAt: agent.updatedAt || ""
+  };
+}
+
+export async function saveCustomAgent(agent: AgentInput): Promise<boolean> {
+  const now = new Date().toISOString();
   const newAgent: CustomAgent = {
+    ...(agent as any),
+    id: agent.id || `custom_${Date.now()}`,
+    isCustom: true,
+    status: agent.status || AGENT_STATUS_ATIVO,
+    createdAt: agent.createdAt || now,
+    updatedAt: now
+  };
+
+  customAgentsList = [newAgent, ...customAgentsList.filter(a => a.id !== newAgent.id)];
+  notifyAgentsChanged();
+
+  const ok = await insertServerTable('custom_agents', buildDbPayload(newAgent));
+  if (!ok) {
+    customAgentsList = customAgentsList.filter(a => a.id !== newAgent.id);
+    notifyAgentsChanged();
+    return false;
+  }
+  return true;
+}
+
+export async function updateCustomAgent(agent: CustomAgent): Promise<boolean> {
+  const updated: CustomAgent = {
     ...agent,
+    updatedAt: new Date().toISOString()
+  };
+
+  customAgentsList = customAgentsList.map(a => a.id === updated.id ? updated : a);
+  notifyAgentsChanged();
+
+  const ok = await updateServerTableRecord('custom_agents', buildDbPayload(updated));
+  if (!ok) {
+    await fetchCustomAgentsFromServer();
+    notifyAgentsChanged();
+    return false;
+  }
+  return true;
+}
+
+export async function duplicateCustomAgent(id: string): Promise<boolean> {
+  const source = customAgentsList.find(a => a.id === id);
+  if (!source) return false;
+
+  const clone: CustomAgent = {
+    ...source,
     id: `custom_${Date.now()}`,
-    isCustom: true,
-    createdAt: new Date().toISOString()
+    label: `${source.label} (Cópia)`,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    status: AGENT_STATUS_ATIVO,
+    isCustom: true
   };
 
-  customAgentsList = [newAgent, ...customAgentsList];
+  customAgentsList = [clone, ...customAgentsList];
+  notifyAgentsChanged();
 
-  const dbPayload = {
-    id: newAgent.id,
-    label: newAgent.label,
-    description: newAgent.description,
-    specialty: newAgent.specialty,
-    category: newAgent.category,
-    avatar: newAgent.avatar,
-    color: newAgent.color,
-    icon: newAgent.icon,
-    model_llm: newAgent.modelLlm,
-    modelLlm: newAgent.modelLlm,
-    provider: newAgent.provider,
-    temperature: newAgent.temperature,
-    context: newAgent.context,
-    objective: newAgent.objective,
-    system_prompt: newAgent.systemPrompt,
-    systemPrompt: newAgent.systemPrompt,
-    initial_prompt: newAgent.initialPrompt,
-    initialPrompt: newAgent.initialPrompt,
-    instructions: newAgent.instructions,
-    allowed_tools: newAgent.allowedTools,
-    allowedTools: newAgent.allowedTools,
-    mcps_enabled: newAgent.mcpsEnabled,
-    mcpsEnabled: newAgent.mcpsEnabled,
-    permissions: newAgent.permissions,
-    status: newAgent.status || 'Ativo',
-    created_by: newAgent.createdBy,
-    createdBy: newAgent.createdBy,
-    company_id: newAgent.companyId,
-    companyId: newAgent.companyId,
-    is_custom: true,
-    isCustom: true,
-    created_at: newAgent.createdAt,
-    createdAt: newAgent.createdAt,
-    updated_at: newAgent.updatedAt,
-    updatedAt: newAgent.updatedAt
-  };
-
-  insertServerTable('custom_agents', dbPayload).catch(() => {});
-
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('omnizeus_agents_change'));
+  const ok = await insertServerTable('custom_agents', buildDbPayload(clone));
+  if (!ok) {
+    customAgentsList = customAgentsList.filter(a => a.id !== clone.id);
+    notifyAgentsChanged();
+    return false;
   }
-
-  return newAgent;
+  return true;
 }
 
-export function deleteCustomAgent(id: string): void {
+export async function setCustomAgentArchived(id: string, archived: boolean): Promise<boolean> {
+  const agent = customAgentsList.find(a => a.id === id);
+  if (!agent) return false;
+  return updateCustomAgent({
+    ...agent,
+    status: archived ? AGENT_STATUS_ARQUIVADO : AGENT_STATUS_ATIVO
+  });
+}
+
+export async function deleteCustomAgent(id: string): Promise<boolean> {
   customAgentsList = customAgentsList.filter(a => a.id !== id);
-  deleteServerTableRecord('custom_agents', id).catch(() => {});
+  notifyAgentsChanged();
 
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('omnizeus_agents_change'));
+  const ok = await deleteServerTableRecord('custom_agents', id);
+  if (!ok) {
+    await fetchCustomAgentsFromServer();
+    notifyAgentsChanged();
+    return false;
   }
+  return true;
 }
-

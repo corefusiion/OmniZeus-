@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { decryptContaAzulFields, encryptContaAzulFields, decryptSecret } from "@/lib/crypto/atRest";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const TOKENS_FILE = path.join(DATA_DIR, "omnizeus_contaazul_tokens.json");
@@ -40,12 +41,12 @@ export function getContaAzulTokens(companyId: string = 'comp_zenitus'): ContaAzu
       if (parsed && typeof parsed.clientId === 'string') {
         const migrated: Record<string, ContaAzulTokenData> = { 'comp_zenitus': { ...DEFAULT_TOKENS, ...parsed } };
         fs.writeFileSync(TOKENS_FILE, JSON.stringify(migrated, null, 2), "utf-8");
-        return companyId === 'comp_zenitus' ? migrated['comp_zenitus'] : { ...DEFAULT_TOKENS };
+        return companyId === 'comp_zenitus' ? decryptContaAzulFields(migrated['comp_zenitus']) : { ...DEFAULT_TOKENS };
       }
 
       // New format: object keyed by companyId
       if (parsed && typeof parsed === 'object') {
-        return { ...DEFAULT_TOKENS, ...(parsed[companyId] || {}) };
+        return decryptContaAzulFields({ ...DEFAULT_TOKENS, ...(parsed[companyId] || {}) });
       }
     }
 
@@ -57,14 +58,14 @@ export function getContaAzulTokens(companyId: string = 'comp_zenitus'): ContaAzu
         ? dbJson.contaazul_config.find((c: any) => c.company_id === companyId)
         : (companyId === 'comp_zenitus' ? dbJson.contaazul_config : null);
       if (cfg) {
-        return {
+        return decryptContaAzulFields({
           ...DEFAULT_TOKENS,
           clientId: cfg.client_id || '',
           clientSecret: cfg.client_secret || '',
           accessToken: cfg.access_token || '',
           refreshToken: cfg.refresh_token || '',
           updatedAt: cfg.updated_at || new Date().toISOString()
-        };
+        });
       }
     }
 
@@ -115,7 +116,8 @@ export function saveContaAzulTokens(
       updatedAt: new Date().toISOString()
     };
 
-    tokenMap[companyId] = updated;
+    // Criptografia em repouso: segredos gravados no disco sempre cifrados
+    tokenMap[companyId] = encryptContaAzulFields(updated);
     fs.writeFileSync(TOKENS_FILE, JSON.stringify(tokenMap, null, 2), "utf-8");
 
     // Sync to main DB contaazul_config array
@@ -132,7 +134,7 @@ export function saveContaAzulTokens(
         }
 
         const cfgIndex = dbJson.contaazul_config.findIndex((c: any) => c.company_id === companyId);
-        const cfgEntry = {
+        const cfgEntry = encryptContaAzulFields({
           company_id: companyId,
           client_id: updated.clientId,
           client_secret: updated.clientSecret,
@@ -140,7 +142,7 @@ export function saveContaAzulTokens(
           refresh_token: updated.refreshToken,
           is_connected: !!(updated.accessToken && updated.refreshToken),
           updated_at: updated.updatedAt
-        };
+        });
 
         if (cfgIndex >= 0) {
           dbJson.contaazul_config[cfgIndex] = cfgEntry;

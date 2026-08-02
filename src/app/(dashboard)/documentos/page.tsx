@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { FileText, Download, Sparkles, RefreshCw, Eye, Coins, Copy, CheckCircle2 } from "lucide-react";
 import { deductCoins } from "@/lib/coins/store";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import DocumentExtractor from "@/components/documents/DocumentExtractor";
 
 function cleanDocumentText(rawText: string): string {
   if (!rawText) return "";
@@ -237,6 +238,9 @@ ${clientName.toUpperCase()}`);
           </div>
         )}
       </div>
+
+      {/* Extração automática de documentos (foto/PDF → texto estruturado) */}
+      <DocumentExtractor />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Input Form */}
