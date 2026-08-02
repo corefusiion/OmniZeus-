@@ -1,0 +1,62 @@
+# Guia Definitivo de Deploy - Cloudflare Pages (Next.js)
+
+Este guia documenta o processo exato para colocar o **OmniZeus** no ar usando a arquitetura serverless de ponta da Cloudflare Pages. 
+
+---
+
+## 1. O Pulo do Gato: Arquitetura Edge
+O OmniZeus foi completamente adaptado para rodar em *Edge Computing*. Isso significa que nós removemos dependências legadas do Node.js (como a biblioteca `fs` que lia arquivos do HD) e conectamos 100% da inteligência da aplicação diretamente ao **Supabase (PostgreSQL)** através de APIs REST. Isso garante altíssima velocidade e distribuição global pela Cloudflare, sem falhas de compilação.
+
+---
+
+## 2. Passo a Passo do Deploy Inicial
+
+1. Acesse o painel da sua conta na [Cloudflare](https://dash.cloudflare.com).
+2. No menu lateral esquerdo, clique em **Workers & Pages**.
+3. Clique no botão azul **Create Application**.
+4. Selecione a aba **Pages** e clique em **Connect to Git**.
+5. Autorize a conexão com o seu GitHub (caso ainda não tenha feito) e selecione o repositório **`OmniZeus-`**.
+6. Clique em **Begin setup**.
+
+---
+
+## 3. Configurações de Compilação (Build Settings)
+
+Na tela de setup, preencha exatamente com estes dados:
+
+- **Project name:** `omnizeus` (ou o nome que preferir)
+- **Production branch:** `main` (ou `develop` se estiver criando um ambiente de homologação/testes).
+- **Framework preset:** Escolha **Next.js**.
+- **Build command:** `npm run build` *(A Cloudflare preenche isso sozinho)*.
+- **Build output directory:** `.vercel/output/static` *(A Cloudflare preenche isso sozinho)*.
+
+---
+
+## 4. O Passo Mais Importante: Variáveis de Ambiente (Secrets)
+
+**ATENÇÃO:** O arquivo `.env.local` que está no seu computador local **nunca** é enviado para o GitHub por questões de segurança (ele está bloqueado no `.gitignore`). Se você não colocar essas chaves na Cloudflare, a aplicação ficará em branco ou dará erro de servidor!
+
+1. Na mesma tela de setup, role um pouco para baixo e clique em **Environment variables (advanced)**.
+2. Você precisará adicionar cada uma das variáveis do seu arquivo local. Clique em **Add variable** para cada uma delas. 
+
+Exemplo das variáveis cruciais (pegue os valores exatos do seu `.env.local` local):
+- `DATABASE_URL` = (sua string postgres)
+- `SUPABASE_URL` = (sua url do supabase)
+- `SUPABASE_ANON_KEY` = (sua chave anon)
+- `SUPABASE_SERVICE_ROLE_KEY` = (sua chave service role)
+- `JWT_SECRET` / `SESSION_SECRET` = (sua chave criptográfica)
+- `SUPER_ADMIN_PASSWORD` = (senha de emergência)
+- `CONTA_AZUL_CLIENT_ID` = (chave pública do app Conta Azul)
+- `CONTA_AZUL_CLIENT_SECRET` = (chave secreta do app Conta Azul)
+
+---
+
+## 5. Lançamento!
+
+1. Após colar as variáveis, clique em **Save and Deploy**.
+2. A Cloudflare iniciará o processo (`Initializing` -> `Cloning` -> `Building` -> `Deploying`).
+3. Aguarde cerca de 2 a 4 minutos.
+4. Você receberá um link automático como `https://omnizeus.pages.dev`.
+
+### E se eu precisar atualizar o projeto depois?
+Basta enviar o código para o GitHub (como nós fizemos na branch `develop` ou `main`). A Cloudflare ouve o seu GitHub 24h por dia e começará um **novo build automaticamente** a cada *push*. Você não precisa fazer mais nada no painel deles!
