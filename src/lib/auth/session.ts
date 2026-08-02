@@ -12,7 +12,7 @@ const SESSION_COOKIE = "omnizeus_session";
 // consegue forjar um cookie de super_adm. O middleware valida a mesma assinatura,
 // então ambos precisam ler exatamente o mesmo valor de SESSION_SECRET.
 // Em produção o servidor NÃO inicializa sem um segredo forte definido no ambiente.
-const SESSION_SECRET = (() => {
+function getSessionSecret() {
   const fromEnv = process.env.SESSION_SECRET;
   if (fromEnv && fromEnv.length >= 32) return fromEnv;
   if (process.env.NODE_ENV === "production") {
@@ -22,7 +22,7 @@ const SESSION_SECRET = (() => {
     );
   }
   return "omnizeus_default_local_dev_session_secret_key_32bytes_long";
-})();
+}
 
 export interface SessionPayload {
   userId: string;
@@ -68,7 +68,7 @@ function decodeSession(token: string): SessionPayload | null {
 }
 
 function sign(data: string): string {
-  return crypto.createHmac("sha256", SESSION_SECRET).update(data).digest("base64url");
+  return crypto.createHmac("sha256", getSessionSecret()).update(data).digest("base64url");
 }
 
 // ─── Create a session cookie response ──────────────────────────────────────────
