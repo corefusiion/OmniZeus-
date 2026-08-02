@@ -13,9 +13,18 @@ import crypto from "crypto";
 const PREFIX = "enc.v1:";
 const MIN_KEY_LEN = 32;
 
-const ENCRYPTION_KEY = (() => {
+let cachedKey: string | null = null;
+
+// Resolução LAZY da chave: só lança quando criptografia é de fato usada em
+// runtime (produção). O import do módulo NUNCA lança, para o Next.js poder
+// coletar dados de página (build) sem exigir variáveis de ambiente presentes.
+function getEncryptionKey(): string {
+  if (cachedKey) return cachedKey;
   const fromEnv = process.env.OMNIZEUS_ENCRYPTION_KEY;
-  if (fromEnv && fromEnv.length >= MIN_KEY_LEN) return fromEnv;
+  if (fromEnv && fromEnv.length >= MIN_KEY_LEN) {
+    cachedKey = fromEnv;
+    return cachedKey;
+  }
   if (process.env.NODE_ENV === "production") {
     throw new Error(
       "OMNIZEUS_ENCRYPTION_KEY ausente ou curta demais (mínimo 32 caracteres). " +
@@ -23,10 +32,10 @@ const ENCRYPTION_KEY = (() => {
     );
   }
   return "omnizeus_local_dev_encryption_key_at_rest_32b";
-})();
+}
 
 function deriveKey(): Buffer {
-  return crypto.createHash("sha256").update(ENCRYPTION_KEY).digest();
+  return crypto.createHash("sha256").update(getEncryptionKey()).digest();
 }
 
 /** Criptografa uma string em repouso. Retorna vazio se a entrada for vazia. */
