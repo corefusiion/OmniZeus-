@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/db/supabaseClient";
 
@@ -202,3 +203,4 @@ Responda EXCLUSIVAMENTE em formato JSON com a estrutura:
     );
   }
 }
+

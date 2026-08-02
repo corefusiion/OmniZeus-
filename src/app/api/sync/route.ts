@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
 import { supabase } from '@/lib/db/supabaseClient';
@@ -34,3 +35,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Falha ao carregar dados.' }, { status: 500 });
   }
 }
+

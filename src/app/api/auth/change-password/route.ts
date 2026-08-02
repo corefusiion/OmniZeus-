@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 // API Route: POST /api/auth/change-password
 // Endpoint for first login / mandatory password change.
 // Validates password security rules, hashes new password, sets must_change_password = false.
@@ -105,3 +106,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err.message || "Erro interno ao alterar senha." }, { status: 500 });
   }
 }
+

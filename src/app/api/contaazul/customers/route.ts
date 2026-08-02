@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { fetchWithAutoRefresh } from "@/lib/contaazul/store";
 import { decryptContaAzulFields, encryptContaAzulFields } from "@/lib/crypto/atRest";
@@ -175,3 +176,4 @@ export async function POST(req: Request) {
     );
   }
 }
+

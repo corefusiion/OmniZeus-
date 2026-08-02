@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { readDb } from "@/lib/db/localDb";
 import { getSession } from "@/lib/auth/session";
@@ -160,3 +161,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
   }
 }
+

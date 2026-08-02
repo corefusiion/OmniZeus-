@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { fetchWithAutoRefresh } from "@/lib/contaazul/store";
 import { supabase } from "@/lib/db/supabaseClient";
@@ -133,3 +134,4 @@ export async function POST(req: Request) {
     );
   }
 }
+

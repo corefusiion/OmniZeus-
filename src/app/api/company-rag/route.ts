@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { executeAIRequest } from "@/lib/ai/openRouterClient";
 import { recordAIMetrics, estimateCostByFixedRates } from "@/lib/ai/metrics";
@@ -105,3 +106,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
   }
 }
+

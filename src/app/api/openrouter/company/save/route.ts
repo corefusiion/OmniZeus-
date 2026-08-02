@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { maskApiKey } from "@/lib/ai/providerResolver";
 import { getSession } from "@/lib/auth/session";
@@ -74,3 +75,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
   }
 }
+

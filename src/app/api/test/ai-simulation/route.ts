@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/db/supabaseClient";
 
@@ -101,3 +102,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err.message || "Falha na execução do teste" }, { status: 500 });
   }
 }
+

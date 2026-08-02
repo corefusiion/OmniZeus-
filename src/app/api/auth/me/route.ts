@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 // API Route: GET /api/auth/me
 // Returns current authenticated user profile from HttpOnly session cookie.
 
@@ -43,3 +44,4 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+

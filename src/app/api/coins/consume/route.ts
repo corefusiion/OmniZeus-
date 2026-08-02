@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { readDb, writeDb } from "@/lib/db/localDb";
@@ -117,3 +118,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Erro interno ao descontar moedas." }, { status: 500 });
   }
 }
+

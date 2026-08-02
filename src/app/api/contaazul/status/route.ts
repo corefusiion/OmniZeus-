@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextResponse, NextRequest } from "next/server";
 import { getContaAzulTokens, saveContaAzulTokens } from "@/lib/contaazul/store";
 import { supabase } from "@/lib/db/supabaseClient";
@@ -62,3 +63,4 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
+

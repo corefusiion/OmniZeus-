@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { supabase } from "@/lib/db/supabaseClient";
@@ -348,3 +349,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err.message || "Webhook handler error" }, { status: 500 });
   }
 }
+

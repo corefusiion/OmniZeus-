@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 // API Route: POST /api/employees/reset-password
 // Allows Gestor or Super Admin to reset a collaborator's password securely.
 // Generates a random temporary password, hashes it, sets must_change_password = true, logs audit.
@@ -86,3 +87,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err.message || "Erro ao resetar senha." }, { status: 500 });
   }
 }
+

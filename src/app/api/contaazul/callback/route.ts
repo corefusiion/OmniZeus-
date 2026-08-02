@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { saveContaAzulTokens } from "@/lib/contaazul/store";
 
@@ -104,3 +105,4 @@ export async function POST(req: Request) {
     );
   }
 }
+

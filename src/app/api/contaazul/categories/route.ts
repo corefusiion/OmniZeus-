@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { fetchContaAzulCategories, insertContaAzulCategory, updateContaAzulCategory, saveContaAzulCategories } from "@/lib/db/serverDb";
 
@@ -29,3 +30,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+

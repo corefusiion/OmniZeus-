@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { resolveAIProvider } from "@/lib/ai/providerResolver";
@@ -215,3 +216,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+

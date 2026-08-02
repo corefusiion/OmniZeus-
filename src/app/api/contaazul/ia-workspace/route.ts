@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/db/supabaseClient";
 import { resolveAIProvider } from "@/lib/ai/providerResolver";
@@ -320,3 +321,4 @@ DIRETRIZES DE RESPOSTA (OBRIGATÓRIO):
     });
   }
 }
+
