@@ -208,3 +208,5 @@ Você possui autonomia e autoridade para responder dúvidas contábeis, orientar
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
+
+

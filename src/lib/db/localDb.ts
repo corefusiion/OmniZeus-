@@ -36,5 +36,7 @@ export async function readDb(): Promise<any> {
  * As rotas devem atualizar apenas as tabelas específicas.
  */
 export async function writeDb(db: any): Promise<void> {
-  console.warn("WARNING: writeDb called but it is deprecated. It will not write the entire DB to Supabase.");
+  console.warn("WARNING: writeDb called but it is deprecated. It will not write the entire DB to supabase.");
 }
+
+

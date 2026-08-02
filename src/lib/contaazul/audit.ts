@@ -50,3 +50,5 @@ export async function getAuditStats() {
     totalTokens: logs.reduce((acc: number, l: AuditLogEntry) => acc + (l.tokensUsed || 0), 0)
   };
 }
+
+
