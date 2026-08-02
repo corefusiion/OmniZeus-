@@ -2,6 +2,8 @@ import { NextResponse, NextRequest } from "next/server";
 import { supabase } from "@/lib/db/supabaseClient";
 import { getSession } from "@/lib/auth/session";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   try {
     const session = getSession(req);

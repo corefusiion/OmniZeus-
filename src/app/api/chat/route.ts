@@ -7,6 +7,7 @@ import { routeModel } from "@/lib/ai/modelRouter";
 import { getSession } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 function agentDisplayName(persona: string | undefined, personaName: string | undefined): string {
   if (personaName) return personaName;
