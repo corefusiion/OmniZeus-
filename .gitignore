@@ -40,3 +40,6 @@ yarn-error.log*
 /.gemini/
 /6f878aa0-cefe-4fed-b53b-87051d484243/
 /scratch/
+
+# Vercel CLI local (peer do next-on-pages)
+.vercel/

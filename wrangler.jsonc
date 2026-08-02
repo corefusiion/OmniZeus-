@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "omnizeus",
+  "main": ".vercel/output/static/_worker.js",
+  "compatibility_date": "2026-08-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".vercel/output/static",
+    "binding": "ASSETS"
+  }
+}
