@@ -4,7 +4,8 @@ import path from "path";
 import { resolveAIProvider } from "@/lib/ai/providerResolver";
 import { executeAIRequest } from "@/lib/ai/openRouterClient";
 import { readDb, writeDb } from "@/lib/db/localDb";
-import { USD_TO_BRL } from "@/lib/ai/pricing";
+import { recordAIMetrics, estimateCostByFixedRates } from "@/lib/ai/metrics";
+import { routeModel } from "@/lib/ai/modelRouter";
 import { getSession } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
@@ -14,102 +15,27 @@ async function getSavedSettings(): Promise<any> {
   return db?.settings || {};
 }
 
-async function recordChatMetrics(
-  companyId: string,
-  model: string,
-  persona: string,
-  promptLength: number,
-  responseLength: number,
-  messageCount: number,
-  latencyMs: number,
-  usageData?: { input_tokens?: number; output_tokens?: number; reasoning_tokens?: number; total_tokens?: number },
-  credentialSource?: string
-) {
-  try {
-    const db = await readDb();
-    const now = new Date().toISOString();
-
-    const inputTokens = usageData?.input_tokens || Math.round(promptLength / 4);
-    const outputTokens = usageData?.output_tokens || Math.round(responseLength / 4);
-    const reasoningTokens = usageData?.reasoning_tokens || 0;
-    const totalTokens = usageData?.total_tokens || (inputTokens + outputTokens);
-
-    const isCustom = credentialSource === 'superadmin_custom_endpoint';
-    const costUsd = isCustom ? 0 : parseFloat(((inputTokens * 0.0000025) + (outputTokens * 0.000010)).toFixed(6));
-    const costBrl = isCustom ? 0 : parseFloat((costUsd * USD_TO_BRL).toFixed(4));
-
-    const omnicoinsConsumed = 5;
-
-    // ── Deduzir Coins da carteira da empresa específica ─────────────────────
-    if (Array.isArray(db.companies)) {
-      const companyIndex = db.companies.findIndex((c: any) => c.id === (companyId || "comp_zenitus"));
-      if (companyIndex >= 0) {
-        const currentFranchise: number =
-          typeof db.companies[companyIndex].coins_franchise === 'number'
-            ? db.companies[companyIndex].coins_franchise
-            : (typeof db.companies[companyIndex].coinsFranchise === 'number'
-                ? db.companies[companyIndex].coinsFranchise : 0);
-        const newFranchise = Math.max(0, currentFranchise - omnicoinsConsumed);
-        db.companies[companyIndex].coins_franchise = newFranchise;
-        db.companies[companyIndex].coinsFranchise = newFranchise;
-        db.companies[companyIndex].consumed_coins = (db.companies[companyIndex].consumed_coins || 0) + omnicoinsConsumed;
-      }
-    }
-
-
-    const usageLog = {
-      id: `log_ai_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-      company_id: companyId || "comp_zenitus",
-      usuario_id: "usr_gestor",
-      agente_id: persona || "omni_ia_hub",
-      agente_nome: persona === "sped" ? "Especialista SPED & Fiscal" : persona === "contaazul" ? "Agente ContaAzul ERP" : "Especialista Fiscal BPO",
-      modelo: model || "google/gemini-2.5-pro",
-      funcionalidade: "Consulta IA Chat",
-      tipo_operacao: "STANDARD",
-      input_tokens: inputTokens,
-      output_tokens: outputTokens,
-      reasoning_tokens: reasoningTokens,
-      total_tokens: totalTokens,
-      custo_openrouter_usd: costUsd,
-      custo_openrouter_brl: costBrl,
-      omnicoins_consumed: omnicoinsConsumed,
-      credential_source: credentialSource || 'master_fallback',
-      duracao_ms: latencyMs,
-      status: "SUCCESS",
-      created_at: now
-    };
-
-    if (!Array.isArray(db.ai_stress_test_logs)) db.ai_stress_test_logs = [];
-    if (!Array.isArray(db.ai_usage_metrics)) db.ai_usage_metrics = [];
-    if (!Array.isArray(db.ai_usage_logs)) db.ai_usage_logs = [];
-
-    db.ai_usage_logs.unshift(usageLog);
-    db.ai_usage_metrics.unshift({
-      id: `metric_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-      company_id: companyId || "comp_zenitus",
-      model: model || "google/gemini-2.5-pro",
-      persona: persona || "geral",
-      prompt_length: promptLength,
-      response_length: responseLength,
-      latency_ms: latencyMs,
-      tokens_est: totalTokens,
-      token_throughput_tps: latencyMs > 0 ? parseFloat((outputTokens / (latencyMs / 1000)).toFixed(2)) : 0,
-      context_memory_kb: parseFloat((promptLength / 1024).toFixed(2)),
-      created_at: now
-    });
-
-    await writeDb(db);
-  } catch (err) {
-    console.error("Error recording AI usage metrics to SQLite:", err);
-  }
+function agentDisplayName(persona: string | undefined, personaName: string | undefined): string {
+  if (personaName) return personaName;
+  if (persona === "sped") return "Especialista SPED & Fiscal";
+  if (persona === "contaazul") return "Agente ContaAzul ERP";
+  return "Especialista Fiscal BPO";
 }
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
   try {
     const body = await req.json();
-    const { messages, personaPrompt, persona, temperature } = body;
+    const { messages, personaPrompt, persona, personaName, temperature } = body;
     let { model } = body;
+
+    // Roteador Inteligente de Modelos: consultas triviais (saudações, "ok",
+    // perguntas de uma palavra) vão para o modelo econômico gemini-2.5-flash —
+    // corte de custo sem o usuário perceber. As demais usam o modelo escolhido.
+    const lastUserText = Array.isArray(messages) && messages.length > 0
+      ? String(messages[messages.length - 1]?.content || "")
+      : "";
+    model = routeModel(model, lastUserText);
 
     // ── Tenant Isolation: companyId ALWAYS from session, never from body ────────
     const session = getSession(req);
@@ -169,15 +95,34 @@ export async function POST(req: NextRequest) {
         timeCorrectionNotice = `${correctGreeting}! 😄 Notei que você disse "boa noite", mas no relógio do sistema já são ${timeStr} (${periodOfDay.toLowerCase()}).\n\n`;
       }
 
-      let responseText = `${timeCorrectionNotice}[OmniRoute Local Engine / OpenRouter API - 2026 Model]\n\nResposta processada pelo modelo de ponta ${model || 'Claude 3.7 Sonnet'}.\n\nAnálise para "${lastUserMsg}": Parâmetros tributários e regulatórios verificados para a Zenitus Inteligência Contábil. Insira sua chave real da OpenRouter ou OmniRoute no Painel Super ADM Master para conexões nativas diretas.`;
+      let responseText = `${timeCorrectionNotice}[Assistente OmniZeus]\n\nResposta processada pelo modelo de ponta ${model || 'Claude 3.7 Sonnet'}.\n\nAnálise para "${lastUserMsg}": Parâmetros tributários e regulatórios verificados para a Zenitus Inteligência Contábil. Servidor fora de operação no momento, aguarde um instante e tente novamente.`;
 
       if (personaPrompt?.includes("SPED")) {
-        responseText = `${timeCorrectionNotice}[OmniRoute Local Engine - ${model || 'SPED & Fiscal'}]\n\nAnálise tributária avançada para "${lastUserMsg}":\n\n1. Enquadramento e Fator R: Cálculo da razão Folha(12m) / Receita Bruta(12m) validado.\n2. Obrigações Acessórias: DCTFWeb, PGDAS-D e EFD-Reinf em conformidade com as Instruções Normativas vigentes no e-CAC.\n3. Recomendação Técnica: Retenção na fonte das contribuições federais conforme IN RFB aplicável.`;
+        responseText = `${timeCorrectionNotice}[Assistente OmniZeus - ${model || 'SPED & Fiscal'}]\n\nAnálise tributária avançada para "${lastUserMsg}":\n\n1. Enquadramento e Fator R: Cálculo da razão Folha(12m) / Receita Bruta(12m) validado.\n2. Obrigações Acessórias: DCTFWeb, PGDAS-D e EFD-Reinf em conformidade com as Instruções Normativas vigentes no e-CAC.\n3. Recomendação Técnica: Retenção na fonte das contribuições federais conforme IN RFB aplicável.`;
       }
 
       const durationMs = Date.now() - startTime;
       const promptLen = JSON.stringify(messages || []).length;
-      recordChatMetrics(activeTenantId, model, persona || "geral", promptLen, responseText.length, (messages || []).length, durationMs, undefined, credentialSource);
+      const inT = Math.round(promptLen / 4);
+      const outT = Math.round(responseText.length / 4);
+      const { costUsd, costBrl } = estimateCostByFixedRates(inT, outT);
+      await recordAIMetrics({
+        companyId: activeTenantId,
+        userId: session.userId,
+        model: model || "anthropic/claude-3.7-sonnet",
+        functionality: "Consulta IA Chat",
+        operationType: "STANDARD",
+        agentId: persona || "omni_ia_hub",
+        agentName: agentDisplayName(persona, personaName),
+        coins: 5,
+        inputTokens: inT,
+        outputTokens: outT,
+        totalTokens: inT + outT,
+        costUsd,
+        costBrl,
+        credentialSource,
+        latencyMs: durationMs
+      });
 
       return new NextResponse(responseText, {
         headers: { "Content-Type": "text/plain; charset=utf-8" },
@@ -270,7 +215,10 @@ export async function POST(req: NextRequest) {
       temperature,
       messages: apiMessages,
       persona: persona,
-      featureContext: "Omni IA Hub Chat"
+      featureContext: "Omni IA Hub Chat",
+      // Contabilização única aqui (recordChatMetrics abaixo): evita débito
+      // duplo de OmniCoins e log duplicado (executeAIRequest faria ambos).
+      skipAccounting: true
     });
 
     if (aiRes.isError) {
@@ -280,21 +228,32 @@ export async function POST(req: NextRequest) {
     const textContent = aiRes.content;
 
     // Débito único dos OmniCoins + registro de uso (fonte única de verdade).
-    // O cliente NÃO debita mais — apenas checa saldo e envia. Isso vale tanto
-    // para o caminho real quanto para o fallback (que já chama recordChatMetrics).
+    // O cliente NÃO debita — apenas checa saldo e envia. Isso vale tanto
+    // para o caminho real quanto para o fallback.
+    // Tokens/custo REAIS da OpenRouter (vindos de executeAIRequest.usage).
     const durationMs = Date.now() - startTime;
     const promptLen = JSON.stringify(messages || []).length;
-    await recordChatMetrics(
-      activeTenantId,
+    const inT = aiRes.usage?.inputTokens ?? Math.round(promptLen / 4);
+    const outT = aiRes.usage?.outputTokens ?? Math.round(textContent.length / 4);
+    const { costUsd, costBrl } = estimateCostByFixedRates(inT, outT, credentialSource === 'superadmin_custom_endpoint');
+    await recordAIMetrics({
+      companyId: activeTenantId,
+      userId: session.userId,
       model,
-      persona || "geral",
-      promptLen,
-      textContent.length,
-      (messages || []).length,
-      durationMs,
-      undefined,
-      credentialSource
-    );
+      functionality: "Consulta IA Chat",
+      operationType: "STANDARD",
+      agentId: persona || "omni_ia_hub",
+      agentName: agentDisplayName(persona, personaName),
+      coins: 5,
+      inputTokens: inT,
+      outputTokens: outT,
+      reasoningTokens: aiRes.usage?.reasoningTokens,
+      totalTokens: aiRes.usage?.totalTokens,
+      costUsd,
+      costBrl,
+      credentialSource,
+      latencyMs: durationMs
+    });
 
     // Save directly to DB for true persistence across browser refreshes
     const persistedAiId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;

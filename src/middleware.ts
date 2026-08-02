@@ -4,12 +4,14 @@
 // If not present, redirects to /login.
 
 import { NextRequest, NextResponse } from "next/server";
+import { getRouteModule } from "./lib/auth/routeGuards";
 
 const SESSION_COOKIE = "omnizeus_session";
 
 // Routes that do NOT require authentication
 const PUBLIC_PATHS = [
   "/login",
+  "/legal",
   "/api/auth/login",
   "/_next",
   "/favicon.ico",
@@ -37,8 +39,13 @@ function isWebhook(pathname: string): boolean {
 
 // Verifica a assinatura HMAC do cookie usando Web Crypto (compatível com Edge runtime)
 async function verifyAndDecode(token: string): Promise<any | null> {
-  const secret = process.env.SESSION_SECRET || "omnizeus_default_local_dev_session_secret_key_32bytes_long";
-  if (!secret) return null;
+  // Mesma regra de src/lib/auth/session.ts: em produção o segredo é obrigatório
+  // (sem env forte nenhum cookie é validado); em dev há fallback local determinístico.
+  let secret = process.env.SESSION_SECRET;
+  if (!secret || secret.length < 32) {
+    if (process.env.NODE_ENV === "production") return null;
+    secret = "omnizeus_default_local_dev_session_secret_key_32bytes_long";
+  }
 
   const [encoded, sig] = token.split(".");
   if (!encoded || !sig) return null;
@@ -105,6 +112,19 @@ export async function middleware(req: NextRequest) {
   // 2. /configuracoes & /usuarios -> Exclusive to super_adm & gestor (block funcionario)
   if ((pathname.startsWith("/configuracoes") || pathname.startsWith("/usuarios")) && userRole === "funcionario") {
     return NextResponse.redirect(new URL("/dashboard", req.url));
+  }
+
+  // 3. Guards de MÓDULO: funcionário só acessa rotas dos módulos liberados (allowedModules)
+  // Aplica o mesmo filtro do menu: rota sem módulo sempre liberada; rota com módulo
+  // exige o módulo no cookie da sessão. gestor/super_adm nunca são filtrados aqui.
+  if (userRole === "funcionario") {
+    const routeModule = getRouteModule(pathname);
+    if (routeModule) {
+      const employeeModules = Array.isArray(decoded.allowedModules) ? decoded.allowedModules : [];
+      if (!employeeModules.includes(routeModule)) {
+        return NextResponse.redirect(new URL("/dashboard", req.url));
+      }
+    }
   }
 
   return NextResponse.next();

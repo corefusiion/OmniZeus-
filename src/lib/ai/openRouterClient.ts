@@ -34,6 +34,16 @@ export interface AIResponse {
   content: string;
   isError: boolean;
   errorDetail?: string;
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    reasoningTokens?: number;
+    totalTokens?: number;
+    costUsd?: number;
+    costBrl?: number;
+    latencyMs?: number;
+    model?: string;
+  };
 }
 
 export async function executeAIRequest(options: {
@@ -45,6 +55,11 @@ export async function executeAIRequest(options: {
   messages: any[];
   persona?: string;
   featureContext: string;
+  // Quando true, NÃO debita OmniCoins nem grava ai_usage_logs — o chamador
+  // assume a responsabilidade única de contabilização (ex.: /api/chat usa
+  // recordChatMetrics com a regra fixa de 5 coins). O consumo real (tokens,
+  // custo, latência) é devolvido no campo `usage` da resposta.
+  skipAccounting?: boolean;
 }): Promise<AIResponse> {
   const startTime = Date.now();
   
@@ -161,6 +176,28 @@ export async function executeAIRequest(options: {
     if (resolved.isCustomEndpoint) costUsd = 0;
     
     const costBrl = parseFloat((costUsd * USD_TO_BRL).toFixed(6));
+
+    const usageInfo = {
+      inputTokens,
+      outputTokens,
+      reasoningTokens: data.usage?.reasoning_tokens || 0,
+      totalTokens,
+      costUsd,
+      costBrl,
+      latencyMs: durationMs,
+      model: realModel
+    };
+
+    // Contabilização (débito de coins + log) — única fonte de verdade.
+    // Quando skipAccounting é true, o chamador (ex.: /api/chat) contabiliza
+    // com as próprias regras e recebe o consumo real em `usage`.
+    if (options.skipAccounting) {
+      return {
+        isError: false,
+        content: textContent,
+        usage: usageInfo
+      };
+    }
     
     // Coins logic: $0.10 USD = 1 Coin? 
     // Wait, the documentation says "1 OmniCoin = R$ 0,10". Let's use costBrl / 0.10
@@ -186,13 +223,21 @@ export async function executeAIRequest(options: {
     }
     
     const now = new Date().toISOString();
+
+    // Resolve o nome de exibição real do agente (custom ou nativo) para o log
+    let agentDisplayName = options.persona || "Assistente IA";
+    if (options.persona && Array.isArray(db.custom_agents)) {
+      const agentRecord = db.custom_agents.find((a: any) => a.id === options.persona);
+      if (agentRecord?.label) agentDisplayName = agentRecord.label;
+    }
+
     const usageLog = {
       id: `log_ai_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
 
       company_id: options.companyId,
-      usuario_id: "usr_gestor", // could extract from token in a real env
+      usuario_id: options.userEmail || "usr_gestor", // could extract from token in a real env
       agente_id: options.persona || "agente_padrao",
-      agente_nome: options.persona || "Assistente IA",
+      agente_nome: agentDisplayName,
       modelo: realModel,
       funcionalidade: options.featureContext,
       tipo_operacao: "STANDARD",

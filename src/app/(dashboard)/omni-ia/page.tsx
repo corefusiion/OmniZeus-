@@ -170,12 +170,28 @@ export default function OmniIAPage() {
   const isActiveConvLoading = Boolean(loadingConvIds[activeConvId]) || hasPendingMessage;
 
   const activeModelObj = allModelsList.find(m => m.id === selectedModel) || allModelsList[0];
+  // Agentes disponíveis para seleção (arquivados ficam ocultos do seletor,
+  // mas conversas antigas continuam resolvendo o agente corretamente).
+  const availablePersonas = personas.filter(p => p.status !== "Arquivado");
   const activePersonaObj = personas.find(p => p.id === selectedPersona) || personas.find(p => p.id === "agente_geral") || personas[0] || {
     id: "agente_geral",
     label: "Agente Geral",
     systemPrompt: "Você é o Agente Geral Corporativo do OmniZeus. Responda de forma concisa, executiva e precisa.",
     color: "bg-slate-50 text-slate-700 border-slate-200/60"
   };
+  // Cards da tela inicial: especialistas padrão + agentes personalizados da empresa
+  const customAgentCards = availablePersonas
+    .filter(p => p.isCustom)
+    .slice(0, 4)
+    .map(p => ({
+      id: p.id,
+      label: p.label,
+      category: `${p.category} • Personalizado`,
+      color: p.color || "bg-blue-50 text-blue-700 border-blue-200/60",
+      description: p.description || p.specialty || "Agente personalizado criado pela sua empresa.",
+      samplePrompt: p.initialPrompt || (p.objective ? `Preciso de auxílio com: ${p.objective}` : `Olá! Preciso de auxílio como ${p.label}.`)
+    }));
+  const welcomeCards = [...SPECIALIST_CARDS, ...customAgentCards];
 
   useEffect(() => {
     setPersonas(getCustomAgents());
@@ -417,6 +433,21 @@ export default function OmniIAPage() {
       setSelectedPersona(overridePersonaId);
     }
 
+    // A conversa fica vinculada ao agente em uso: atualiza o persona da
+    // conversa no banco para que histórico e contexto sigam o agente ativo
+    // mesmo em conversas existentes (sem criar nova conversa).
+    if (!isNewConv && targetConvId) {
+      try {
+        await import("@/lib/db/serverDb").then(({ updateServerTableRecord }) =>
+          updateServerTableRecord("conversations", {
+            id: targetConvId,
+            persona: activePersona,
+            updated_at: new Date().toISOString()
+          })
+        );
+      } catch (e) {}
+    }
+
     // Snapshot of prior messages for this conversation (for the API history payload).
     const priorMessages = isNewConv ? [] : (messagesByConv[targetConvId] || []);
 
@@ -463,6 +494,7 @@ export default function OmniIAPage() {
         model: personaObj.modelLlm || selectedModel,
         persona: activePersona,
         personaPrompt: personaObj.systemPrompt,
+        personaName: personaObj.label || activePersona,
         temperature: personaObj.temperature !== undefined ? personaObj.temperature : undefined,
         activeCompanyId: activeCompany
       });
@@ -628,7 +660,7 @@ export default function OmniIAPage() {
                     onChange={(e) => setSelectedPersona(e.target.value)}
                     className="bg-transparent font-semibold text-slate-800 focus:outline-none flex-1 min-w-0 truncate cursor-pointer"
                   >
-                    {personas.map(p => (
+                    {availablePersonas.map(p => (
                       <option key={p.id} value={p.id}>{p.label}</option>
                     ))}
                   </select>
@@ -776,7 +808,7 @@ export default function OmniIAPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full pt-2">
-                {SPECIALIST_CARDS.map(agent => (
+                {welcomeCards.map(agent => (
                   <button
                     key={agent.id}
                     onClick={() => handleStartAgentChat(agent.id, agent.samplePrompt)}

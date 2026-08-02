@@ -14,6 +14,7 @@ import { getActiveRole, getActiveTenantId, UserRole } from "@/lib/auth/roles";
 import { getCoinBalance } from "@/lib/coins/store";
 import { fetchServerTable, fetchServerSettings } from "@/lib/db/serverDb";
 import { getCompanies, CompanyProfile } from "@/lib/company/store";
+import AiUsageByUser from "@/components/dashboard/AiUsageByUser";
 
 export interface AIUsageLogEntry {
   id: string;
@@ -693,6 +694,9 @@ export default function EstatisticasIAPage() {
         </div>
       </div>
 
+      {/* CONSUMO DE IA POR COLABORADOR (gestor enxerga todos) */}
+      <AiUsageByUser />
+
       {/* SEÇÃO 4: MÉTRICA DE EFICIÊNCIA & ACOMPANHAMENTO DO PLANO */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* CUSTO MÉDIO POR PROCESSAMENTO */}
@@ -830,7 +834,7 @@ export default function EstatisticasIAPage() {
                       {tx.agente_nome || tx.agente_id || 'Omni IA Hub'}
                     </td>
                     <td className="py-3 px-3 text-slate-600 font-mono text-[11px]">
-                      {tx.modelo || 'OpenRouter LLM'}
+                      {tx.modelo || 'Modelo padrão'}
                     </td>
                     <td className="py-3 px-3 text-slate-700">
                       {tx.funcionalidade || 'Consulta IA Chat'}

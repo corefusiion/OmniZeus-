@@ -88,8 +88,12 @@ export async function fetchCompaniesFromServer(): Promise<CompanyProfile[]> {
       inMemoryCompanies = records.map((r: any) => {
         const planName = r.plan || 'Premium';
         const defaultPlanPrice = planName === 'Business' ? 1990 : planName === 'Premium' ? 890 : 490;
-        const rawRev = r.monthlyRevenueBrl || r.monthly_revenue_brl;
-        const realRevenue = (rawRev && rawRev <= 5000) ? rawRev : defaultPlanPrice;
+        const rawRev = r.monthlyRevenueBrl ?? r.monthly_revenue_brl;
+        // Receita real sempre preservada (sem teto arbitrário — receitas legítimas
+        // acima de R$ 5.000/mês eram substituídas pelo preço padrão do plano).
+        // Fallback para o preço do plano apenas quando o valor é inválido (0/NaN/negativo).
+        const numericRev = typeof rawRev === 'number' ? rawRev : Number(rawRev);
+        const realRevenue = (Number.isFinite(numericRev) && numericRev > 0) ? numericRev : defaultPlanPrice;
 
         const rawKey = r.openrouterApiKey || r.openrouter_api_key || "";
         const maskedKey = rawKey ? `${rawKey.substring(0, 8)}-••••••••${rawKey.substring(rawKey.length - 4)}` : "";

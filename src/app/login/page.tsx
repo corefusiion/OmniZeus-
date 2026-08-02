@@ -61,6 +61,7 @@ export default function LoginPage() {
         } else {
           // Super ADM entra direto no Dashboard Master SaaS (plataforma).
           // Gestores/funcionários vão para o Dashboard Executivo da empresa.
+          sessionStorage.setItem("omnizeus_post_login_banner", "1");
           window.location.href = data.user.role === "super_adm" ? "/dashboard-master" : "/dashboard";
         }
       } else {
@@ -113,6 +114,7 @@ export default function LoginPage() {
             setActiveCompanyContext(null);
           }
         }
+        sessionStorage.setItem("omnizeus_post_login_banner", "1");
         window.location.href = data.user?.role === "super_adm" ? "/dashboard-master" : "/dashboard";
       } else {
         setChangeErrorMsg(data.error || "Erro ao definir nova senha.");
@@ -142,17 +144,32 @@ export default function LoginPage() {
 
         <div>
           <p className="text-[22px] font-medium text-white leading-snug tracking-tight mb-6">
-            &ldquo;Centralizamos toda a operação do escritório. O que antes tomava horas, agora leva minutos.&rdquo;
+            Tudo que seu escritório opera hoje, em uma única plataforma.
           </p>
-          <div>
-            <p className="text-sm font-semibold text-white/90">Patricia Fischer</p>
-            <p className="text-xs text-white/70 mt-0.5">Gestora de BPO · Grupo Fischer Contábil</p>
-          </div>
+          <ul className="space-y-2.5 text-sm text-white/85">
+            <li className="flex items-start gap-2.5">
+              <Check className="w-4 h-4 mt-0.5 text-white/90 flex-shrink-0" />
+              <span><strong className="text-white font-semibold">Omni IA Hub</strong> — especialistas de IA para contabilidade, fiscal, DP e jurídico, com agentes personalizados.</span>
+            </li>
+            <li className="flex items-start gap-2.5">
+              <Check className="w-4 h-4 mt-0.5 text-white/90 flex-shrink-0" />
+              <span><strong className="text-white font-semibold">Integração Conta Azul</strong> — clientes, fornecedores e lançamentos sincronizados automaticamente (24/7).</span>
+            </li>
+            <li className="flex items-start gap-2.5">
+              <Check className="w-4 h-4 mt-0.5 text-white/90 flex-shrink-0" />
+              <span><strong className="text-white font-semibold">Gestão completa</strong> — tarefas, documentos, apresentações, contratos, contas a pagar e solicitações.</span>
+            </li>
+            <li className="flex items-start gap-2.5">
+              <Check className="w-4 h-4 mt-0.5 text-white/90 flex-shrink-0" />
+              <span><strong className="text-white font-semibold">Multi-empresa</strong> — cada escritório gerencia todas as suas empresas em um único ambiente seguro.</span>
+            </li>
+          </ul>
         </div>
 
         <div>
           <p className="text-[11px] text-white/60 leading-relaxed">
-            Plataforma SaaS para Escritórios Contábeis<br />e Prestadores de BPO Financeiro no Brasil.
+            Plataforma SaaS B2B All-in-One para Escritórios Contábeis e Prestadores de BPO Financeiro no Brasil.
+            Centralize tarefas, tributos, ERP Conta Azul e Inteligência Artificial contextualizada.
           </p>
           <p className="text-[10px] text-white/40 mt-3">© 2025 OmniZeus</p>
         </div>

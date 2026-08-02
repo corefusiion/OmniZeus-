@@ -11,9 +11,16 @@ const SESSION_COOKIE = "omnizeus_session";
 // O segredo é obrigatório. Sem ele qualquer pessoa que conheça o default
 // consegue forjar um cookie de super_adm. O middleware valida a mesma assinatura,
 // então ambos precisam ler exatamente o mesmo valor de SESSION_SECRET.
+// Em produção o servidor NÃO inicializa sem um segredo forte definido no ambiente.
 const SESSION_SECRET = (() => {
   const fromEnv = process.env.SESSION_SECRET;
   if (fromEnv && fromEnv.length >= 32) return fromEnv;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "SESSION_SECRET ausente ou curta demais (mínimo 32 caracteres). " +
+      "Defina a variável no ambiente de produção — sem ela o cookie de sessão é forjável."
+    );
+  }
   return "omnizeus_default_local_dev_session_secret_key_32bytes_long";
 })();
 

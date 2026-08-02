@@ -4,7 +4,10 @@ import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
+import CompanyRagChat from "@/components/layout/CompanyRagChat";
+import PostLoginBanner from "@/components/dashboard/PostLoginBanner";
 import { getCurrentUser, getActiveCompanyId, rehydrateSession } from "@/lib/auth/roles";
+import { canAccessRoute } from "@/lib/auth/routeGuards";
 import { getCompanies, CompanyProfile } from "@/lib/company/store";
 import { TenantProvider, useTenant } from "@/lib/tenant/TenantContext";
 import { AlertTriangle, Lock, ExternalLink, ShieldAlert, CreditCard } from "lucide-react";
@@ -49,6 +52,23 @@ function DashboardShell({
       router.replace("/dashboard-master");
     }
   }, [isTenantMode, pathname, router, canSwitchCompany]);
+
+  // ── Guard de MÓDULOS (client-side) ──
+  // Middleware cobre hard navigation; aqui cobrimos a navegação suave (router.push),
+  // que não re-executa o middleware. Funcionário só acessa rotas dos módulos liberados;
+  // gestor/super_adm nunca bloqueados; sessão não reidratada nunca bloqueia.
+  useEffect(() => {
+    if (!currentUser.id) return; // sessão ainda reidratando — não bloquear com default
+    const isSuperAdmin = currentUser.role === "super_adm" || currentUser.email === "jsgleisson@gmail.com";
+    if (!isSuperAdmin && isRouteMatch(pathname, SAAS_ROUTES)) {
+      router.replace("/dashboard");
+      return;
+    }
+    if (currentUser.role !== "funcionario") return;
+    if (!canAccessRoute(currentUser, pathname)) {
+      router.replace("/dashboard");
+    }
+  }, [pathname, currentUser, router]);
 
   const checkCompanyStatus = () => {
     setCurrentUser(getCurrentUser());
@@ -200,9 +220,15 @@ function DashboardShell({
             </div>
           )}
 
+          {/* Banner pós-login: resumo do dia + caixa (uma vez por login) */}
+          <PostLoginBanner />
+
           {children}
         </div>
       </main>
+
+      {/* Assistente global "Pergunte sobre esta empresa" — apenas em modo empresa */}
+      {isTenantMode && <CompanyRagChat />}
     </div>
   );
 }
