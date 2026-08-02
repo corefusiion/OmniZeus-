@@ -27,10 +27,10 @@ Na tela de setup, preencha exatamente com estes dados:
 - **Project name:** `omnizeus` (ou o nome que preferir)
 - **Production branch:** `main` (ou `develop` se estiver criando um ambiente de homologação/testes).
 - **Framework preset:** Escolha **Next.js**.
-- **Build command:** `npm run build:cf` *(roda o adapter `@cloudflare/next-on-pages` — NÃO usar `npm run build` puro, senão o deploy falha com "Missing entry-point to Worker script or to assets directory")*.
-- **Build output directory:** `.vercel/output/static` *(gerado pelo adapter; contém o `_worker.js` que é o entry-point do Worker)*.
+- **Build command:** `npm run build` *(o script `build` do `package.json` agora é `node scripts/build.js`, que detecta o ambiente Cloudflare via `CF_PAGES=1` e roda automaticamente o adapter `@cloudflare/next-on-pages` para gerar o Worker; localmente ele se comporta como `next build` puro)*.
+- **Build output directory:** `.vercel/output/static` *(gerado pelo adapter; contém o `_worker.js` que é o entry-point do Worker — o `wrangler.jsonc` declara `main: ".vercel/output/static/_worker.js"`)*.
 
-> ⚠️ **IMPORTANTE (Next.js 14)**: o projeto usa `next@14.2.15`, que NÃO é compatível com o adapter oficial atual `@opennextjs/cloudflare` (exige Next ≥15.5.21). Por isso usamos `@cloudflare/next-on-pages@1.13.15` (devDependency já instalada) + o arquivo `wrangler.jsonc` na raiz do repo, que declara `main: ".vercel/output/static/_worker.js"` e `assets.directory` — é o que faz o `wrangler versions upload` (deploy do novo fluxo Cloudflare) encontrar o entry-point. O `.npmrc` com `legacy-peer-deps=true` é necessário para o `npm clean-install` resolver o conflito de peers (wrangler/workers-types).
+> ⚠️ **IMPORTANTE (Next.js 14)**: o projeto usa `next@14.2.15`, que NÃO é compatível com o adapter oficial atual `@opennextjs/cloudflare` (exige Next ≥15.5.21). Por isso usamos `@cloudflare/next-on-pages@1.13.15` (devDependency já instalada) + o arquivo `wrangler.jsonc` na raiz do repo, que declara `main: ".vercel/output/static/_worker.js"` e `assets.directory` — é o que faz o `wrangler versions upload` (deploy do novo fluxo Cloudflare) encontrar o entry-point. O `.npmrc` com `legacy-peer-deps=true` é necessário para o `npm clean-install` resolver o conflito de peers (wrangler/workers-types). Se o deploy ainda falhar com "The entry-point file at .vercel/output/static/_worker.js was not found", significa que o build command do painel NÃO rodou o adapter — verifique se está usando `npm run build` (script do package.json) e não `next build` direto.
 
 ---
 
