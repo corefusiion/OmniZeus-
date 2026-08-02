@@ -1,33 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
 import { maskApiKey } from "@/lib/ai/providerResolver";
 import { getSession } from "@/lib/auth/session";
+import { supabase } from "@/lib/db/supabaseClient";
 
 export const runtime = "nodejs";
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
-
-function getLocalDb(): any {
-  try {
-    if (fs.existsSync(DB_FILE_PATH)) {
-      return JSON.parse(fs.readFileSync(DB_FILE_PATH, "utf-8"));
-    }
-  } catch (e) {}
-  return {};
-}
-
-function saveLocalDb(db: any): void {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(db, null, 2), "utf-8");
-  } catch (err) {
-    console.error("Error saving local DB file:", err);
-  }
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -62,24 +38,22 @@ export async function POST(req: NextRequest) {
     const testData = await testRes.json();
     const modelsCount = testData.data?.length || 0;
 
-    const db = getLocalDb();
-    if (!Array.isArray(db.companies)) db.companies = [];
-
-    const compIndex = db.companies.findIndex((c: any) => c.id === companyId);
-    const now = new Date().toISOString();
-
-    if (compIndex >= 0) {
-      db.companies[compIndex].openrouter_api_key = trimmedKey;
-      db.companies[compIndex].openrouter_key_status = 'connected';
-      db.companies[compIndex].openrouter_key_tested_at = now;
-      db.companies[compIndex].updated_at = now;
-    } else {
+    const { data: company, error: findError } = await supabase.from('companies').select('id').eq('id', companyId).maybeSingle();
+    if (findError || !company) {
       return NextResponse.json({ error: "Empresa não encontrada." }, { status: 444 });
     }
 
+    const now = new Date().toISOString();
+
+    await supabase.from('companies').update({
+      openrouter_api_key: trimmedKey,
+      openrouter_key_status: 'connected',
+      openrouter_key_tested_at: now,
+      updated_at: now
+    }).eq('id', companyId);
+
     // Record Audit Log
-    if (!Array.isArray(db.audit_logs)) db.audit_logs = [];
-    db.audit_logs.unshift({
+    await supabase.from('audit_logs').insert([{
       id: `log_audit_${Date.now()}`,
       company_id: companyId,
       user_name: session.name || "Super Admin",
@@ -87,9 +61,7 @@ export async function POST(req: NextRequest) {
       resource: `Empresa ${companyId}`,
       details: `Chave OpenRouter cadastrada (Masked: ${maskApiKey(trimmedKey)})`,
       created_at: now
-    });
-
-    saveLocalDb(db);
+    }]);
 
     return NextResponse.json({
       success: true,

@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
 import { getSession } from '@/lib/auth/session';
+import { supabase } from '@/lib/db/supabaseClient';
 
-// Esta rota devolvia o banco inteiro (todas as empresas, credenciais e senhas)
-// para qualquer requisição anônima. Agora é restrita ao super_adm.
 export async function GET(req: NextRequest) {
   const session = getSession(req);
   if (!session) {
@@ -14,21 +11,26 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Acesso negado.', code: 'FORBIDDEN' }, { status: 403 });
   }
 
-  let sqlData: any = {};
-  let caData: any = [];
   try {
-    const sqlPath = path.join(process.cwd(), "data", "omnizeus_local_sql_database.json");
-    if (fs.existsSync(sqlPath)) {
-      sqlData = JSON.parse(fs.readFileSync(sqlPath, 'utf8'));
-    }
-    const caPath = path.join(process.cwd(), "data", "omnizeus_contaazul_customers.json");
-    if (fs.existsSync(caPath)) {
-      caData = JSON.parse(fs.readFileSync(caPath, 'utf8'));
-    }
+    const [{ data: companies }, { data: employees }, { data: purchase_orders }, { data: audit_logs }] = await Promise.all([
+      supabase.from('companies').select('*'),
+      supabase.from('employees').select('*'),
+      supabase.from('purchase_orders').select('*'),
+      supabase.from('audit_logs').select('*')
+    ]);
+
+    const sqlData = {
+      companies: companies || [],
+      employees: employees || [],
+      purchase_orders: purchase_orders || [],
+      audit_logs: audit_logs || []
+    };
+
+    const caData: any = [];
+
+    return NextResponse.json({ sqlData, caData });
   } catch (err) {
-    console.error('Falha ao ler arquivos de dados em /api/sync:', err);
+    console.error('Falha ao carregar dados em /api/sync:', err);
     return NextResponse.json({ error: 'Falha ao carregar dados.' }, { status: 500 });
   }
-
-  return NextResponse.json({ sqlData, caData });
 }

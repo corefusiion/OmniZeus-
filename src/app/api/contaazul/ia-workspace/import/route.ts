@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
 import * as XLSX from "xlsx";
 import { resolveAIProvider } from "@/lib/ai/providerResolver";
 import { MODEL_MAP } from "@/lib/ai/openRouterClient";
 import { getSession } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
 
 /**
  * POST /api/contaazul/ia-workspace/import

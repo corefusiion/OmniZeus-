@@ -1,32 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { supabase } from "@/lib/db/supabaseClient";
 import { resolveAIProvider } from "@/lib/ai/providerResolver";
 import { MODEL_MAP } from "@/lib/ai/openRouterClient";
 import { getSession } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
-
-function getLocalDbFile(): any {
-  try {
-    if (fs.existsSync(DB_FILE_PATH)) {
-      return JSON.parse(fs.readFileSync(DB_FILE_PATH, "utf-8"));
-    }
-  } catch (e) {}
-  return {};
-}
-
-function saveLocalDbFile(db: any): void {
-  try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(db, null, 2), "utf-8");
-  } catch (err) {
-    console.error("[IA-Workspace] Erro ao salvar DB local:", err);
-  }
-}
 
 /**
  * Clean JSON output from LLM Markdown Code Fences
@@ -100,17 +78,20 @@ export async function POST(req: NextRequest) {
 
       if (activeApiKey && !activeApiKey.includes("sk-or-v1-master-****") && activeApiKey.length > 10) {
         try {
-          const db = getLocalDbFile();
-          const clients = db.contaazul_clients || [];
-          const suppliers = db.contaazul_suppliers || [];
-          const entries = db.contaazul_entries || [];
-          const categories = db.contaazul_categories || [];
+          const { data: clients } = await supabase.from('contaazul_clients').select('*').eq('company_id', activeCompanyId);
+          const { data: suppliers } = await supabase.from('contaazul_suppliers').select('*').eq('company_id', activeCompanyId);
+          const { data: entries } = await supabase.from('contaazul_entries').select('*').eq('company_id', activeCompanyId);
+          const { data: categories } = await supabase.from('contaazul_categories').select('*');
 
           // Recuperar histórico da conversa para manter contexto (ex: "sim")
-          const messagesHistory = (db.contaazul_ia_messages || [])
-            .filter((m: any) => m.conversation_id === conversationId)
-            .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-            .slice(-10)
+          const { data: messagesRows } = await supabase
+            .from('contaazul_ia_messages')
+            .select('*')
+            .eq('conversation_id', conversationId)
+            .order('created_at', { ascending: true })
+            .limit(10);
+            
+          const messagesHistory = (messagesRows || [])
             .map((m: any) => {
               if (m.sender === "ai") {
                 try {
@@ -137,10 +118,10 @@ COMPORTAMENTO CONVERSACIONAL (OBRIGATÓRIO):
 IMPORTANTE: VOCÊ TEM ACESSO VERDADEIRO E COMPLETO AOS DADOS REAIS ABAIXO. NUNCA DIGA AO USUÁRIO QUE NÃO TEM ACESSO AO BANCO DE DADOS DA CONTAAZUL!
 
 DADOS REAIS SINCRONIZADOS DA CONTAAZUL:
-- Clientes (${clients.length} cadastrados): ${JSON.stringify(clients.slice(0, 10))}
-- Fornecedores (${suppliers.length}): ${JSON.stringify(suppliers.slice(0, 10))}
-- Lançamentos (${entries.length}): ${JSON.stringify(entries.slice(0, 10))}
-- Categorias (${categories.length}): ${JSON.stringify(categories.slice(0, 10))}
+- Clientes (${(clients || []).length} cadastrados): ${JSON.stringify((clients || []).slice(0, 10))}
+- Fornecedores (${(suppliers || []).length}): ${JSON.stringify((suppliers || []).slice(0, 10))}
+- Lançamentos (${(entries || []).length}): ${JSON.stringify((entries || []).slice(0, 10))}
+- Categorias (${(categories || []).length}): ${JSON.stringify((categories || []).slice(0, 10))}
 
 DIRETRIZES DE RESPOSTA (OBRIGATÓRIO):
 1. NÃO imprima blocos de código JSON brutos como \`\`\`json na mensagem. Responda em JSON puro na raiz do corpo HTTP.
@@ -210,10 +191,9 @@ DIRETRIZES DE RESPOSTA (OBRIGATÓRIO):
 
             // Automatic Table Synthesizer for Client/Supplier/Entry Table Queries
             const promptLower = prompt.toLowerCase();
-            const db = getLocalDbFile();
-            const clients = db.contaazul_clients || [];
-            const suppliers = db.contaazul_suppliers || [];
-            const entries = db.contaazul_entries || [];
+            const safeClients = clients || [];
+            const safeSuppliers = suppliers || [];
+            const safeEntries = entries || [];
 
             if (!parsedResponse.table && (promptLower.includes("tabela") || promptLower.includes("liste") || promptLower.includes("quantos") || promptLower.includes("mostrar"))) {
               if (promptLower.includes("cliente")) {
@@ -223,7 +203,7 @@ DIRETRIZES DE RESPOSTA (OBRIGATÓRIO):
                     { key: "document", label: "Documento (CNPJ/CPF)" },
                     { key: "email", label: "E-mail de Contato" }
                   ],
-                  rows: clients.map((c: any) => ({
+                  rows: safeClients.map((c: any) => ({
                     id: c.id,
                     name: c.name || c.nome || c.company_name || c.razao_social || "Cliente CA",
                     document: c.document || c.cnpj || c.cpf || c.documento || "Não informado",
@@ -237,7 +217,7 @@ DIRETRIZES DE RESPOSTA (OBRIGATÓRIO):
                     { key: "document", label: "CNPJ / Documento" },
                     { key: "email", label: "E-mail de Contato" }
                   ],
-                  rows: suppliers.map((s: any) => ({
+                  rows: safeSuppliers.map((s: any) => ({
                     id: s.id,
                     name: s.name || s.nome || "Fornecedor ERP",
                     document: s.document || s.cnpj || s.documento || "Não informado",
@@ -252,7 +232,7 @@ DIRETRIZES DE RESPOSTA (OBRIGATÓRIO):
                     { key: "valor", label: "Valor (R$)", type: "currency" },
                     { key: "situacao", label: "Situação", type: "status" }
                   ],
-                  rows: entries.map((e: any) => ({
+                  rows: safeEntries.map((e: any) => ({
                     id: e.id || e.id_evento,
                     description: e.description || e.desc || "Lançamento Financeiro",
                     nome_pessoa: e.nome_pessoa || e.cliente || e.fornecedor || "-",
@@ -277,41 +257,35 @@ DIRETRIZES DE RESPOSTA (OBRIGATÓRIO):
       };
     }
 
-    // Persistir mensagem limpa e sem marcações JSON no banco SQLite
-    const db = getLocalDbFile();
+    // Persistir mensagem limpa e sem marcações JSON no banco
     const msgId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     const aiMsgId = `msg_${Date.now() + 1}_${Math.random().toString(36).substr(2, 5)}`;
     const now = new Date().toISOString();
 
-    if (!Array.isArray(db.contaazul_ia_messages)) db.contaazul_ia_messages = [];
+    await supabase.from("contaazul_ia_messages").insert([
+      {
+        id: msgId,
+        conversation_id: conversationId || `conv_${Date.now()}`,
+        sender: "user",
+        text: prompt,
+        created_at: now
+      },
+      {
+        id: aiMsgId,
+        conversation_id: conversationId || `conv_${Date.now()}`,
+        sender: "ai",
+        text: JSON.stringify({
+          message: parsedResponse.message,
+          chart: parsedResponse.chart || null,
+          table: parsedResponse.table || null,
+          actions: parsedResponse.actions || []
+        }),
+        model: model || "google/gemini-2.5-pro",
+        created_at: now
+      }
+    ]);
 
-    db.contaazul_ia_messages.push({
-      id: msgId,
-      conversation_id: conversationId || `conv_${Date.now()}`,
-      sender: "user",
-      text: prompt,
-      created_at: now
-    });
-
-    // Guardar resposta como string JSON estruturada interna mas limpa
-    const cleanStorageText = JSON.stringify({
-      message: parsedResponse.message,
-      chart: parsedResponse.chart || null,
-      table: parsedResponse.table || null,
-      actions: parsedResponse.actions || []
-    });
-
-    db.contaazul_ia_messages.push({
-      id: aiMsgId,
-      conversation_id: conversationId || `conv_${Date.now()}`,
-      sender: "ai",
-      text: cleanStorageText,
-      model: model || "google/gemini-2.5-pro",
-      created_at: now
-    });
-
-    if (!Array.isArray(db.contaazul_ia_audit_logs)) db.contaazul_ia_audit_logs = [];
-    db.contaazul_ia_audit_logs.unshift({
+    await supabase.from("contaazul_ia_audit_logs").insert({
       id: `audit_${Date.now()}`,
       userId: session?.userId || "super_adm",
       companyId: activeCompanyId,
@@ -324,8 +298,6 @@ DIRETRIZES DE RESPOSTA (OBRIGATÓRIO):
       result: "SUCCESS",
       responseTimeMs: Date.now() - startTime
     });
-
-    saveLocalDbFile(db);
 
     return NextResponse.json({
       success: true,

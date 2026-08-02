@@ -1,38 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { supabase } from "@/lib/db/supabaseClient";
 
 export const runtime = "nodejs";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
-
-function getLocalDbFile(): any {
-  try {
-    if (fs.existsSync(DB_FILE_PATH)) {
-      const raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
-      return JSON.parse(raw);
-    }
-  } catch (e) {}
-  return {};
-}
-
-function saveLocalDbFile(db: any): void {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(db, null, 2), "utf-8");
-  } catch (err) {
-    console.error("Error saving local SQL database file:", err);
-  }
-}
-
 export async function POST(req: NextRequest) {
   try {
-    const db = getLocalDbFile();
-    if (!Array.isArray(db.ai_usage_logs)) db.ai_usage_logs = [];
-
     const agentsList = [
       { id: "omni_ia_hub", name: "Especialista Fiscal BPO", category: "STANDARD", baseCoins: 5 },
       { id: "omni_ia_hub", name: "Auditor Trabalhista eSocial", category: "ADVANCED", baseCoins: 25 },
@@ -95,8 +67,10 @@ export async function POST(req: NextRequest) {
       newLogs.push(logEntry);
     }
 
-    db.ai_usage_logs = [...newLogs, ...db.ai_usage_logs];
-    saveLocalDbFile(db);
+    const { error } = await supabase.from("ai_usage_logs").insert(newLogs);
+    if (error) {
+      console.error("Error inserting logs to supabase:", error);
+    }
 
     const totalCostBrl = parseFloat((totalCostUsd * 5.80).toFixed(2));
     const revenueBrl = parseFloat((totalCoins * 0.10).toFixed(2));

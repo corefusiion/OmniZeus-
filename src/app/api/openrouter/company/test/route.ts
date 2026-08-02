@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
 import { getSession } from "@/lib/auth/session";
+import { supabase } from "@/lib/db/supabaseClient";
 
 export const runtime = "nodejs";
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,11 +19,8 @@ export async function POST(req: NextRequest) {
     let targetKey = apiKey;
 
     if (!targetKey && companyId) {
-      if (fs.existsSync(DB_FILE_PATH)) {
-        const db = JSON.parse(fs.readFileSync(DB_FILE_PATH, "utf-8"));
-        const comp = (db.companies || []).find((c: any) => c.id === companyId);
-        if (comp) targetKey = comp.openrouter_api_key;
-      }
+      const { data: comp } = await supabase.from('companies').select('openrouter_api_key').eq('id', companyId).maybeSingle();
+      if (comp) targetKey = comp.openrouter_api_key;
     }
 
     if (!targetKey || targetKey.trim().length === 0) {

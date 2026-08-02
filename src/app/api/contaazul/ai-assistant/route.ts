@@ -1,32 +1,9 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { supabase } from "@/lib/db/supabaseClient";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
-
-function getLocalDb(): any {
+async function recordAuditLog(user: string, company: string, action: string, details: string) {
   try {
-    if (fs.existsSync(DB_FILE_PATH)) {
-      const raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
-      return JSON.parse(raw);
-    }
-  } catch (e) {}
-  return {};
-}
-
-function saveLocalDb(db: any) {
-  try {
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(db, null, 2), "utf-8");
-  } catch (e) {}
-}
-
-function recordAuditLog(user: string, company: string, action: string, details: string) {
-  try {
-    const db = getLocalDb();
-    if (!Array.isArray(db.ai_stress_test_logs)) db.ai_stress_test_logs = [];
-    
-    db.ai_stress_test_logs.unshift({
+    await supabase.from("ai_stress_test_logs").insert({
       id: `audit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       user: user || "Super ADM Master",
       company: company || "Zenitus Inteligência Contábil Ltda",
@@ -34,9 +11,9 @@ function recordAuditLog(user: string, company: string, action: string, details: 
       details: details,
       timestamp: new Date().toISOString()
     });
-
-    saveLocalDb(db);
-  } catch (e) {}
+  } catch (e) {
+    console.error("Failed to record audit log:", e);
+  }
 }
 
 export async function POST(req: Request) {
@@ -51,8 +28,6 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-
-    const db = getLocalDb();
     
     // Configurações dinâmicas baseadas no painel Super ADM
     const systemPrompt = `Você é o "Zeus BPO IA" — o Engenheiro e Especialista Master em BPO Financeiro e Operações Contábeis.
@@ -139,7 +114,8 @@ Responda EXCLUSIVAMENTE em formato JSON com a estrutura:
     // Direct Action Execution with Auto-Refresh Token!
     let actionResult = null;
     if (action === "CREATE_CUSTOMER" && extractedData.name && extractedData.document) {
-      const customerRes = await fetch(`${req.headers.get("origin") || "http://localhost:3000"}/api/contaazul/customers`, {
+      const origin = req.headers.get("origin") || "http://localhost:3000";
+      const customerRes = await fetch(`${origin}/api/contaazul/customers`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -162,50 +138,50 @@ Responda EXCLUSIVAMENTE em formato JSON com a estrutura:
 
     // Persistir no histórico de conversas e mensagens
     if (conversationId) {
-      const db = getLocalDb();
-      if (!db.messages) db.messages = [];
-      if (!db.conversations) db.conversations = [];
-      
       const now = new Date().toISOString();
       
-      db.messages.push({
-        id: `msg_${Date.now()}_u`,
-        conversation_id: conversationId,
-        role: "user",
-        content: userInput,
-        model: model,
-        provider: "openrouter",
-        created_at: now
-      });
-      
-      db.messages.push({
-        id: `msg_${Date.now()}_ai`,
-        conversation_id: conversationId,
-        role: "assistant",
-        content: aiMessage,
-        model: model,
-        provider: "openrouter",
-        created_at: new Date().toISOString()
-      });
-      
-      db.conversations = db.conversations.map((c: any) => {
-        if (c.id === conversationId) {
-          const title = (c.title === "Nova Conversa BPO" || !c.title) 
-            ? userInput.substring(0, 30) + (userInput.length > 30 ? "..." : "")
-            : c.title;
-          return {
-            ...c,
-            title,
-            updated_at: now,
-            last_message_at: now
-          };
+      await supabase.from("contaazul_ia_messages").insert([
+        {
+          id: `msg_${Date.now()}_u`,
+          conversation_id: conversationId,
+          sender: "user",
+          text: userInput,
+          model: model,
+          created_at: now
+        },
+        {
+          id: `msg_${Date.now()}_ai`,
+          conversation_id: conversationId,
+          sender: "ai",
+          text: aiMessage,
+          model: model,
+          created_at: new Date().toISOString()
         }
-        return c;
-      });
-      saveLocalDb(db);
+      ]);
+      
+      const { data: convs } = await supabase
+        .from("contaazul_ia_conversations")
+        .select("*")
+        .eq("id", conversationId)
+        .limit(1);
+        
+      if (convs && convs.length > 0) {
+        const c = convs[0];
+        const title = (c.title === "Nova Conversa BPO" || !c.title) 
+          ? userInput.substring(0, 30) + (userInput.length > 30 ? "..." : "")
+          : c.title;
+          
+        await supabase
+          .from("contaazul_ia_conversations")
+          .update({
+            title,
+            updatedAt: now
+          })
+          .eq("id", conversationId);
+      }
     }
 
-    recordAuditLog(
+    await recordAuditLog(
       currentUser || "Super ADM Master",
       companyName || "Zenitus Inteligência Contábil Ltda",
       "ZEUS_BPO_IA_INTERACTION",

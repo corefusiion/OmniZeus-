@@ -1,27 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchWithAutoRefresh } from "@/lib/contaazul/store";
-import fs from "fs";
-import path from "path";
-
-// Helpers para acesso ao banco local
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
-
-function getLocalDb() {
-  try {
-    const raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
-    return JSON.parse(raw);
-  } catch (e) {
-    return { contaazul_clients: [], contaazul_entries: [], contaazul_suppliers: [] };
-  }
-}
-
-function saveLocalDb(db: any) {
-  try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(db, null, 2), "utf-8");
-  } catch (e) {}
-}
+import { supabase } from "@/lib/db/supabaseClient";
 
 export async function POST(req: Request) {
   try {
@@ -55,7 +34,6 @@ export async function POST(req: Request) {
     }
 
     // Segregar Pessoas entre Clientes e Fornecedores
-    // Suporta perfis tanto como Array de Strings (ex: ["Fornecedor"]) quanto Array de Objetos (ex: [{tipo_perfil: "Fornecedor"}])
     let customersData: any[] = [];
     let suppliersData: any[] = [];
 
@@ -127,13 +105,19 @@ export async function POST(req: Request) {
       }
     }
 
-    // SALVAMENTO PERSISTENTE NO BACK-END (SQL DB LOCAL)
-    const db = getLocalDb();
-    db.contaazul_clients = customersData;
-    db.contaazul_suppliers = suppliersData;
-    if (entriesData && entriesData.length > 0) db.contaazul_entries = entriesData;
-    if (categoriesData && categoriesData.length > 0) db.contaazul_categories = categoriesData;
-    saveLocalDb(db);
+    // SALVAMENTO PERSISTENTE NO BACK-END (Supabase)
+    if (customersData.length > 0) {
+      await supabase.from('contaazul_clients').upsert(customersData, { onConflict: 'id' });
+    }
+    if (suppliersData.length > 0) {
+      await supabase.from('contaazul_suppliers').upsert(suppliersData, { onConflict: 'id' });
+    }
+    if (entriesData && entriesData.length > 0) {
+      await supabase.from('contaazul_entries').upsert(entriesData, { onConflict: 'id' });
+    }
+    if (categoriesData && categoriesData.length > 0) {
+      await supabase.from('contaazul_categories').upsert(categoriesData, { onConflict: 'id' });
+    }
 
     return NextResponse.json({
       success: true,

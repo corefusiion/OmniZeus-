@@ -1,23 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchWithAutoRefresh, getContaAzulTokens } from "@/lib/contaazul/store";
-import fs from "fs";
-import path from "path";
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
-
-function saveLocalEntry(entry: any) {
-  try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    let db: any = { contaazul_entries: [] };
-    if (fs.existsSync(DB_FILE_PATH)) {
-      db = JSON.parse(fs.readFileSync(DB_FILE_PATH, "utf-8"));
-    }
-    if (!Array.isArray(db.contaazul_entries)) db.contaazul_entries = [];
-    db.contaazul_entries.unshift(entry);
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(db, null, 2), "utf-8");
-  } catch (e) {}
-}
+import { supabase } from "@/lib/db/supabaseClient";
 
 export async function POST(req: Request) {
   try {
@@ -34,7 +17,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const storedTokens = getContaAzulTokens();
+    const storedTokens = await getContaAzulTokens();
     const passedTokens = { 
       accessToken: accessToken || storedTokens.accessToken, 
       refreshToken: refreshToken || storedTokens.refreshToken, 
@@ -188,7 +171,7 @@ export async function POST(req: Request) {
       created_at: new Date().toISOString()
     };
 
-    saveLocalEntry(newEntryObj);
+    await supabase.from("contaazul_entries").insert(newEntryObj);
 
     return NextResponse.json({
       success: true,

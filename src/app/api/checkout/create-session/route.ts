@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
 import { PurchaseOrder } from "@/lib/db/serverDb";
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
+import { supabase } from "@/lib/db/supabaseClient";
 
 // Backend Official Plans (Security: Price & Coins are strictly determined on server)
 const PLANS: Record<string, { name: string; price: number; coins: number; is_test?: boolean }> = {
@@ -88,28 +84,16 @@ export async function POST(req: NextRequest) {
       created_at: new Date().toISOString()
     };
 
-    // Save order to local SQL JSON database
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
+    // Save order to Supabase
+    const { error: insertError } = await supabase.from('purchase_orders').insert([newOrder]);
+    if (insertError) {
+      console.error("Error inserting order:", insertError);
+      return NextResponse.json({ error: "Erro ao salvar pedido." }, { status: 500 });
     }
-
-    let dbData: any = {};
-    if (fs.existsSync(DB_FILE_PATH)) {
-      let raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
-      if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
-      dbData = JSON.parse(raw);
-    }
-
-    if (!Array.isArray(dbData.purchase_orders)) {
-      dbData.purchase_orders = [];
-    }
-
-    // Save order
-    dbData.purchase_orders.unshift(newOrder);
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(dbData, null, 2), "utf-8");
 
     // Fetch Master Stripe Key
-    const stripeSecretKey = (dbData.settings?.stripe_secret_key || "").trim();
+    const { data: settingsData } = await supabase.from('settings').select('stripe_secret_key').limit(1).maybeSingle();
+    const stripeSecretKey = (settingsData?.stripe_secret_key || "").trim();
 
     if (!stripeSecretKey || stripeSecretKey.includes("***")) {
       return NextResponse.json(
@@ -175,7 +159,7 @@ export async function POST(req: NextRequest) {
 
     // Update order with stripe session id
     newOrder.stripe_session_id = stripeJson.id;
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(dbData, null, 2), "utf-8");
+    await supabase.from('purchase_orders').update({ stripe_session_id: stripeJson.id }).eq('id', orderId);
 
     return NextResponse.json({
       success: true,

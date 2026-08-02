@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
 import { getSession } from "@/lib/auth/session";
-import { PurchaseOrder } from "@/lib/db/serverDb";
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
+import { supabase } from "@/lib/db/supabaseClient";
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,30 +19,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "ID do pedido não informado." }, { status: 400 });
     }
 
-    if (!fs.existsSync(DB_FILE_PATH)) {
-      return NextResponse.json({ error: "Banco de dados não encontrado." }, { status: 500 });
-    }
+    const { data: order, error: findError } = await supabase.from('purchase_orders')
+      .select('*')
+      .or(`id.eq.${order_id},order_number.eq.${order_id}`)
+      .maybeSingle();
 
-    let raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
-    if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
-    const dbData = JSON.parse(raw);
-
-    if (!Array.isArray(dbData.purchase_orders)) {
-      return NextResponse.json({ error: "Tabela de pedidos de compra vazia." }, { status: 404 });
-    }
-
-    const orderIndex = dbData.purchase_orders.findIndex(
-      (o: PurchaseOrder) => o.id === order_id || o.order_number === order_id
-    );
-
-    if (orderIndex === -1) {
+    if (findError || !order) {
       return NextResponse.json({ error: "Pedido de compra não encontrado." }, { status: 404 });
     }
 
-    const order: PurchaseOrder = dbData.purchase_orders[orderIndex];
-
-    // Segurança: pedido provisionado já gerou empresa + gestor. Excluir deixaria
-    // a empresa órfã (sem referência de pedido) e corromperia a contabilização.
     if (order.status === "PROVISIONADO" || order.provisioned_company_id) {
       return NextResponse.json(
         {
@@ -57,26 +37,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const [removedOrder] = dbData.purchase_orders.splice(orderIndex, 1);
+    const { error: deleteError } = await supabase.from('purchase_orders').delete().eq('id', order.id);
+
+    if (deleteError) {
+      throw new Error(deleteError.message);
+    }
 
     // Audit Log
-    if (!Array.isArray(dbData.audit_logs)) dbData.audit_logs = [];
-    dbData.audit_logs.push({
+    await supabase.from('audit_logs').insert([{
       id: `log_${Date.now()}`,
       company_id: "global",
       user_id: session?.userId || "super_adm",
       user_name: session?.name || "Super Admin",
       action: "EXCLUSAO_PEDIDO_COMPRA",
       resource: "purchase_orders",
-      details: `Pedido ${removedOrder.order_number || removedOrder.id} (${removedOrder.empresa_nome || ""}) excluído antes do provisionamento. Origem: ${removedOrder.origin_source || "landing_page"}.`,
+      details: `Pedido ${order.order_number || order.id} (${order.empresa_nome || ""}) excluído antes do provisionamento. Origem: ${order.origin_source || "landing_page"}.`,
       created_at: new Date().toISOString()
-    });
-
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(dbData, null, 2), "utf-8");
+    }]);
 
     return NextResponse.json({
       success: true,
-      message: `Pedido "${removedOrder.order_number || removedOrder.id}" excluído com sucesso.`
+      message: `Pedido "${order.order_number || order.id}" excluído com sucesso.`
     });
   } catch (err: any) {
     console.error("Error deleting purchase order:", err);

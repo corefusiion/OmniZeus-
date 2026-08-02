@@ -1,24 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchWithAutoRefresh } from "@/lib/contaazul/store";
-import fs from "fs";
-import path from "path";
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
-
-function getLocalDb(): any {
-  try {
-    if (fs.existsSync(DB_FILE_PATH)) return JSON.parse(fs.readFileSync(DB_FILE_PATH, "utf-8"));
-  } catch (e) {}
-  return {};
-}
-
-function saveLocalDb(db: any): void {
-  try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(db, null, 2), "utf-8");
-  } catch (e) {}
-}
+import { supabase } from "@/lib/db/supabaseClient";
 
 export async function POST(req: Request) {
   try {
@@ -123,10 +105,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // Persistir no cache local com company_id para não perder após sync
-    const db = getLocalDb();
-    if (!Array.isArray(db.contaazul_suppliers)) db.contaazul_suppliers = [];
-    db.contaazul_suppliers.push({
+    // Persistir no supabase
+    await supabase.from("contaazul_suppliers").insert({
       id: data.id || `fornecedor_${Date.now()}`,
       company_id: companyId || "comp_zenitus",
       nome: supplier.name.trim(),
@@ -138,7 +118,6 @@ export async function POST(req: Request) {
       synced_at: new Date().toISOString(),
       ativo: true
     });
-    saveLocalDb(db);
 
     return NextResponse.json({
       success: true,

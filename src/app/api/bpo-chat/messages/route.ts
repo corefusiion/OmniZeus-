@@ -1,38 +1,6 @@
 import { NextResponse, NextRequest } from "next/server";
-import fs from "fs";
-import path from "path";
+import { supabase } from "@/lib/db/supabaseClient";
 import { getSession } from "@/lib/auth/session";
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
-
-function getDbData() {
-  try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    if (!fs.existsSync(DB_FILE_PATH)) {
-      const defaultDb = { conversations: [], messages: [] };
-      fs.writeFileSync(DB_FILE_PATH, JSON.stringify(defaultDb, null, 2), "utf-8");
-      return defaultDb;
-    }
-    let raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
-    if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
-    const parsed = JSON.parse(raw);
-    if (!parsed.conversations) parsed.conversations = [];
-    if (!parsed.messages) parsed.messages = [];
-    return parsed;
-  } catch (e) {
-    return { conversations: [], messages: [] };
-  }
-}
-
-function saveDbData(data: any) {
-  try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(data, null, 2), "utf-8");
-  } catch (e) {
-    console.error("Error saving DB data:", e);
-  }
-}
 
 export async function GET(req: NextRequest) {
   try {
@@ -44,20 +12,18 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: "ID da conversa ausente." }, { status: 400 });
     }
 
-    const db = getDbData();
-
     // Verify conversation tenant ownership if session is present
     if (session && session.role !== "super_adm") {
-      const conv = (db.conversations || []).find((c: any) => c.id === conversationId);
+      const { data: conv } = await supabase.from("conversations").select("*").eq("id", conversationId).single();
       if (conv && conv.company_id && conv.company_id !== session.companyId) {
         return NextResponse.json({ success: false, error: "Acesso não autorizado a esta conversa." }, { status: 403 });
       }
     }
 
-    const filteredMsgs = (db.messages || []).filter((m: any) => m.conversation_id === conversationId)
-      .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    const { data: messages, error } = await supabase.from("messages").select("*").eq("conversation_id", conversationId).order("created_at", { ascending: true });
+    if (error) throw error;
 
-    return NextResponse.json({ success: true, messages: filteredMsgs });
+    return NextResponse.json({ success: true, messages: messages || [] });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
@@ -76,8 +42,6 @@ export async function POST(req: NextRequest) {
       ? (session.role === "super_adm" && companyId ? companyId : session.companyId)
       : (companyId || req.headers.get("x-company-id") || "comp_zenitus");
 
-
-    const db = getDbData();
     const now = new Date().toISOString();
     const userMsgId = `msg_${Date.now()}_u`;
     const userText = content.trim();
@@ -92,25 +56,20 @@ export async function POST(req: NextRequest) {
       created_at: now
     };
 
-    db.messages.push(userMsg);
+    await supabase.from("messages").insert(userMsg);
 
     // Update conversation title and timestamps
-    db.conversations = (db.conversations || []).map((c: any) => {
-      if (c.id === conversationId) {
-        const title = (c.title === "Nova Conversa BPO" || !c.title) 
-          ? userText.substring(0, 30) + (userText.length > 30 ? "..." : "")
-          : c.title;
-        return {
-          ...c,
-          title,
-          updated_at: now,
-          last_message_at: now
-        };
-      }
-      return c;
-    });
-
-    saveDbData(db);
+    const { data: conv } = await supabase.from("conversations").select("*").eq("id", conversationId).single();
+    if (conv) {
+      const title = (conv.title === "Nova Conversa BPO" || !conv.title) 
+        ? userText.substring(0, 30) + (userText.length > 30 ? "..." : "")
+        : conv.title;
+      await supabase.from("conversations").update({
+        title,
+        updated_at: now,
+        last_message_at: now
+      }).eq("id", conversationId);
+    }
 
     // Intent detection for automatic execution of ContaAzul tasks via AI
     const lowerText = userText.toLowerCase();
@@ -163,8 +122,7 @@ export async function POST(req: NextRequest) {
             created_at: new Date().toISOString()
           };
 
-          db.messages.push(aiMsgObj);
-          saveDbData(db);
+          await supabase.from("messages").insert(aiMsgObj);
 
           return NextResponse.json({ success: true, message: aiTextResponse, actionExecuted: true });
         } catch (e) {}
@@ -172,9 +130,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch conversation history for LLM
-    const historyMsgs = (db.messages || [])
-      .filter((m: any) => m.conversation_id === conversationId)
-      .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    const { data: dbMsgs } = await supabase.from("messages").select("*").eq("conversation_id", conversationId).order("created_at", { ascending: true });
+    const historyMsgs = (dbMsgs || [])
       .slice(-20)
       .map((m: any) => ({
         role: m.role === 'assistant' ? 'assistant' : 'user',
@@ -221,8 +178,8 @@ Você possui autonomia e autoridade para responder dúvidas contábeis, orientar
         created_at: new Date().toISOString(),
         isError: true
       };
-      db.messages.push(aiErrObj);
-      saveDbData(db);
+      
+      await supabase.from("messages").insert(aiErrObj);
 
       return NextResponse.json({ success: true, message: errText, isConfigError: true });
     }
@@ -239,8 +196,7 @@ Você possui autonomia e autoridade para responder dúvidas contábeis, orientar
       created_at: new Date().toISOString()
     };
 
-    db.messages.push(aiMsgObj);
-    saveDbData(db);
+    await supabase.from("messages").insert(aiMsgObj);
 
     return NextResponse.json({
       success: true,

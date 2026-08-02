@@ -1,29 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchWithAutoRefresh, getContaAzulTokens, saveContaAzulTokens } from "@/lib/contaazul/store";
 import { decryptContaAzulFields, encryptContaAzulFields } from "@/lib/crypto/atRest";
-import fs from "fs";
-import path from "path";
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
-
-function getLocalDb() {
-  try {
-    if (!fs.existsSync(DB_FILE_PATH)) return {};
-    let raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
-    if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
-    return JSON.parse(raw);
-  } catch (e) {
-    return {};
-  }
-}
-
-function saveLocalDb(db: any) {
-  try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(db, null, 2), "utf-8");
-  } catch (e) {}
-}
+import { supabase } from "@/lib/db/supabaseClient";
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
@@ -31,41 +9,13 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const targetCompanyId = body.company_id || null;
 
-    const dbData = getLocalDb();
+    const { data: dbDataConfigs } = await supabase.from('contaazul_config').select('*');
+    let configData = dbDataConfigs || [];
 
-    if (!Array.isArray(dbData.contaazul_config)) {
-      // Migração: objeto legado → array preservando dados existentes
-      const existing = dbData.contaazul_config || {};
-      if (existing.access_token || existing.client_id) {
-        dbData.contaazul_config = [{ ...existing, company_id: existing.company_id || targetCompanyId || "comp_zenitus" }];
-      } else {
-        dbData.contaazul_config = [];
-      }
-    }
-
-    if (!Array.isArray(dbData.companies)) {
-      dbData.companies = [];
-    }
-
-    if (!Array.isArray(dbData.contaazul_sync_logs)) {
-      dbData.contaazul_sync_logs = [];
-    }
-
-    // Filter companies to sync: if targetCompanyId is provided, sync only that company; otherwise sync all connected companies
-    // Tokens podem estar criptografados em repouso (enc:v1:) — descriptografa antes de usar.
-    const connectedConfigs = dbData.contaazul_config
-      .map((cfg: any) => decryptContaAzulFields(cfg))
-      .filter((cfg: any) => {
-        if (!cfg.is_connected || !cfg.access_token) return false;
-        if (targetCompanyId && targetCompanyId !== "global" && cfg.company_id !== targetCompanyId) return false;
-        return true;
-      });
-
-    // Buscar tokens no arquivo per-company como fallback se nenhuma config conectada no DB
-    if (connectedConfigs.length === 0 && targetCompanyId) {
-      const fileTokens = getContaAzulTokens(targetCompanyId);
+    if (configData.length === 0 && targetCompanyId) {
+      const fileTokens = await getContaAzulTokens(targetCompanyId);
       if (fileTokens.accessToken) {
-        connectedConfigs.push({
+        configData.push({
           company_id: targetCompanyId,
           client_id: fileTokens.clientId,
           client_secret: fileTokens.clientSecret,
@@ -76,7 +26,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Aviso explícito: nenhuma empresa com integração ativa encontrada
+    const connectedConfigs = configData
+      .map((cfg: any) => decryptContaAzulFields(cfg))
+      .filter((cfg: any) => {
+        if (!cfg.is_connected || !cfg.access_token) return false;
+        if (targetCompanyId && targetCompanyId !== "global" && cfg.company_id !== targetCompanyId) return false;
+        return true;
+      });
+
     if (connectedConfigs.length === 0) {
       return NextResponse.json({
         success: false,
@@ -86,11 +43,14 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
+    const { data: companiesData } = await supabase.from('companies').select('*');
+    const companies = companiesData || [];
+
     const syncResults: any[] = [];
 
     for (const cfg of connectedConfigs) {
       const companyId = cfg.company_id || "comp_zenitus";
-      const companyProfile = dbData.companies.find((c: any) => c.id === companyId);
+      const companyProfile = companies.find((c: any) => c.id === companyId);
       const companyName = companyProfile?.tradeName || companyProfile?.corporateName || companyId;
 
       let newCount = 0;
@@ -156,7 +116,6 @@ export async function POST(req: NextRequest) {
 
         totalFetched = rawPessoas.length + entriesData.length + categoriesData.length;
 
-        // Separate Customers vs Suppliers with company_id scoping
         const scopedCustomers: any[] = [];
         const scopedSuppliers: any[] = [];
 
@@ -171,36 +130,24 @@ export async function POST(req: NextRequest) {
           else scopedCustomers.push(itemScoped);
         }
 
-        // Incremental Update for `contaazul_clients` and `contaazul_suppliers`
-        if (!Array.isArray(dbData.contaazul_clients)) dbData.contaazul_clients = [];
-        if (!Array.isArray(dbData.contaazul_suppliers)) dbData.contaazul_suppliers = [];
-        if (!Array.isArray(dbData.contaazul_entries)) dbData.contaazul_entries = [];
-        if (!Array.isArray(dbData.contaazul_categories)) dbData.contaazul_categories = [];
-        if (!Array.isArray(dbData.payables)) dbData.payables = [];
-
-        for (const cust of scopedCustomers) {
-          const idx = dbData.contaazul_clients.findIndex((c: any) => c.id === cust.id && c.company_id === companyId);
-          if (idx !== -1) {
-            dbData.contaazul_clients[idx] = { ...dbData.contaazul_clients[idx], ...cust };
-            updatedCount++;
-          } else {
-            dbData.contaazul_clients.push(cust);
-            newCount++;
-          }
+        if (scopedCustomers.length > 0) {
+          const { data: upsertDataC } = await supabase.from('contaazul_clients').upsert(scopedCustomers, { onConflict: 'id,company_id' }).select();
+          newCount += upsertDataC?.length || scopedCustomers.length;
+        }
+        
+        if (scopedSuppliers.length > 0) {
+          const { data: upsertDataS } = await supabase.from('contaazul_suppliers').upsert(scopedSuppliers, { onConflict: 'id,company_id' }).select();
+          newCount += upsertDataS?.length || scopedSuppliers.length;
         }
 
-        for (const supp of scopedSuppliers) {
-          const idx = dbData.contaazul_suppliers.findIndex((s: any) => s.id === supp.id && s.company_id === companyId);
-          if (idx !== -1) {
-            dbData.contaazul_suppliers[idx] = { ...dbData.contaazul_suppliers[idx], ...supp };
-            updatedCount++;
-          } else {
-            dbData.contaazul_suppliers.push(supp);
-            newCount++;
-          }
-        }
+        const { data: existingEntriesRows } = await supabase.from('contaazul_entries').select('id, id_evento, situacao, status').eq('company_id', companyId);
+        const existingEntries = existingEntriesRows || [];
 
-        // 4. PROCESS FINANCIAL ENTRIES & DETECT STATUS CHANGES (PENDENTE -> PAGO)
+        const { data: payablesRows } = await supabase.from('payables').select('*').or(`company_id.eq.${companyId},company_id.is.null`);
+        const payables = payablesRows || [];
+
+        const entriesToUpsert = [];
+
         for (const entry of entriesData) {
           const entryId = entry.id || entry.id_evento;
           const entryScoped = {
@@ -209,46 +156,42 @@ export async function POST(req: NextRequest) {
             synced_at: new Date().toISOString()
           };
 
-          const existingIdx = dbData.contaazul_entries.findIndex(
-            (e: any) => (e.id === entryId || e.id_evento === entryId) && e.company_id === companyId
-          );
+          const existingEntry = existingEntries.find((e: any) => (e.id === entryId || e.id_evento === entryId));
 
           let previousStatus = "";
-          if (existingIdx !== -1) {
-            previousStatus = dbData.contaazul_entries[existingIdx].situacao || dbData.contaazul_entries[existingIdx].status || "";
-            dbData.contaazul_entries[existingIdx] = { ...dbData.contaazul_entries[existingIdx], ...entryScoped };
+          if (existingEntry) {
+            previousStatus = existingEntry.situacao || existingEntry.status || "";
             updatedCount++;
           } else {
-            dbData.contaazul_entries.push(entryScoped);
             newCount++;
           }
+          
+          entriesToUpsert.push(entryScoped);
 
-          // Detect Status Change to PAID and update internal BPO Payables automatically!
           const currentStatus = (entry.situacao || entry.status || "").toUpperCase();
           const isPaidInContaAzul = currentStatus === "PAGO" || currentStatus === "QUITADO" || currentStatus === "PAID";
 
           if (isPaidInContaAzul && previousStatus && previousStatus.toUpperCase() !== "PAGO") {
-            // Find matching payable in internal BPO payables
-            const matchingPayable = dbData.payables.find((p: any) => {
+            const matchingPayable = payables.find((p: any) => {
               if (p.company_id && p.company_id !== companyId) return false;
               if (p.conta_azul_id === entryId) return true;
-              // CNPJ/Vendor + Value + Date Matching
               const sameVendor = (p.creditor || p.fornecedor || "").toLowerCase().includes((entry.nome_pessoa || entry.cliente || "").toLowerCase());
               const sameValue = Math.abs(Number(p.valor || p.value_brl || 0) - Number(entry.valor || 0)) < 0.5;
               return sameVendor && sameValue;
             });
 
             if (matchingPayable) {
-              matchingPayable.status = "Pago";
-              matchingPayable.paid_at = entry.data_pagamento || new Date().toISOString();
-              matchingPayable.conta_azul_id = entryId;
-              matchingPayable.reconciliation_status = "MATCHED_PAID";
+              await supabase.from('payables').update({
+                status: "Pago",
+                paid_at: entry.data_pagamento || new Date().toISOString(),
+                conta_azul_id: entryId,
+                reconciliation_status: "MATCHED_PAID"
+              }).eq('id', matchingPayable.id);
               matchedCount++;
             }
           }
 
-          // 5. MATCHING BETWEEN INTERNAL PAYABLES AND CONTA AZUL ENTRIES
-          const unlinkedPayables = dbData.payables.filter(
+          const unlinkedPayables = payables.filter(
             (p: any) => (!p.company_id || p.company_id === companyId) && !p.conta_azul_id
           );
 
@@ -261,21 +204,33 @@ export async function POST(req: NextRequest) {
 
             if (payVal > 0 && Math.abs(payVal - entryVal) < 0.5) {
               if (payVendor.length > 2 && entryVendor.length > 2 && (payVendor.includes(entryVendor) || entryVendor.includes(payVendor))) {
-                pay.conta_azul_id = entryId;
-                pay.reconciliation_status = "MATCHED";
+                const updateData: any = {
+                  conta_azul_id: entryId,
+                  reconciliation_status: "MATCHED"
+                };
                 if (isPaidInContaAzul && pay.status !== "Pago") {
-                  pay.status = "Pago";
-                  pay.paid_at = entry.data_pagamento || new Date().toISOString();
+                  updateData.status = "Pago";
+                  updateData.paid_at = entry.data_pagamento || new Date().toISOString();
                 }
+                await supabase.from('payables').update(updateData).eq('id', pay.id);
+                pay.conta_azul_id = entryId;
+                pay.reconciliation_status = updateData.reconciliation_status;
                 matchedCount++;
               }
             }
           }
         }
+        
+        if (entriesToUpsert.length > 0) {
+          await supabase.from('contaazul_entries').upsert(entriesToUpsert, { onConflict: 'id,company_id' });
+        }
+        
+        if (categoriesData.length > 0) {
+          await supabase.from('contaazul_categories').upsert(categoriesData, { onConflict: 'id' });
+        }
 
-        // Save updated tokens
         if (activeToken && activeRefresh) {
-          saveContaAzulTokens(companyId, {
+          await saveContaAzulTokens(companyId, {
             accessToken: activeToken,
             refreshToken: activeRefresh,
             clientId: cfg.client_id,
@@ -283,23 +238,21 @@ export async function POST(req: NextRequest) {
           });
         }
 
-        // Update company config last_sync_at & next_sync_at
         const now = new Date();
-        const nextSync = new Date(now.getTime() + 10 * 60 * 1000); // Next automatic sync in 10 minutes
+        const nextSync = new Date(now.getTime() + 10 * 60 * 1000);
 
-        const cfgIdx = dbData.contaazul_config.findIndex((c: any) => c.company_id === companyId);
-        if (cfgIdx !== -1) {
-          const encryptedCfg = encryptContaAzulFields({
-            access_token: activeToken,
-            refresh_token: activeRefresh
-          });
-          dbData.contaazul_config[cfgIdx].last_sync_at = now.toISOString();
-          dbData.contaazul_config[cfgIdx].next_sync_at = nextSync.toISOString();
-          dbData.contaazul_config[cfgIdx].access_token = encryptedCfg.access_token;
-          dbData.contaazul_config[cfgIdx].refresh_token = encryptedCfg.refresh_token;
-        }
+        const encryptedCfg = encryptContaAzulFields({
+          access_token: activeToken,
+          refresh_token: activeRefresh
+        });
+        
+        await supabase.from('contaazul_config').update({
+          last_sync_at: now.toISOString(),
+          next_sync_at: nextSync.toISOString(),
+          access_token: encryptedCfg.access_token,
+          refresh_token: encryptedCfg.refresh_token
+        }).eq('company_id', companyId);
 
-        // Log Sync Execution
         const syncLog = {
           id: `log_sync_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
           company_id: companyId,
@@ -316,12 +269,9 @@ export async function POST(req: NextRequest) {
           message: `Sincronização concluída: ${newCount} novos, ${updatedCount} atualizados, ${matchedCount} reconciliados.`
         };
 
-        dbData.contaazul_sync_logs.unshift(syncLog);
-        if (dbData.contaazul_sync_logs.length > 200) {
-          dbData.contaazul_sync_logs = dbData.contaazul_sync_logs.slice(0, 200);
-        }
-
+        await supabase.from('contaazul_sync_logs').insert(syncLog);
         syncResults.push(syncLog);
+        
       } catch (err: any) {
         errorsCount++;
         console.error(`Error syncing company ${companyId}:`, err);
@@ -340,12 +290,10 @@ export async function POST(req: NextRequest) {
           status: "error",
           message: `Falha na sincronização Conta Azul: ${err.message || 'Erro de conexão'}`
         };
-        dbData.contaazul_sync_logs.unshift(errLog);
+        await supabase.from('contaazul_sync_logs').insert(errLog);
         syncResults.push(errLog);
       }
     }
-
-    saveLocalDb(dbData);
 
     return NextResponse.json({
       success: true,

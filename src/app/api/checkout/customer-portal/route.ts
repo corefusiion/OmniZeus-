@@ -1,24 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
+import { supabase } from "@/lib/db/supabaseClient";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const { company_id, return_url } = body;
 
-    if (!fs.existsSync(DB_FILE_PATH)) {
-      return NextResponse.json({ error: "Banco de dados local não encontrado." }, { status: 500 });
-    }
+    const { data: settingsData } = await supabase.from('settings').select('stripe_secret_key').limit(1).maybeSingle();
+    const stripeSecretKey = (settingsData?.stripe_secret_key || "").trim();
 
-    let rawDb = fs.readFileSync(DB_FILE_PATH, "utf-8");
-    if (rawDb.charCodeAt(0) === 0xFEFF) rawDb = rawDb.slice(1);
-    const dbData = JSON.parse(rawDb);
-
-    const stripeSecretKey = (dbData.settings?.stripe_secret_key || "").trim();
     if (!stripeSecretKey || stripeSecretKey.includes("***")) {
       return NextResponse.json(
         { error: "Chave Secreta do Stripe não configurada no Super Admin." },
@@ -29,18 +19,22 @@ export async function POST(req: NextRequest) {
     let customerId: string | null = null;
 
     // Find company profile
-    if (company_id && Array.isArray(dbData.companies)) {
-      const company = dbData.companies.find((c: any) => c.id === company_id);
+    if (company_id) {
+      const { data: company } = await supabase.from('companies').select('stripe_customer_id, stripeCustomerId').eq('id', company_id).maybeSingle();
       if (company) {
         customerId = company.stripe_customer_id || company.stripeCustomerId || null;
       }
     }
 
     // Fallback: search purchase orders for matching customer ID
-    if (!customerId && Array.isArray(dbData.purchase_orders)) {
-      const matchingOrder = dbData.purchase_orders.find(
-        (o: any) => o.provisioned_company_id === company_id && o.stripe_customer_id
-      );
+    if (!customerId) {
+      const { data: matchingOrder } = await supabase.from('purchase_orders')
+        .select('stripe_customer_id')
+        .eq('provisioned_company_id', company_id)
+        .not('stripe_customer_id', 'is', null)
+        .limit(1)
+        .maybeSingle();
+
       if (matchingOrder) {
         customerId = matchingOrder.stripe_customer_id;
       }

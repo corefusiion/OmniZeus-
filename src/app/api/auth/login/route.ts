@@ -5,12 +5,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { setSessionCookie } from "@/lib/auth/session";
 import { PRODUCTION_USERS } from "@/lib/auth/roles";
-import path from "path";
-import fs from "fs";
+import { supabase } from "@/lib/db/supabaseClient";
 
 export const runtime = "nodejs";
-
-const DB_FILE = path.join(process.cwd(), "data", "omnizeus_local_sql_database.json");
 
 const MAX_ATTEMPTS = 8;
 const LOCKOUT_MS = 15 * 60 * 1000;
@@ -29,13 +26,6 @@ function checkRateLimit(key: string): boolean {
 
 function clearRateLimit(key: string): void {
   attempts.delete(key);
-}
-
-function getDb(): any {
-  try {
-    if (fs.existsSync(DB_FILE)) return JSON.parse(fs.readFileSync(DB_FILE, "utf-8"));
-  } catch {}
-  return {};
 }
 
 export async function POST(req: NextRequest) {
@@ -90,14 +80,14 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Check dynamically created employees in DB
-    const db = getDb();
-    const employees: any[] = Array.isArray(db.employees) ? db.employees : [];
+    const { data: employees } = await supabase.from('employees').select('*');
+    const safeEmployees = employees || [];
 
     const { verifyPassword } = await import("@/lib/auth/passwordUtils");
 
     let empIndex = -1;
-    for (let i = 0; i < employees.length; i++) {
-      const e = employees[i];
+    for (let i = 0; i < safeEmployees.length; i++) {
+      const e = safeEmployees[i];
       if ((e.email || "").toLowerCase() !== cleanEmail) continue;
       const stored = e.passwordHash || e.password_hash || e.password || e.temporary_password || e.temporaryPassword;
       if (stored && await verifyPassword(cleanPass, stored)) {
@@ -107,7 +97,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (empIndex >= 0) {
-      const emp = employees[empIndex];
+      const emp = safeEmployees[empIndex];
       clearRateLimit(rateKey);
 
       // Check if user account is blocked or inactive
@@ -120,17 +110,12 @@ export async function POST(req: NextRequest) {
 
       // Update last login timestamp
       const now = new Date().toISOString();
-      employees[empIndex].last_login_at = now;
-      employees[empIndex].lastLoginAt = now;
-      try {
-        fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), "utf-8");
-      } catch {}
+      await supabase.from('employees').update({ last_login_at: now }).eq('id', emp.id);
 
       const mustChangePassword = emp.must_change_password === true || emp.mustChangePassword === true;
 
       // Resolve company name
-      const companies: any[] = Array.isArray(db.companies) ? db.companies : [];
-      const company = companies.find((c: any) => c.id === emp.company_id || c.id === emp.companyId);
+      const { data: company } = await supabase.from('companies').select('*').eq('id', emp.company_id || emp.companyId).single();
       const companyName = emp.companyName || company?.tradeName || company?.corporate_name || emp.companyId || "";
 
       const res = NextResponse.json({
@@ -159,7 +144,6 @@ export async function POST(req: NextRequest) {
         allowedModules: emp.allowed_modules || emp.allowedModules || []
       });
     }
-
 
     return NextResponse.json(
       { success: false, error: "E-mail ou senha incorretos. Verifique suas credenciais." },
