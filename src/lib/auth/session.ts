@@ -14,6 +14,15 @@ import { getEnv } from "@/lib/env";
 
 const SESSION_COOKIE = "omnizeus_session";
 
+// Edge-safe: em Cloudflare Workers (sem nodejs_compat) `process` não existe.
+function isProduction(): boolean {
+  try {
+    return typeof process !== "undefined" && process.env?.NODE_ENV === "production";
+  } catch {
+    return false;
+  }
+}
+
 function getSessionSecret(): string {
   const fromEnv = getEnv("SESSION_SECRET");
   if (fromEnv && fromEnv.length >= 32) return fromEnv;
@@ -113,7 +122,7 @@ export async function createAuthResponse(
   status: number = 200
 ): Promise<NextResponse> {
   const token = await createSessionCookie(payload);
-  const isProd = process.env.NODE_ENV === "production";
+  const isProd = isProduction();
   const cookieHeader = `${SESSION_COOKIE}=${token}; Path=/; Max-Age=86400; HttpOnly; SameSite=Lax${isProd ? "; Secure" : ""}`;
 
   return new NextResponse(JSON.stringify(jsonBody), {
@@ -127,7 +136,7 @@ export async function createAuthResponse(
 
 export async function setSessionCookie(res: NextResponse, payload: Omit<SessionPayload, "issuedAt" | "expiresAt">): Promise<NextResponse> {
   const token = await createSessionCookie(payload);
-  const isProd = process.env.NODE_ENV === "production";
+  const isProd = isProduction();
   const cookieHeader = `${SESSION_COOKIE}=${token}; Path=/; Max-Age=86400; HttpOnly; SameSite=Lax${isProd ? "; Secure" : ""}`;
   
   try {
@@ -152,7 +161,7 @@ export async function setSessionCookie(res: NextResponse, payload: Omit<SessionP
 export function clearSessionCookie(res: NextResponse): NextResponse {
   res.cookies.set(SESSION_COOKIE, "", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isProduction(),
     sameSite: "lax",
     path: "/",
     maxAge: 0,

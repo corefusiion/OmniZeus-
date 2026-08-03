@@ -1,5 +1,14 @@
 import { readDb } from "@/lib/db/localDb";
 
+// Edge-safe: lê variáveis de ambiente sem quebrar em Cloudflare Workers (onde `process` pode não existir).
+function envOrEmpty(key: string): string {
+  try {
+    return typeof process !== "undefined" && process.env ? (process.env[key] || "") : "";
+  } catch {
+    return "";
+  }
+}
+
 export interface ResolvedAIProvider {
   apiUrl: string;
   apiKey: string;
@@ -49,7 +58,7 @@ export async function resolveAIProvider(options: {
     }
 
     // Default to OpenRouter Master for Super Admin
-    const masterKey = settings.openrouter_api_key || process.env.OPENROUTER_API_KEY || '';
+    const masterKey = settings.openrouter_api_key || envOrEmpty('OPENROUTER_API_KEY');
     return {
       apiUrl: "https://openrouter.ai/api/v1/chat/completions",
       apiKey: masterKey,
@@ -78,7 +87,7 @@ export async function resolveAIProvider(options: {
   }
 
   // Fallback to OpenRouter Master
-  const masterKey = settings.openrouter_api_key || process.env.OPENROUTER_API_KEY || '';
+  const masterKey = settings.openrouter_api_key || envOrEmpty('OPENROUTER_API_KEY');
   return {
     apiUrl: "https://openrouter.ai/api/v1/chat/completions",
     apiKey: masterKey,

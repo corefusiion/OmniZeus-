@@ -42,7 +42,14 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim(), password: password.trim() }),
       });
-      const data = await res.json();
+      const rawText = await res.text();
+      let data: any = {};
+      try {
+        data = rawText ? JSON.parse(rawText) : {};
+      } catch {
+        // Resposta não-JSON (ex.: HTML de erro do servidor) — mantém data vazio.
+        data = {};
+      }
 
       if (res.ok && data.success && data.user) {
         // Sync client-side roles module
@@ -65,7 +72,7 @@ export default function LoginPage() {
           window.location.href = data.user.role === "super_adm" ? "/dashboard-master" : "/dashboard";
         }
       } else {
-        setErrorMsg(data.error || `Erro (${res.status}): Credenciais inválidas.`);
+        setErrorMsg(data.error || `Erro (${res.status}): ${res.statusText || "Falha na autenticação."}`);
       }
     } catch (err: any) {
       console.error("Login fetch error:", err);

@@ -119,7 +119,12 @@ export async function searchAll(query: string) {
  */
 export async function syncAll() {
   const tokens = await getContaAzulTokens();
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  let baseUrl = "http://localhost:3000";
+  try {
+    if (typeof process !== "undefined" && process.env && process.env.NEXT_PUBLIC_APP_URL) {
+      baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+    }
+  } catch {}
   const res = await fetch(`${baseUrl}/api/contaazul/sync`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

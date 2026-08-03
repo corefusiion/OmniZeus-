@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/db/supabaseClient";
+import { getEnv } from "@/lib/env";
 
 export const runtime = "edge";
 
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest) {
     const signatureHeader = req.headers.get("stripe-signature") || "";
 
     const { data: settingsData } = await supabase.from('settings').select('stripe_webhook_secret, grace_period_days').limit(1).maybeSingle();
-    const webhookSecret = (settingsData?.stripe_webhook_secret || process.env.STRIPE_WEBHOOK_SECRET || "").trim();
+    const webhookSecret = (settingsData?.stripe_webhook_secret || getEnv("STRIPE_WEBHOOK_SECRET") || "").trim();
     const defaultGracePeriodDays = Number(settingsData?.grace_period_days || 5);
 
     if (!webhookSecret) {

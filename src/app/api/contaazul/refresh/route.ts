@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { getContaAzulTokens, saveContaAzulTokens } from "@/lib/contaazul/store";
+import { getEnv } from "@/lib/env";
 
 export const runtime = "edge";
 
@@ -11,8 +12,8 @@ export async function POST(req: Request) {
 
     const activeRefreshToken = body.refreshToken || stored.refreshToken;
     // Credenciais OAuth movidas para variáveis de ambiente (nunca hardcoded no código).
-    const activeClientId = body.clientId || stored.clientId || process.env.CONTA_AZUL_CLIENT_ID || "";
-    const activeClientSecret = body.clientSecret || stored.clientSecret || process.env.CONTA_AZUL_CLIENT_SECRET || "";
+    const activeClientId = body.clientId || stored.clientId || getEnv("CONTA_AZUL_CLIENT_ID") || "";
+    const activeClientSecret = body.clientSecret || stored.clientSecret || getEnv("CONTA_AZUL_CLIENT_SECRET") || "";
 
     if (!activeRefreshToken) {
       return NextResponse.json(
