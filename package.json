@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "node scripts/build.js",
+    "build": "next build",
     "build:cf": "next-on-pages",
     "start": "next start",
     "lint": "next lint",
