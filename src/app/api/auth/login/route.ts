@@ -1,4 +1,4 @@
-﻿export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic";
 // API Route: POST /api/auth/login
 // Server-side authentication â€” sets a signed HttpOnly cookie with the session.
 // This is the ONLY way the frontend should authenticate. Never trust client-side state for auth.
@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { setSessionCookie } from "@/lib/auth/session";
 import { PRODUCTION_USERS } from "@/lib/auth/roles";
 import { supabase } from "@/lib/db/supabaseClient";
+import { getEnv } from "@/lib/env";
 
 export const runtime = "edge";
 
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
       u => u.email.toLowerCase() === cleanEmail
     );
 
-    const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD || 'Design20';
+    const superAdminPassword = getEnv("SUPER_ADMIN_PASSWORD") || 'Design20';
 
     if (prodUser && cleanPass === superAdminPassword) {
       clearRateLimit(rateKey);

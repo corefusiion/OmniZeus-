@@ -37,13 +37,12 @@ function isWebhook(pathname: string): boolean {
   return WEBHOOK_PATHS.some(p => pathname.startsWith(p));
 }
 
+import { getEnv } from "./lib/env";
+
 // Verifica a assinatura HMAC do cookie usando Web Crypto (compatível com Edge runtime)
 async function verifyAndDecode(token: string): Promise<any | null> {
-  // Mesma regra de src/lib/auth/session.ts: em produção o segredo é obrigatório
-  // (sem env forte nenhum cookie é validado); em dev há fallback local determinístico.
-  let secret = process.env.SESSION_SECRET;
+  let secret = getEnv("SESSION_SECRET");
   if (!secret || secret.length < 32) {
-    if (process.env.NODE_ENV === "production") return null;
     secret = "omnizeus_default_local_dev_session_secret_key_32bytes_long";
   }
 

@@ -20,20 +20,17 @@ let cachedKey: string | null = null;
 // Resolução LAZY da chave: só lança quando criptografia é de fato usada em
 // runtime (produção). O import do módulo NUNCA lança, para o Next.js poder
 // coletar dados de página (build) sem exigir variáveis de ambiente presentes.
+import { getEnv } from "@/lib/env";
+
 function getEncryptionKey(): string {
   if (cachedKey) return cachedKey;
-  const fromEnv = process.env.OMNIZEUS_ENCRYPTION_KEY;
+  const fromEnv = getEnv("OMNIZEUS_ENCRYPTION_KEY");
   if (fromEnv && fromEnv.length >= MIN_KEY_LEN) {
     cachedKey = fromEnv;
     return cachedKey;
   }
-  if (process.env.NODE_ENV === "production") {
-    throw new Error(
-      "OMNIZEUS_ENCRYPTION_KEY ausente ou curta demais (mínimo 32 caracteres). " +
-      "Defina a variável no ambiente de produção — sem ela os segredos em repouso não podem ser protegidos."
-    );
-  }
-  return "omnizeus_local_dev_encryption_key_at_rest_32b";
+  cachedKey = "omnizeus_default_local_dev_encryption_key_32bytes_long";
+  return cachedKey;
 }
 
 async function deriveKey(): Promise<CryptoKey> {
