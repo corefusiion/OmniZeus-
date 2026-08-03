@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 // This is the ONLY way the frontend should authenticate. Never trust client-side state for auth.
 
 import { NextRequest, NextResponse } from "next/server";
-import { setSessionCookie } from "@/lib/auth/session";
+import { setSessionCookie, createAuthResponse } from "@/lib/auth/session";
 import { PRODUCTION_USERS } from "@/lib/auth/roles";
 import { supabase } from "@/lib/db/supabaseClient";
 import { getEnv } from "@/lib/env";
@@ -68,25 +68,26 @@ export async function POST(req: NextRequest) {
 
     if (prodUser && cleanPass === superAdminPassword) {
       clearRateLimit(rateKey);
-      const res = NextResponse.json({
-        success: true,
-        user: {
-          id: prodUser.id,
-          name: prodUser.name,
+      const userData = {
+        id: prodUser.id,
+        name: prodUser.name,
+        email: prodUser.email,
+        role: prodUser.role,
+        companyId: prodUser.companyId,
+        companyName: prodUser.companyName,
+      };
+
+      return await createAuthResponse(
+        { success: true, user: userData },
+        {
+          userId: prodUser.id,
           email: prodUser.email,
+          name: prodUser.name,
           role: prodUser.role,
           companyId: prodUser.companyId,
           companyName: prodUser.companyName,
         }
-      });
-      return await setSessionCookie(res, {
-        userId: prodUser.id,
-        email: prodUser.email,
-        name: prodUser.name,
-        role: prodUser.role,
-        companyId: prodUser.companyId,
-        companyName: prodUser.companyName,
-      });
+      );
     }
 
     // 2. Check dynamically created employees in DB
@@ -140,31 +141,30 @@ export async function POST(req: NextRequest) {
         }
       } catch {}
 
-      const res = NextResponse.json({
-        success: true,
+      const userData = {
+        id: emp.id,
+        name: emp.name,
+        email: emp.email,
+        role: emp.role,
+        companyId: emp.company_id || emp.companyId,
+        companyName,
         mustChangePassword,
-        user: {
-          id: emp.id,
-          name: emp.name,
+        allowedModules: emp.allowed_modules || emp.allowedModules || []
+      };
+
+      return await createAuthResponse(
+        { success: true, mustChangePassword, user: userData },
+        {
+          userId: emp.id,
           email: emp.email,
+          name: emp.name,
           role: emp.role,
           companyId: emp.company_id || emp.companyId,
           companyName,
           mustChangePassword,
           allowedModules: emp.allowed_modules || emp.allowedModules || []
         }
-      });
-
-      return await setSessionCookie(res, {
-        userId: emp.id,
-        email: emp.email,
-        name: emp.name,
-        role: emp.role,
-        companyId: emp.company_id || emp.companyId,
-        companyName,
-        mustChangePassword,
-        allowedModules: emp.allowed_modules || emp.allowedModules || []
-      });
+      );
     }
 
     return NextResponse.json(
