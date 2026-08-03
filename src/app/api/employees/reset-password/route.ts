@@ -8,7 +8,7 @@ import { getSession } from "@/lib/auth/session";
 import { generateTemporaryPassword, hashPassword } from "@/lib/auth/passwordUtils";
 import { supabase } from "@/lib/db/supabaseClient";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
   try {

@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { PurchaseOrder } from "@/lib/db/serverDb";
 import { supabase } from "@/lib/db/supabaseClient";
 
+export const runtime = "edge";
+
 // Backend Official Plans (Security: Price & Coins are strictly determined on server)
 const PLANS: Record<string, { name: string; price: number; coins: number; is_test?: boolean }> = {
   test_1_real: {

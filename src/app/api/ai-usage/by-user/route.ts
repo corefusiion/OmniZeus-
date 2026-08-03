@@ -1,13 +1,13 @@
-export const dynamic = "force-dynamic";
+﻿export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { readDb } from "@/lib/db/localDb";
 import { getSession } from "@/lib/auth/session";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = getSession(req);
+    const session = await getSession(req);
     if (!session) {
       return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
     }
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
       ? requestedCompanyId
       : (session.companyId || "comp_zenitus");
 
-    // Gestor/super_adm enxergam todos; funcionário vê apenas o próprio consumo.
+    // Gestor/super_adm enxergam todos; funcionÃ¡rio vÃª apenas o prÃ³prio consumo.
     const isGestor = session.role === "gestor" || session.role === "super_adm";
     const ownUserId = session.userId;
 
@@ -27,23 +27,23 @@ export async function GET(req: NextRequest) {
       ? db.ai_usage_logs.filter((l: any) => (l.company_id || l.companyId) === companyId)
       : [];
 
-    // Nome dos colaboradores para exibição
+    // Nome dos colaboradores para exibiÃ§Ã£o
     const emps = Array.isArray(db.employees) ? db.employees : [];
     const userNames = new Map<string, string>();
     emps.forEach((e: any) => {
-      if (e.id) userNames.set(e.id, e.name || e.nome || e.email || "—");
-      if (e.user_id) userNames.set(e.user_id, e.name || e.nome || e.email || "—");
+      if (e.id) userNames.set(e.id, e.name || e.nome || e.email || "â€”");
+      if (e.user_id) userNames.set(e.user_id, e.name || e.nome || e.email || "â€”");
     });
 
     const byKey = new Map<string, any>();
     logs.forEach((l: any) => {
       const uid = l.usuario_id || "desconhecido";
       if (!isGestor && uid !== ownUserId) return;
-      const day = (l.created_at || "").slice(0, 10) || "—";
+      const day = (l.created_at || "").slice(0, 10) || "â€”";
       const key = `${uid}::${day}`;
       const cur = byKey.get(key) || {
         usuario_id: uid,
-        usuario_nome: userNames.get(uid) || (uid === ownUserId && !isGestor ? "Você" : uid),
+        usuario_nome: userNames.get(uid) || (uid === ownUserId && !isGestor ? "VocÃª" : uid),
         dia: day,
         interacoes: 0,
         coins: 0,

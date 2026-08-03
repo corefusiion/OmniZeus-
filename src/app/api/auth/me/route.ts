@@ -1,18 +1,18 @@
-export const dynamic = "force-dynamic";
+﻿export const dynamic = "force-dynamic";
 // API Route: GET /api/auth/me
 // Returns current authenticated user profile from HttpOnly session cookie.
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = getSession(req);
+    const session = await getSession(req);
     if (!session) {
       return NextResponse.json(
-        { success: false, error: "Sessão inválida ou expirada." },
+        { success: false, error: "SessÃ£o invÃ¡lida ou expirada." },
         { status: 401 }
       );
     }
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
     return response;
   } catch {
     return NextResponse.json(
-      { success: false, error: "Falha ao verificar sessão." },
+      { success: false, error: "Falha ao verificar sessÃ£o." },
       { status: 500 }
     );
   }

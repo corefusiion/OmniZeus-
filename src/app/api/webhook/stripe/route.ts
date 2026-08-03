@@ -1,12 +1,13 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 import { supabase } from "@/lib/db/supabaseClient";
+
+export const runtime = "edge";
 
 // HMAC-SHA256 Stripe Webhook Signature Verification
 const SIGNATURE_TOLERANCE_SEC = 300;
 
-function verifyStripeSignature(rawBody: string, signatureHeader: string, webhookSecret: string): boolean {
+async function verifyStripeSignature(rawBody: string, signatureHeader: string, webhookSecret: string): Promise<boolean> {
   try {
     const items = signatureHeader.split(",").reduce((acc: any, item: string) => {
       const [key, val] = item.trim().split("=");
@@ -24,15 +25,21 @@ function verifyStripeSignature(rawBody: string, signatureHeader: string, webhook
     if (!Number.isFinite(ageSec) || ageSec > SIGNATURE_TOLERANCE_SEC) return false;
 
     const payload = `${timestamp}.${rawBody}`;
-    const expectedSignature = crypto
-      .createHmac("sha256", webhookSecret)
-      .update(payload, "utf8")
-      .digest("hex");
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(webhookSecret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    const sigBytes = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)));
+    const expectedSignature = Array.from(sigBytes).map(b => b.toString(16).padStart(2, "0")).join("");
 
-    const sigBuf = Buffer.from(signature);
-    const expectedBuf = Buffer.from(expectedSignature);
-    if (sigBuf.length !== expectedBuf.length) return false;
-    return crypto.timingSafeEqual(sigBuf, expectedBuf);
+    // comparação em tempo constante (hex)
+    if (signature.length !== expectedSignature.length) return false;
+    let diff = 0;
+    for (let i = 0; i < signature.length; i++) diff |= signature.charCodeAt(i) ^ expectedSignature.charCodeAt(i);
+    return diff === 0;
   } catch (err) {
     console.error("Error verifying Stripe signature:", err);
     return false;
@@ -69,7 +76,7 @@ export async function POST(req: NextRequest) {
     if (!signatureHeader) {
       return NextResponse.json({ error: "Missing stripe-signature header" }, { status: 400 });
     }
-    if (!verifyStripeSignature(rawBody, signatureHeader, webhookSecret)) {
+    if (!(await verifyStripeSignature(rawBody, signatureHeader, webhookSecret))) {
       return NextResponse.json({ error: "Invalid Stripe Webhook signature" }, { status: 400 });
     }
 

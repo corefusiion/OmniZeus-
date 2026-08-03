@@ -1,15 +1,15 @@
-export const dynamic = "force-dynamic";
+﻿export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { supabase } from "@/lib/db/supabaseClient";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
   try {
-    const session = getSession(req);
+    const session = await getSession(req);
     if (!session) {
-      return NextResponse.json({ error: "Não autenticado.", code: "UNAUTHORIZED" }, { status: 401 });
+      return NextResponse.json({ error: "NÃ£o autenticado.", code: "UNAUTHORIZED" }, { status: 401 });
     }
     if (session.role !== "super_adm") {
       return NextResponse.json({ error: "Acesso negado.", code: "FORBIDDEN" }, { status: 403 });
@@ -18,14 +18,14 @@ export async function POST(req: NextRequest) {
     const { companyId } = await req.json();
 
     if (!companyId) {
-      return NextResponse.json({ error: "Identificador da empresa é obrigatório." }, { status: 400 });
+      return NextResponse.json({ error: "Identificador da empresa Ã© obrigatÃ³rio." }, { status: 400 });
     }
 
     const now = new Date().toISOString();
 
     const { data: company, error: findError } = await supabase.from('companies').select('id').eq('id', companyId).maybeSingle();
     if (findError || !company) {
-      return NextResponse.json({ error: "Empresa não encontrada." }, { status: 404 });
+      return NextResponse.json({ error: "Empresa nÃ£o encontrada." }, { status: 404 });
     }
 
     await supabase.from('companies').update({

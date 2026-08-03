@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { fetchWithAutoRefresh } from "@/lib/contaazul/store";
 import { supabase } from "@/lib/db/supabaseClient";
 
+export const runtime = "edge";
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();

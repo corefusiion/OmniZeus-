@@ -38,6 +38,8 @@ Na tela de setup, preencha exatamente com estes dados:
 
 > ⚠️ **NÃO use `pnpm` como package manager**: o projeto é configurado para **npm** (`package-lock.json` existe; `pnpm-lock.yaml` não). Rodar via pnpm faz o adapter avisar `The project is set up for npm but it is currently being run via pnpm`. Use npm (o painel detecta `npm@10.9.2` automaticamente).
 
+> ⚠️ **Edge Runtime obrigatório**: o `next-on-pages` exige `export const runtime = "edge"` em TODA rota API não-estática (senão: `Failed to produce a Cloudflare Pages build from the project. The following routes were not configured to run with the Edge Runtime`). Todas as 44 rotas do OmniZeus já estão migradas. Isso impôs a migração para **Web Crypto** (`crypto.subtle`/`getRandomValues` — HMAC de sessão, PBKDF2 de senhas, AES-GCM do at-rest, HMAC do webhook Stripe); `node:` e `Buffer` não são usados no `src/`. O `next.config.mjs` ignora imports `node:` nos bundles edge (`IgnorePlugin`) para o `pptxgenjs` (seus `import("node:fs")` dinâmicos são guardados por detecção de Node e nunca executam no edge). **Validação local confiável**: `npm run build` no Windows compila os bundles edge (`next-edge-app-route-loader`) e acusa qualquer incompatibilidade antes do push — rode `npm run build` + `npx tsc --noEmit` antes de dar push.
+
 ---
 
 ## 4. O Passo Mais Importante: Variáveis de Ambiente (Secrets)

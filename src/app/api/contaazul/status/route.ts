@@ -3,6 +3,8 @@ import { NextResponse, NextRequest } from "next/server";
 import { getContaAzulTokens, saveContaAzulTokens } from "@/lib/contaazul/store";
 import { supabase } from "@/lib/db/supabaseClient";
 
+export const runtime = "edge";
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);

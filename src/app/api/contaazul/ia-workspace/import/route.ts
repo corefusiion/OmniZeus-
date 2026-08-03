@@ -1,15 +1,15 @@
-export const dynamic = "force-dynamic";
+﻿export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { resolveAIProvider } from "@/lib/ai/providerResolver";
 import { MODEL_MAP } from "@/lib/ai/openRouterClient";
 import { getSession } from "@/lib/auth/session";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 
 /**
  * POST /api/contaazul/ia-workspace/import
- * Importação inteligente de documentos
+ * ImportaÃ§Ã£o inteligente de documentos
  * Aceita: XLSX, CSV, PDF (texto), imagens (via LLM vision)
  */
 export async function POST(req: NextRequest) {
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     let errors: string[] = [];
     let rawText = "";
 
-    // ─── XLSX / XLS / CSV ───
+    // â”€â”€â”€ XLSX / XLS / CSV â”€â”€â”€
     if (["xlsx", "xls", "csv"].includes(fileExt)) {
       try {
         const workbook = XLSX.read(buffer, { type: "buffer" });
@@ -47,11 +47,11 @@ export async function POST(req: NextRequest) {
         if (jsonData.length < 2) {
           return NextResponse.json({
             success: false,
-            error: "Planilha sem dados suficientes (mínimo: cabeçalho + 1 linha)."
+            error: "Planilha sem dados suficientes (mÃ­nimo: cabeÃ§alho + 1 linha)."
           }, { status: 400 });
         }
 
-        // Primeira linha = cabeçalhos
+        // Primeira linha = cabeÃ§alhos
         const headers = (jsonData[0] || []).map((h: any) => String(h || "").trim());
         columns = headers;
 
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
             obj[header] = row[idx] !== undefined ? String(row[idx]).trim() : "";
           });
 
-          // Validação básica
+          // ValidaÃ§Ã£o bÃ¡sica
           const hasData = Object.values(obj).some(v => v && v !== "");
           if (hasData) {
             extractedData.push(obj);
@@ -73,62 +73,62 @@ export async function POST(req: NextRequest) {
         }
 
         if (extractedData.length === 0) {
-          warnings.push("Nenhuma linha com dados válidos encontrada na planilha.");
+          warnings.push("Nenhuma linha com dados vÃ¡lidos encontrada na planilha.");
         }
 
         // Mapeamento inteligente de colunas
         const headerMap: Record<string, string> = {};
         headers.forEach(h => {
           const lower = h.toLowerCase();
-          if (lower.includes("nome") || lower.includes("razão") || lower.includes("razao")) headerMap[h] = "nome";
+          if (lower.includes("nome") || lower.includes("razÃ£o") || lower.includes("razao")) headerMap[h] = "nome";
           else if (lower.includes("cnpj") || lower.includes("cpf") || lower.includes("documento")) headerMap[h] = "documento";
           else if (lower.includes("email") || lower.includes("e-mail")) headerMap[h] = "email";
           else if (lower.includes("telefone") || lower.includes("celular") || lower.includes("fone")) headerMap[h] = "telefone";
-          else if (lower.includes("valor") || lower.includes("preço") || lower.includes("preco")) headerMap[h] = "valor";
+          else if (lower.includes("valor") || lower.includes("preÃ§o") || lower.includes("preco")) headerMap[h] = "valor";
           else if (lower.includes("vencimento") || lower.includes("data")) headerMap[h] = "data";
           else if (lower.includes("status")) headerMap[h] = "status";
-          else if (lower.includes("descrição") || lower.includes("descricao")) headerMap[h] = "descricao";
+          else if (lower.includes("descriÃ§Ã£o") || lower.includes("descricao")) headerMap[h] = "descricao";
         });
 
         // Converter texto para formato que a IA possa interpretar
         rawText = `Arquivo: ${fileName}\nColunas: ${columns.join(", ")}\nLinhas: ${extractedData.length}\n\n`;
         rawText += `Mapeamento detectado: ${JSON.stringify(headerMap)}\n\n`;
-        rawText += `Dados extraídos:\n${JSON.stringify(extractedData.slice(0, 50), null, 2)}`;
+        rawText += `Dados extraÃ­dos:\n${JSON.stringify(extractedData.slice(0, 50), null, 2)}`;
 
       } catch (xlsErr: any) {
         errors.push(`Erro ao processar planilha: ${xlsErr.message}`);
       }
     }
 
-    // ─── PDF (extração de texto simples) ───
+    // â”€â”€â”€ PDF (extraÃ§Ã£o de texto simples) â”€â”€â”€
     else if (fileExt === "pdf") {
-      // Extração simplificada - converte bytes para string procurando texto legível
+      // ExtraÃ§Ã£o simplificada - converte bytes para string procurando texto legÃ­vel
       const text = buffer.toString("utf-8").replace(/[^\x20-\x7E\xA0-\xFF\n\r\t]/g, " ");
-      rawText = `Arquivo PDF: ${fileName}\nConteúdo extraído (texto bruto):\n${text.slice(0, 8000)}`;
-      warnings.push("PDFs com imagens ou layouts complexos podem ter extração parcial. Revise os dados.");
+      rawText = `Arquivo PDF: ${fileName}\nConteÃºdo extraÃ­do (texto bruto):\n${text.slice(0, 8000)}`;
+      warnings.push("PDFs com imagens ou layouts complexos podem ter extraÃ§Ã£o parcial. Revise os dados.");
     }
 
-    // ─── DOCX (extração de texto do XML interno) ───
+    // â”€â”€â”€ DOCX (extraÃ§Ã£o de texto do XML interno) â”€â”€â”€
     else if (fileExt === "docx") {
       try {
         const zip = XLSX.read(buffer, { type: "buffer" });
-        // DOCX é um ZIP - tentar extrair texto do document.xml
-        rawText = `Arquivo DOCX: ${fileName}\nConteúdo extraído do documento Word.`;
-        warnings.push("Extração de DOCX é limitada. Para melhores resultados, salve como CSV ou XLSX.");
+        // DOCX Ã© um ZIP - tentar extrair texto do document.xml
+        rawText = `Arquivo DOCX: ${fileName}\nConteÃºdo extraÃ­do do documento Word.`;
+        warnings.push("ExtraÃ§Ã£o de DOCX Ã© limitada. Para melhores resultados, salve como CSV ou XLSX.");
       } catch (e) {
-        rawText = `Arquivo DOCX: ${fileName}\nNão foi possível extrair texto automaticamente.`;
-        errors.push("Falha na extração de texto do DOCX.");
+        rawText = `Arquivo DOCX: ${fileName}\nNÃ£o foi possÃ­vel extrair texto automaticamente.`;
+        errors.push("Falha na extraÃ§Ã£o de texto do DOCX.");
       }
     }
 
-    // ─── Imagens (enviar para LLM com vision) ───
+    // â”€â”€â”€ Imagens (enviar para LLM com vision) â”€â”€â”€
     else if (["png", "jpg", "jpeg", "webp"].includes(fileExt)) {
       const base64 = buffer.toString("base64");
       const mimeType = fileType || `image/${fileExt}`;
 
       // Enviar para LLM com vision para OCR inteligente
       // Usa a chave OpenRouter da empresa (se configurada) ou o fallback master
-      const session = getSession(req);
+      const session = await getSession(req);
       const companyId =
         req.headers.get("x-company-id") ||
         (formData.get("companyId") as string | null) ||
@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
                 content: [
                   {
                     type: "text",
-                    text: "Analise esta imagem e extraia TODOS os dados estruturados visíveis (tabelas, formulários, textos). Retorne os dados em formato JSON com as chaves identificadas. Se houver uma tabela, retorne como array de objetos. Responda APENAS com JSON válido."
+                    text: "Analise esta imagem e extraia TODOS os dados estruturados visÃ­veis (tabelas, formulÃ¡rios, textos). Retorne os dados em formato JSON com as chaves identificadas. Se houver uma tabela, retorne como array de objetos. Responda APENAS com JSON vÃ¡lido."
                   },
                   {
                     type: "image_url",
@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
 
         if (visionRes.ok) {
           const visionData = await visionRes.json();
-          rawText = visionData.choices?.[0]?.message?.content || "Não foi possível extrair dados da imagem.";
+          rawText = visionData.choices?.[0]?.message?.content || "NÃ£o foi possÃ­vel extrair dados da imagem.";
         } else {
           warnings.push("Falha ao processar imagem via IA. Verifique a chave de API.");
           rawText = `Imagem: ${fileName} (${(buffer.length / 1024).toFixed(1)} KB)`;
@@ -186,11 +186,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ─── Tipo não suportado ───
+    // â”€â”€â”€ Tipo nÃ£o suportado â”€â”€â”€
     else {
       return NextResponse.json({
         success: false,
-        error: `Tipo de arquivo não suportado: .${fileExt}. Aceitos: PDF, XLSX, XLS, CSV, DOCX, PNG, JPG.`
+        error: `Tipo de arquivo nÃ£o suportado: .${fileExt}. Aceitos: PDF, XLSX, XLS, CSV, DOCX, PNG, JPG.`
       }, { status: 400 });
     }
 
@@ -211,7 +211,7 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error("[IA-Workspace Import] Error:", err);
     return NextResponse.json(
-      { success: false, error: err.message || "Erro ao processar importação." },
+      { success: false, error: err.message || "Erro ao processar importaÃ§Ã£o." },
       { status: 500 }
     );
   }

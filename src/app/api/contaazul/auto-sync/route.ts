@@ -4,6 +4,8 @@ import { fetchWithAutoRefresh, getContaAzulTokens, saveContaAzulTokens } from "@
 import { decryptContaAzulFields, encryptContaAzulFields } from "@/lib/crypto/atRest";
 import { supabase } from "@/lib/db/supabaseClient";
 
+export const runtime = "edge";
+
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
   try {
@@ -27,8 +29,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const connectedConfigs = configData
-      .map((cfg: any) => decryptContaAzulFields(cfg))
+    const connectedConfigs = (await Promise.all(
+      configData.map(async (cfg: any) => await decryptContaAzulFields(cfg))
+    ))
       .filter((cfg: any) => {
         if (!cfg.is_connected || !cfg.access_token) return false;
         if (targetCompanyId && targetCompanyId !== "global" && cfg.company_id !== targetCompanyId) return false;
@@ -242,7 +245,7 @@ export async function POST(req: NextRequest) {
         const now = new Date();
         const nextSync = new Date(now.getTime() + 10 * 60 * 1000);
 
-        const encryptedCfg = encryptContaAzulFields({
+        const encryptedCfg = await encryptContaAzulFields({
           access_token: activeToken,
           refresh_token: activeRefresh
         });

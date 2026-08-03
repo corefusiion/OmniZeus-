@@ -2,6 +2,8 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { getContaAzulTokens, saveContaAzulTokens } from "@/lib/contaazul/store";
 
+export const runtime = "edge";
+
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));

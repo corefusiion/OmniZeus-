@@ -1,6 +1,6 @@
-export const dynamic = "force-dynamic";
+﻿export const dynamic = "force-dynamic";
 // API Route: POST /api/auth/login
-// Server-side authentication — sets a signed HttpOnly cookie with the session.
+// Server-side authentication â€” sets a signed HttpOnly cookie with the session.
 // This is the ONLY way the frontend should authenticate. Never trust client-side state for auth.
 
 import { NextRequest, NextResponse } from "next/server";
@@ -8,7 +8,7 @@ import { setSessionCookie } from "@/lib/auth/session";
 import { PRODUCTION_USERS } from "@/lib/auth/roles";
 import { supabase } from "@/lib/db/supabaseClient";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 
 const MAX_ATTEMPTS = 8;
 const LOCKOUT_MS = 15 * 60 * 1000;
@@ -34,13 +34,13 @@ export async function POST(req: NextRequest) {
     const { email, password } = await req.json();
 
     if (!email || !password) {
-      return NextResponse.json({ error: "E-mail e senha são obrigatórios." }, { status: 400 });
+      return NextResponse.json({ error: "E-mail e senha sÃ£o obrigatÃ³rios." }, { status: 400 });
     }
 
     const cleanEmail = email.trim().toLowerCase();
     const cleanPass = password.trim();
 
-    // Trava de força bruta por e-mail + IP
+    // Trava de forÃ§a bruta por e-mail + IP
     const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";
     const rateKey = `${cleanEmail}|${clientIp}`;
     if (!checkRateLimit(rateKey)) {
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
           companyName: prodUser.companyName,
         }
       });
-      return setSessionCookie(res, {
+      return await setSessionCookie(res, {
         userId: prodUser.id,
         email: prodUser.email,
         name: prodUser.name,
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
       // Check if user account is blocked or inactive
       if (emp.status === "Bloqueado" || emp.status === "Inativo") {
         return NextResponse.json(
-          { success: false, error: "Esta conta está desativada ou bloqueada. Entre em contato com o Gestor da sua empresa." },
+          { success: false, error: "Esta conta estÃ¡ desativada ou bloqueada. Entre em contato com o Gestor da sua empresa." },
           { status: 403 }
         );
       }
@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
         }
       });
 
-      return setSessionCookie(res, {
+      return await setSessionCookie(res, {
         userId: emp.id,
         email: emp.email,
         name: emp.name,
@@ -157,7 +157,7 @@ export async function POST(req: NextRequest) {
 
 // POST /api/auth/logout
 export async function DELETE(_req: NextRequest) {
-  const res = NextResponse.json({ success: true, message: "Sessão encerrada." });
+  const res = NextResponse.json({ success: true, message: "SessÃ£o encerrada." });
   res.cookies.set("omnizeus_session", "", {
     httpOnly: true,
     path: "/",

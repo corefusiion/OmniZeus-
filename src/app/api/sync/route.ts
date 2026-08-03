@@ -1,12 +1,14 @@
-export const dynamic = "force-dynamic";
+﻿export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
 import { supabase } from '@/lib/db/supabaseClient';
 
+export const runtime = "edge";
+
 export async function GET(req: NextRequest) {
-  const session = getSession(req);
+  const session = await getSession(req);
   if (!session) {
-    return NextResponse.json({ error: 'Não autenticado.', code: 'UNAUTHORIZED' }, { status: 401 });
+    return NextResponse.json({ error: 'NÃ£o autenticado.', code: 'UNAUTHORIZED' }, { status: 401 });
   }
   if (session.role !== 'super_adm') {
     return NextResponse.json({ error: 'Acesso negado.', code: 'FORBIDDEN' }, { status: 403 });

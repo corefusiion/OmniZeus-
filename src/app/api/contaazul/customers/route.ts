@@ -4,6 +4,8 @@ import { fetchWithAutoRefresh } from "@/lib/contaazul/store";
 import { decryptContaAzulFields, encryptContaAzulFields } from "@/lib/crypto/atRest";
 import { supabase } from "@/lib/db/supabaseClient";
 
+export const runtime = "edge";
+
 export async function POST(req: Request) {
   try {
     const { 
@@ -68,7 +70,7 @@ export async function POST(req: Request) {
       .limit(1);
     
     const configRaw = configRows && configRows.length > 0 ? configRows[0] : {};
-    const config = decryptContaAzulFields(configRaw) as any;
+    const config = await decryptContaAzulFields(configRaw) as any;
 
     const finalAccessToken = accessToken || config.access_token;
     const finalRefreshToken = refreshToken || config.refresh_token;
@@ -148,7 +150,7 @@ export async function POST(req: Request) {
     
     // Atualiza tokens
     if (newAccessToken && newRefreshToken) {
-      const encryptedTokens = encryptContaAzulFields({
+      const encryptedTokens = await encryptContaAzulFields({
         access_token: newAccessToken,
         refresh_token: newRefreshToken
       });

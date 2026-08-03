@@ -1,16 +1,16 @@
-export const dynamic = "force-dynamic";
+﻿export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { readDb, writeDb } from "@/lib/db/localDb";
 import { USD_TO_BRL } from "@/lib/ai/pricing";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
   try {
-    const session = getSession(req);
+    const session = await getSession(req);
     if (!session) {
-      return NextResponse.json({ error: "Não autenticado.", code: "UNAUTHORIZED" }, { status: 401 });
+      return NextResponse.json({ error: "NÃ£o autenticado.", code: "UNAUTHORIZED" }, { status: 401 });
     }
 
     const body = await req.json();
@@ -31,28 +31,28 @@ export async function POST(req: NextRequest) {
       custo_openrouter_brl
     } = body;
 
-    // O tenant cobrado vem da sessão. Aceitar company_id do body permitiria
+    // O tenant cobrado vem da sessÃ£o. Aceitar company_id do body permitiria
     // debitar OmniCoins da carteira de outra empresa.
     const company_id = session.role === "super_adm"
       ? (requestedCompanyId || session.companyId)
       : session.companyId;
 
     if (!company_id) {
-      return NextResponse.json({ error: "company_id é obrigatório." }, { status: 400 });
+      return NextResponse.json({ error: "company_id Ã© obrigatÃ³rio." }, { status: 400 });
     }
 
     const coinsToDeduct = typeof coins_consumed === 'number' && coins_consumed > 0 ? coins_consumed : 5;
 
     const db = await readDb();
 
-    // ── Deduzir da carteira da empresa específica (isolamento por tenant) ──────
+    // â”€â”€ Deduzir da carteira da empresa especÃ­fica (isolamento por tenant) â”€â”€â”€â”€â”€â”€
     if (!Array.isArray(db.companies)) {
       return NextResponse.json({ error: "Nenhuma empresa encontrada no banco de dados." }, { status: 404 });
     }
 
     const companyIndex = db.companies.findIndex((c: any) => c.id === company_id);
     if (companyIndex < 0) {
-      return NextResponse.json({ error: `Empresa '${company_id}' não encontrada.` }, { status: 404 });
+      return NextResponse.json({ error: `Empresa '${company_id}' nÃ£o encontrada.` }, { status: 404 });
     }
 
     // Support both coins_franchise (snake_case) and coinsFranchise (camelCase)
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     if (currentBalance < coinsToDeduct) {
       return NextResponse.json(
         {
-          error: "Saldo insuficiente de OmniCoins para realizar a operação.",
+          error: "Saldo insuficiente de OmniCoins para realizar a operaÃ§Ã£o.",
           required: coinsToDeduct,
           current_balance: currentBalance,
           company_id
@@ -91,9 +91,9 @@ export async function POST(req: NextRequest) {
       company_id,
       usuario_id: usuario_id || "usr_gestor",
       agente_id: agente_id || "omni_ia_hub",
-      agente_nome: agente_nome || "Gerador de Conteúdo IA",
+      agente_nome: agente_nome || "Gerador de ConteÃºdo IA",
       modelo: modelo || "anthropic/claude-3.7-sonnet",
-      funcionalidade: funcionalidade || "Geração de Conteúdo",
+      funcionalidade: funcionalidade || "GeraÃ§Ã£o de ConteÃºdo",
       tipo_operacao: tipo_operacao || "DOCUMENT_A4",
       input_tokens: inputToks,
       output_tokens: outputToks,

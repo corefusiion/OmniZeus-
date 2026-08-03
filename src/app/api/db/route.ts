@@ -1,8 +1,10 @@
-export const dynamic = "force-dynamic";
+﻿export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { encryptContaAzulFields } from "@/lib/crypto/atRest";
 import { supabase } from "@/lib/db/supabaseClient";
+
+export const runtime = "edge";
 
 const SUPER_ADMIN_ONLY_TABLES = [
   "settings",
@@ -78,7 +80,7 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const table = url.searchParams.get("table");
 
-  const session = getSession(req);
+  const session = await getSession(req);
   if (!session) {
     return NextResponse.json({ error: "Acesso negado.", code: "UNAUTHORIZED" }, { status: 401 });
   }
@@ -91,7 +93,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (!table) {
-    return NextResponse.json({ error: "Parâmetro 'table' é obrigatório.", code: "TABLE_REQUIRED" }, { status: 400 });
+    return NextResponse.json({ error: "ParÃ¢metro 'table' Ã© obrigatÃ³rio.", code: "TABLE_REQUIRED" }, { status: 400 });
   }
 
   if (SUPER_ADMIN_ONLY_TABLES.includes(table) && !isSuperAdmin) {
@@ -137,7 +139,7 @@ export async function POST(req: NextRequest) {
     const { action, table, settings, contaazul_config } = body;
     let record = body.record;
 
-    const session = getSession(req);
+    const session = await getSession(req);
     if (!session) {
       return NextResponse.json({ error: "Acesso negado.", code: "UNAUTHORIZED" }, { status: 401 });
     }
@@ -163,7 +165,7 @@ export async function POST(req: NextRequest) {
         .single();
         
       if (error && error.code === 'PGRST116') {
-        // Se não existir, faz insert
+        // Se nÃ£o existir, faz insert
         const { data: inserted } = await supabase.from('settings').insert({ id: 'master_config', ...settings }).select().single();
         return NextResponse.json({ success: true, settings: inserted });
       }
@@ -174,7 +176,7 @@ export async function POST(req: NextRequest) {
       if (!isSuperAdmin) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
       
       const compId = contaazul_config.company_id || effectiveCompanyId;
-      const encryptedConfig = encryptContaAzulFields(contaazul_config);
+      const encryptedConfig = await encryptContaAzulFields(contaazul_config);
       
       const { data, error } = await supabase
         .from('contaazul_config')
@@ -186,7 +188,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "delete" && table && record?.id) {
-      if (!isWritableTable(table)) return NextResponse.json({ error: "Tabela inválida." }, { status: 400 });
+      if (!isWritableTable(table)) return NextResponse.json({ error: "Tabela invÃ¡lida." }, { status: 400 });
       if (SUPER_ADMIN_ONLY_TABLES.includes(table) && !isSuperAdmin) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
       
       const { error } = await supabase.from(table).delete().eq('id', record.id);
@@ -195,7 +197,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "insert" && table && record) {
-      if (!isWritableTable(table)) return NextResponse.json({ error: "Tabela inválida." }, { status: 400 });
+      if (!isWritableTable(table)) return NextResponse.json({ error: "Tabela invÃ¡lida." }, { status: 400 });
       if (SUPER_ADMIN_ONLY_TABLES.includes(table) && !isSuperAdmin) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
       if (table === "employees" && !canManageEmployees) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
       
@@ -210,7 +212,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "update" && table && record && record.id) {
-      if (!isWritableTable(table)) return NextResponse.json({ error: "Tabela inválida." }, { status: 400 });
+      if (!isWritableTable(table)) return NextResponse.json({ error: "Tabela invÃ¡lida." }, { status: 400 });
       if (SUPER_ADMIN_ONLY_TABLES.includes(table) && !isSuperAdmin) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
       if (table === "employees" && !canManageEmployees) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
       
@@ -220,8 +222,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "set_table" && table && record) {
-      // Usado para sobrescrever. Com Supabase, o ideal é fazer upsert.
-      // Assumindo que `record` é um array de objetos.
+      // Usado para sobrescrever. Com Supabase, o ideal Ã© fazer upsert.
+      // Assumindo que `record` Ã© um array de objetos.
       if (!isSuperAdmin) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
       if (Array.isArray(record) && record.length > 0) {
          const { error } = await supabase.from(table).upsert(record);
@@ -230,7 +232,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
-    return NextResponse.json({ error: "Ação não reconhecida." }, { status: 400 });
+    return NextResponse.json({ error: "AÃ§Ã£o nÃ£o reconhecida." }, { status: 400 });
   } catch (error: any) {
     console.error("POST /api/db error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

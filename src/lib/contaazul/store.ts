@@ -29,7 +29,7 @@ export async function getContaAzulTokens(companyId: string = 'comp_zenitus'): Pr
       .single();
 
     if (cfg) {
-      return decryptContaAzulFields({
+      return await decryptContaAzulFields({
         ...DEFAULT_TOKENS,
         clientId: cfg.client_id || '',
         clientSecret: cfg.client_secret || '',
@@ -70,7 +70,7 @@ export async function saveContaAzulTokens(
       updatedAt: new Date().toISOString()
     };
 
-    const encrypted = encryptContaAzulFields(updated);
+    const encrypted = await encryptContaAzulFields(updated);
 
     const cfgEntry = {
       company_id: companyId,

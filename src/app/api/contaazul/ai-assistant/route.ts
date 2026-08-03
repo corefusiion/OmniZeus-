@@ -2,6 +2,8 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/db/supabaseClient";
 
+export const runtime = "edge";
+
 async function recordAuditLog(user: string, company: string, action: string, details: string) {
   try {
     await supabase.from("ai_stress_test_logs").insert({

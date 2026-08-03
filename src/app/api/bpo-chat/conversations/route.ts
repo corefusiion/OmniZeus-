@@ -1,12 +1,14 @@
-import { NextResponse, NextRequest } from "next/server";
+﻿import { NextResponse, NextRequest } from "next/server";
 import { supabase } from "@/lib/db/supabaseClient";
 import { getSession } from "@/lib/auth/session";
+
+export const runtime = "edge";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = getSession(req);
+    const session = await getSession(req);
     const { searchParams } = new URL(req.url);
     const superAdminOverride = searchParams.get("companyId") || req.headers.get("x-company-id");
 
@@ -37,7 +39,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = getSession(req);
+    const session = await getSession(req);
     const body = await req.json();
     const { title, model, provider } = body;
     
@@ -88,7 +90,7 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const session = getSession(req);
+    const session = await getSession(req);
     const { searchParams } = new URL(req.url);
     const convId = searchParams.get("id");
 
@@ -100,14 +102,14 @@ export async function DELETE(req: NextRequest) {
     if (conv) {
       // Only allow delete if owner or super_adm
       if (session && session.role !== "super_adm" && conv.company_id && conv.company_id !== session.companyId) {
-        return NextResponse.json({ success: false, error: "Não autorizado a excluir." }, { status: 403 });
+        return NextResponse.json({ success: false, error: "NÃ£o autorizado a excluir." }, { status: 403 });
       }
       
       await supabase.from("conversations").update({ deleted: 1 }).eq("id", convId);
       await supabase.from("messages").delete().eq("conversation_id", convId);
     }
 
-    return NextResponse.json({ success: true, message: "Conversa excluída com sucesso." });
+    return NextResponse.json({ success: true, message: "Conversa excluÃ­da com sucesso." });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }

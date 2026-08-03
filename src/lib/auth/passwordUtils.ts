@@ -19,19 +19,15 @@ export interface PasswordValidationResult {
 // Inteiro aleatório criptograficamente seguro em [0, max). Math.random é previsível
 // e não pode ser usado para gerar credenciais.
 function secureRandomInt(max: number): number {
-  if (typeof globalThis.crypto?.getRandomValues === "function") {
-    const buf = new Uint32Array(1);
-    // Rejeição do resto para evitar viés de módulo
-    const limit = Math.floor(0xFFFFFFFF / max) * max;
-    let value: number;
-    do {
-      globalThis.crypto.getRandomValues(buf);
-      value = buf[0];
-    } while (value >= limit);
-    return value % max;
-  }
-  const nodeCrypto = require("crypto");
-  return nodeCrypto.randomInt(max);
+  const buf = new Uint32Array(1);
+  // Rejeição do resto para evitar viés de módulo
+  const limit = Math.floor(0xFFFFFFFF / max) * max;
+  let value: number;
+  do {
+    globalThis.crypto.getRandomValues(buf);
+    value = buf[0];
+  } while (value >= limit);
+  return value % max;
 }
 
 export function generateTemporaryPassword(): string {
@@ -100,24 +96,14 @@ function toHex(bytes: Uint8Array): string {
 }
 
 async function pbkdf2(password: string, saltHex: string): Promise<string> {
-  const subtle = globalThis.crypto?.subtle;
-  if (subtle) {
-    const enc = new TextEncoder();
-    const key = await subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
-    const bits = await subtle.deriveBits(
-      { name: "PBKDF2", salt: enc.encode(saltHex), iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
-      key,
-      PBKDF2_KEYLEN * 8
-    );
-    return toHex(new Uint8Array(bits));
-  }
-  const nodeCrypto = require("crypto");
-  return new Promise<string>((resolve, reject) => {
-    nodeCrypto.pbkdf2(password, saltHex, PBKDF2_ITERATIONS, PBKDF2_KEYLEN, "sha256", (err: any, derived: Buffer) => {
-      if (err) reject(err);
-      else resolve(derived.toString("hex"));
-    });
-  });
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", salt: enc.encode(saltHex), iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
+    key,
+    PBKDF2_KEYLEN * 8
+  );
+  return toHex(new Uint8Array(bits));
 }
 
 /**
@@ -126,12 +112,7 @@ async function pbkdf2(password: string, saltHex: string): Promise<string> {
  */
 export async function hashPassword(password: string): Promise<string> {
   const saltBytes = new Uint8Array(16);
-  if (typeof globalThis.crypto?.getRandomValues === "function") {
-    globalThis.crypto.getRandomValues(saltBytes);
-  } else {
-    const nodeCrypto = require("crypto");
-    saltBytes.set(nodeCrypto.randomBytes(16));
-  }
+  globalThis.crypto.getRandomValues(saltBytes);
   const salt = toHex(saltBytes);
   const derived = await pbkdf2(password, salt);
   return `pbkdf2$${PBKDF2_ITERATIONS}$${salt}$${derived}`;
@@ -154,14 +135,8 @@ export async function verifyPassword(password: string, stored: string): Promise<
 
   // Legado: SHA-256 sem salt (64 chars hex)
   if (/^[a-f0-9]{64}$/i.test(stored)) {
-    const subtle = globalThis.crypto?.subtle;
-    let sha: string;
-    if (subtle) {
-      const buf = await subtle.digest("SHA-256", new TextEncoder().encode(password));
-      sha = toHex(new Uint8Array(buf));
-    } else {
-      sha = require("crypto").createHash("sha256").update(password).digest("hex");
-    }
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
+    const sha = toHex(new Uint8Array(buf));
     return timingSafeEqualHex(sha, stored.toLowerCase());
   }
 

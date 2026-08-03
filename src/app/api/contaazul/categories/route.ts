@@ -2,6 +2,8 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { fetchContaAzulCategories, insertContaAzulCategory, updateContaAzulCategory, saveContaAzulCategories } from "@/lib/db/serverDb";
 
+export const runtime = "edge";
+
 export async function GET() {
   try {
     const categories = await fetchContaAzulCategories();

@@ -1,9 +1,9 @@
-export const dynamic = "force-dynamic";
+﻿export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { readDb } from "@/lib/db/localDb";
 import { getSession } from "@/lib/auth/session";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 
 function hasModule(allowed: string[] | undefined, module: string): boolean {
   if (!allowed || allowed.length === 0) return true;
@@ -16,7 +16,7 @@ function money(v: number): string {
 
 export async function GET(req: NextRequest) {
   try {
-    const session = getSession(req);
+    const session = await getSession(req);
     if (!session) {
       return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
     }
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
       text: string;
     }[] = [];
 
-    // ── Financeiro (solicitações também são módulo financeiro no menu) ─────
+    // â”€â”€ Financeiro (solicitaÃ§Ãµes tambÃ©m sÃ£o mÃ³dulo financeiro no menu) â”€â”€â”€â”€â”€
     if (hasModule(allowed, "financeiro")) {
       if (Array.isArray(db.payables)) {
         const payables = db.payables.filter((p: any) => (p.company_id || p.companyId) === companyId);
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
             module: "financeiro",
             title: "Contas vencidas",
             tone: "danger",
-            text: `${overdue.length} título(s) vencido(s) somando R$ ${money(overdueSum)}.`
+            text: `${overdue.length} tÃ­tulo(s) vencido(s) somando R$ ${money(overdueSum)}.`
           });
         }
         if (dueToday.length > 0) {
@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
             module: "financeiro",
             title: "Vencem hoje",
             tone: "warn",
-            text: `${dueToday.length} conta(s) vencem hoje — total de R$ ${money(dueTodaySum)}.`
+            text: `${dueToday.length} conta(s) vencem hoje â€” total de R$ ${money(dueTodaySum)}.`
           });
         }
       }
@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
             module: "financeiro",
             title: "Contratos expirando",
             tone: "warn",
-            text: `${expiringSoon.length} contrato(s) com vigência terminando em até 30 dias.`
+            text: `${expiringSoon.length} contrato(s) com vigÃªncia terminando em atÃ© 30 dias.`
           });
         }
       }
@@ -95,21 +95,21 @@ export async function GET(req: NextRequest) {
         if (pending.length > 0) {
           items.push({
             module: "financeiro",
-            title: "Solicitações pendentes",
+            title: "SolicitaÃ§Ãµes pendentes",
             tone: urgent.length > 0 ? "warn" : "ok",
-            text: `${pending.length} solicitação(ões) em aprovação${urgent.length > 0 ? `, ${urgent.length} urgente(s)` : ""}.`
+            text: `${pending.length} solicitaÃ§Ã£o(Ãµes) em aprovaÃ§Ã£o${urgent.length > 0 ? `, ${urgent.length} urgente(s)` : ""}.`
           });
         }
       }
     }
 
-    // ── Tarefas ─────────────────────────────────────────────────────────────
+    // â”€â”€ Tarefas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (hasModule(allowed, "tarefas")) {
       if (Array.isArray(db.tasks)) {
         const tasks = db.tasks.filter((t: any) => (t.company_id || t.companyId) === companyId);
         const open = tasks.filter((t: any) => {
           const s = (t.status || "Pendente").toLowerCase();
-          return s !== "concluída" && s !== "concluida" && s !== "concluido";
+          return s !== "concluÃ­da" && s !== "concluida" && s !== "concluido";
         });
         const dueToday = open.filter((t: any) => (t.due_date || t.vencimento || "").slice(0, 10) === today);
         const overdue = open.filter((t: any) => {
@@ -121,7 +121,7 @@ export async function GET(req: NextRequest) {
             module: "tarefas",
             title: "Tarefas atrasadas",
             tone: "danger",
-            text: `${overdue.length} tarefa(s) atrasada(s) precisam de atenção.`
+            text: `${overdue.length} tarefa(s) atrasada(s) precisam de atenÃ§Ã£o.`
           });
         }
         if (dueToday.length > 0) {
@@ -143,7 +143,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // ── Conta Azul ──────────────────────────────────────────────────────────
+    // â”€â”€ Conta Azul â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (hasModule(allowed, "contaazul")) {
       if (Array.isArray(db.contaazul_entries)) {
         const entries = db.contaazul_entries.filter((e: any) => (e.company_id || e.companyId) === companyId);
@@ -155,7 +155,7 @@ export async function GET(req: NextRequest) {
         if (recToday.length > 0 || payToday.length > 0) {
           items.push({
             module: "contaazul",
-            title: "Lançamentos Conta Azul hoje",
+            title: "LanÃ§amentos Conta Azul hoje",
             tone: "warn",
             text: `${recToday.length} recebimento(s) (R$ ${money(recSum)}) e ${payToday.length} pagamento(s) (R$ ${money(paySum)}) para hoje.`
           });
@@ -163,13 +163,13 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Sem pendências
+    // Sem pendÃªncias
     if (items.length === 0) {
       items.push({
         module: "geral",
         title: "Dia tranquilo",
         tone: "ok",
-        text: "Nenhuma pendência para hoje. Tudo em dia!"
+        text: "Nenhuma pendÃªncia para hoje. Tudo em dia!"
       });
     }
 
