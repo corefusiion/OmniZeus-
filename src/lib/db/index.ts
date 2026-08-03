@@ -9,6 +9,10 @@ try {
   }
 } catch {}
 
+if (!connectionString) {
+  connectionString = 'postgres://mock:mock@mock:5432/mock';
+}
+
 // Disable prefetch as it is not supported for "Transaction" pool mode
 const client = postgres(connectionString, { prepare: false });
 
