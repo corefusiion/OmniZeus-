@@ -122,21 +122,19 @@ export async function createAuthResponse(
   status: number = 200
 ): Promise<NextResponse> {
   const token = await createSessionCookie(payload);
-  const isProd = isProduction();
+  const isProd = process.env.NODE_ENV === "production";
   const cookieHeader = `${SESSION_COOKIE}=${token}; Path=/; Max-Age=86400; HttpOnly; SameSite=Lax${isProd ? "; Secure" : ""}`;
 
-  return new NextResponse(JSON.stringify(jsonBody), {
-    status,
-    headers: {
-      "Content-Type": "application/json",
-      "Set-Cookie": cookieHeader,
-    },
-  });
+  const res = NextResponse.json(jsonBody, { status });
+  try {
+    res.headers.set("Set-Cookie", cookieHeader);
+  } catch {}
+  return res;
 }
 
 export async function setSessionCookie(res: NextResponse, payload: Omit<SessionPayload, "issuedAt" | "expiresAt">): Promise<NextResponse> {
   const token = await createSessionCookie(payload);
-  const isProd = isProduction();
+  const isProd = process.env.NODE_ENV === "production";
   const cookieHeader = `${SESSION_COOKIE}=${token}; Path=/; Max-Age=86400; HttpOnly; SameSite=Lax${isProd ? "; Secure" : ""}`;
   
   try {
