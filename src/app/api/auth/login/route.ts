@@ -31,9 +31,11 @@ function clearRateLimit(key: string): void {
 
 export async function POST(req: NextRequest) {
   try {
+    console.log("[LOGIN] Request recebido");
     let body;
     try {
       body = await req.json();
+      console.log("[LOGIN] Body parseado");
     } catch (e) {
       console.error("Auth Login: Failed to parse request body", e);
       return NextResponse.json({ error: "Invalid JSON format." }, { status: 400 });
@@ -42,15 +44,17 @@ export async function POST(req: NextRequest) {
     const { email, password } = body;
 
     if (!email || !password) {
-      return NextResponse.json({ error: "E-mail e senha sÃ£o obrigatÃ³rios." }, { status: 400 });
+      return NextResponse.json({ error: "E-mail e senha são obrigatórios." }, { status: 400 });
     }
 
     const cleanEmail = email.trim().toLowerCase();
     const cleanPass = password.trim();
+    console.log("[LOGIN] Email limpo:", cleanEmail);
 
-    // Trava de forÃ§a bruta por e-mail + IP
+    // Trava de força bruta por e-mail + IP
     const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";
     const rateKey = `${cleanEmail}|${clientIp}`;
+    console.log("[LOGIN] Verificando rate limit para:", rateKey);
     if (!checkRateLimit(rateKey)) {
       return NextResponse.json(
         { success: false, error: "Muitas tentativas de login. Tente novamente em 15 minutos." },
@@ -58,6 +62,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    console.log("[LOGIN] Consultando usuário de produção fixo");
     // 1. Check hardcoded production users (super admin etc.)
     const prodUser = PRODUCTION_USERS.find(
       u => u.email.toLowerCase() === cleanEmail
@@ -66,6 +71,7 @@ export async function POST(req: NextRequest) {
     const superAdminPassword = getEnv("SUPER_ADMIN_PASSWORD") || 'Design20';
 
     if (prodUser && cleanPass === superAdminPassword) {
+      console.log("[LOGIN] Usuário super admin/master encontrado. Criando sessão.");
       clearRateLimit(rateKey);
       const userData = {
         id: prodUser.id,
@@ -76,7 +82,8 @@ export async function POST(req: NextRequest) {
         companyName: prodUser.companyName,
       };
 
-      return await createAuthResponse(
+      console.log("[LOGIN] Gerando cookie via createAuthResponse");
+      const res = await createAuthResponse(
         { success: true, user: userData },
         {
           userId: prodUser.id,
@@ -87,19 +94,25 @@ export async function POST(req: NextRequest) {
           companyName: prodUser.companyName,
         }
       );
+      console.log("[LOGIN] Resposta de sucesso gerada para master.");
+      return res;
     }
 
+    console.log("[LOGIN] Criando Supabase client para checar banco");
     // 2. Check dynamically created employees in DB
     let employees: any[] = [];
     try {
       const { data } = await supabase.from('employees').select('*');
       employees = data || [];
+      console.log(`[LOGIN] Encontrados ${employees.length} funcionários no BD`);
     } catch (dbErr) {
       console.error("[LOGIN DB FETCH ERROR]:", dbErr);
     }
 
+    console.log("[LOGIN] Importando passwordUtils dinamicamente");
     const { verifyPassword } = await import("@/lib/auth/passwordUtils");
 
+    console.log("[LOGIN] Validando senhas dos usuários encontrados");
     let empIndex = -1;
     for (let i = 0; i < employees.length; i++) {
       const e = employees[i];
@@ -113,16 +126,19 @@ export async function POST(req: NextRequest) {
 
     if (empIndex >= 0) {
       const emp = employees[empIndex];
+      console.log("[LOGIN] Senha validada com sucesso para o usuário:", emp.id);
       clearRateLimit(rateKey);
 
       // Check if user account is blocked or inactive
       if (emp.status === "Bloqueado" || emp.status === "Inativo") {
+        console.log("[LOGIN] Usuário bloqueado/inativo.");
         return NextResponse.json(
           { success: false, error: "Esta conta está desativada ou bloqueada. Entre em contato com o Gestor da sua empresa." },
           { status: 403 }
         );
       }
 
+      console.log("[LOGIN] Atualizando timestamp de login");
       // Update last login timestamp
       const now = new Date().toISOString();
       try {
@@ -131,6 +147,7 @@ export async function POST(req: NextRequest) {
 
       const mustChangePassword = emp.must_change_password === true || emp.mustChangePassword === true;
 
+      console.log("[LOGIN] Buscando nome da empresa");
       // Resolve company name
       let companyName = emp.companyName || emp.companyId || "";
       try {
@@ -151,7 +168,8 @@ export async function POST(req: NextRequest) {
         allowedModules: emp.allowed_modules || emp.allowedModules || []
       };
 
-      return await createAuthResponse(
+      console.log("[LOGIN] Criando sessão e gerando cookie (funcionario/gestor)");
+      const res = await createAuthResponse(
         { success: true, mustChangePassword, user: userData },
         {
           userId: emp.id,
@@ -164,16 +182,31 @@ export async function POST(req: NextRequest) {
           allowedModules: emp.allowed_modules || emp.allowedModules || []
         }
       );
+      console.log("[LOGIN] Finalizando login funcionário.");
+      return res;
     }
 
+    console.log("[LOGIN] Credenciais incorretas.");
     return NextResponse.json(
       { success: false, error: "E-mail ou senha incorretos. Verifique suas credenciais." },
       { status: 401 }
     );
   } catch (err: any) {
-    console.error("[LOGIN CRITICAL ERROR]:", err);
+    console.error("[LOGIN CRITICAL ERROR]", {
+      message: err?.message,
+      stack: err?.stack,
+      cause: err?.cause,
+      name: err?.name
+    });
     return NextResponse.json(
-      { success: false, error: err?.message || "Erro interno no servidor." },
+      { 
+        success: false, 
+        error: "Erro de runtime.",
+        message: err?.message,
+        stack: err?.stack,
+        name: err?.name,
+        cause: err?.cause
+      },
       { status: 500 }
     );
   }
