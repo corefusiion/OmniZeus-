@@ -1,18 +1,15 @@
+﻿export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
 import { getSession } from "@/lib/auth/session";
+import { supabase } from "@/lib/db/supabaseClient";
 
-export const runtime = "nodejs";
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
+export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
   try {
-    const session = getSession(req);
+    const session = await getSession(req);
     if (!session) {
-      return NextResponse.json({ success: false, message: "Não autenticado." }, { status: 401 });
+      return NextResponse.json({ success: false, message: "NÃ£o autenticado." }, { status: 401 });
     }
     if (session.role !== "super_adm") {
       return NextResponse.json({ success: false, message: "Acesso negado." }, { status: 403 });
@@ -23,11 +20,8 @@ export async function POST(req: NextRequest) {
     let targetKey = apiKey;
 
     if (!targetKey && companyId) {
-      if (fs.existsSync(DB_FILE_PATH)) {
-        const db = JSON.parse(fs.readFileSync(DB_FILE_PATH, "utf-8"));
-        const comp = (db.companies || []).find((c: any) => c.id === companyId);
-        if (comp) targetKey = comp.openrouter_api_key;
-      }
+      const { data: comp } = await supabase.from('companies').select('openrouter_api_key').eq('id', companyId).maybeSingle();
+      if (comp) targetKey = comp.openrouter_api_key;
     }
 
     if (!targetKey || targetKey.trim().length === 0) {
@@ -48,7 +42,7 @@ export async function POST(req: NextRequest) {
       const errText = await res.text();
       return NextResponse.json({
         success: false,
-        message: `🔴 Falha na conexão: HTTP ${res.status} - ${errText.substring(0, 100)}`,
+        message: `ðŸ”´ Falha na conexÃ£o: HTTP ${res.status} - ${errText.substring(0, 100)}`,
         latencyMs
       }, { status: 400 });
     }
@@ -58,7 +52,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `🟢 Conexão estabelecida com sucesso! ${modelsCount} modelos OpenRouter disponíveis.`,
+      message: `ðŸŸ¢ ConexÃ£o estabelecida com sucesso! ${modelsCount} modelos OpenRouter disponÃ­veis.`,
       modelsCount,
       latencyMs,
       testedAt: new Date().toISOString()
@@ -66,7 +60,10 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     return NextResponse.json({
       success: false,
-      message: `🔴 Erro técnico ao conectar com a OpenRouter: ${error.message}`
+      message: `ðŸ”´ Erro tÃ©cnico ao conectar com a OpenRouter: ${error.message}`
     }, { status: 500 });
   }
 }
+
+
+

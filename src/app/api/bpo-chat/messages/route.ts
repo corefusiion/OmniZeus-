@@ -1,42 +1,14 @@
-import { NextResponse, NextRequest } from "next/server";
-import fs from "fs";
-import path from "path";
+﻿import { NextResponse, NextRequest } from "next/server";
+import { supabase } from "@/lib/db/supabaseClient";
 import { getSession } from "@/lib/auth/session";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
+export const runtime = "edge";
 
-function getDbData() {
-  try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    if (!fs.existsSync(DB_FILE_PATH)) {
-      const defaultDb = { conversations: [], messages: [] };
-      fs.writeFileSync(DB_FILE_PATH, JSON.stringify(defaultDb, null, 2), "utf-8");
-      return defaultDb;
-    }
-    let raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
-    if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
-    const parsed = JSON.parse(raw);
-    if (!parsed.conversations) parsed.conversations = [];
-    if (!parsed.messages) parsed.messages = [];
-    return parsed;
-  } catch (e) {
-    return { conversations: [], messages: [] };
-  }
-}
-
-function saveDbData(data: any) {
-  try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(data, null, 2), "utf-8");
-  } catch (e) {
-    console.error("Error saving DB data:", e);
-  }
-}
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = getSession(req);
+    const session = await getSession(req);
     const { searchParams } = new URL(req.url);
     const conversationId = searchParams.get("conversationId");
 
@@ -44,20 +16,18 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: "ID da conversa ausente." }, { status: 400 });
     }
 
-    const db = getDbData();
-
     // Verify conversation tenant ownership if session is present
     if (session && session.role !== "super_adm") {
-      const conv = (db.conversations || []).find((c: any) => c.id === conversationId);
+      const { data: conv } = await supabase.from("conversations").select("*").eq("id", conversationId).single();
       if (conv && conv.company_id && conv.company_id !== session.companyId) {
-        return NextResponse.json({ success: false, error: "Acesso não autorizado a esta conversa." }, { status: 403 });
+        return NextResponse.json({ success: false, error: "Acesso nÃ£o autorizado a esta conversa." }, { status: 403 });
       }
     }
 
-    const filteredMsgs = (db.messages || []).filter((m: any) => m.conversation_id === conversationId)
-      .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    const { data: messages, error } = await supabase.from("messages").select("*").eq("conversation_id", conversationId).order("created_at", { ascending: true });
+    if (error) throw error;
 
-    return NextResponse.json({ success: true, messages: filteredMsgs });
+    return NextResponse.json({ success: true, messages: messages || [] });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
@@ -65,19 +35,17 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = getSession(req);
+    const session = await getSession(req);
     const { conversationId, content, model, provider, accessToken, refreshToken, clientId, clientSecret, companyId } = await req.json();
 
     if (!conversationId || !content) {
-      return NextResponse.json({ success: false, error: "ID da conversa e conteúdo são obrigatórios." }, { status: 400 });
+      return NextResponse.json({ success: false, error: "ID da conversa e conteÃºdo sÃ£o obrigatÃ³rios." }, { status: 400 });
     }
 
     const activeTenantId = session
       ? (session.role === "super_adm" && companyId ? companyId : session.companyId)
       : (companyId || req.headers.get("x-company-id") || "comp_zenitus");
 
-
-    const db = getDbData();
     const now = new Date().toISOString();
     const userMsgId = `msg_${Date.now()}_u`;
     const userText = content.trim();
@@ -92,25 +60,20 @@ export async function POST(req: NextRequest) {
       created_at: now
     };
 
-    db.messages.push(userMsg);
+    await supabase.from("messages").insert(userMsg);
 
     // Update conversation title and timestamps
-    db.conversations = (db.conversations || []).map((c: any) => {
-      if (c.id === conversationId) {
-        const title = (c.title === "Nova Conversa BPO" || !c.title) 
-          ? userText.substring(0, 30) + (userText.length > 30 ? "..." : "")
-          : c.title;
-        return {
-          ...c,
-          title,
-          updated_at: now,
-          last_message_at: now
-        };
-      }
-      return c;
-    });
-
-    saveDbData(db);
+    const { data: conv } = await supabase.from("conversations").select("*").eq("id", conversationId).single();
+    if (conv) {
+      const title = (conv.title === "Nova Conversa BPO" || !conv.title) 
+        ? userText.substring(0, 30) + (userText.length > 30 ? "..." : "")
+        : conv.title;
+      await supabase.from("conversations").update({
+        title,
+        updated_at: now,
+        last_message_at: now
+      }).eq("id", conversationId);
+    }
 
     // Intent detection for automatic execution of ContaAzul tasks via AI
     const lowerText = userText.toLowerCase();
@@ -142,7 +105,7 @@ export async function POST(req: NextRequest) {
               clientSecret,
               name: clientName,
               document: doc,
-              personType: doc.length > 11 ? "Jurídica" : "Física"
+              personType: doc.length > 11 ? "JurÃ­dica" : "FÃ­sica"
             })
           });
 
@@ -150,7 +113,7 @@ export async function POST(req: NextRequest) {
           let aiTextResponse = `Excelente! O cadastro do cliente **${clientName}** (CPF/CNPJ: ${doc}) foi transmitido e sincronizado com sucesso no ERP ContaAzul Pro!`;
 
           if (!createRes.ok) {
-            aiTextResponse = `Tentei realizar o cadastro de **${clientName}** na ContaAzul, porém a API retornou: ${createData.error || 'Verifique o token de acesso'}.`;
+            aiTextResponse = `Tentei realizar o cadastro de **${clientName}** na ContaAzul, porÃ©m a API retornou: ${createData.error || 'Verifique o token de acesso'}.`;
           }
 
           const aiMsgObj = {
@@ -163,8 +126,7 @@ export async function POST(req: NextRequest) {
             created_at: new Date().toISOString()
           };
 
-          db.messages.push(aiMsgObj);
-          saveDbData(db);
+          await supabase.from("messages").insert(aiMsgObj);
 
           return NextResponse.json({ success: true, message: aiTextResponse, actionExecuted: true });
         } catch (e) {}
@@ -172,9 +134,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch conversation history for LLM
-    const historyMsgs = (db.messages || [])
-      .filter((m: any) => m.conversation_id === conversationId)
-      .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    const { data: dbMsgs } = await supabase.from("messages").select("*").eq("conversation_id", conversationId).order("created_at", { ascending: true });
+    const historyMsgs = (dbMsgs || [])
       .slice(-20)
       .map((m: any) => ({
         role: m.role === 'assistant' ? 'assistant' : 'user',
@@ -185,15 +146,15 @@ export async function POST(req: NextRequest) {
     const dateStrBr = nowBr.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", year: "numeric", month: "long", day: "numeric" });
     const timeStrBr = nowBr.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
     const hourBr = parseInt(nowBr.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }), 10);
-    const periodBr = hourBr >= 12 && hourBr < 18 ? "Tarde" : (hourBr >= 18 || hourBr < 5 ? "Noite" : "Manhã");
+    const periodBr = hourBr >= 12 && hourBr < 18 ? "Tarde" : (hourBr >= 18 || hourBr < 5 ? "Noite" : "ManhÃ£");
     const greetingBr = periodBr === "Tarde" ? "Boa tarde" : (periodBr === "Noite" ? "Boa noite" : "Bom dia");
 
-    const systemPrompt = `Você é o Zeus BPO — Especialista Master em BPO Financeiro, Rotinas Contábeis e API RESTful v2 da ContaAzul Pro.
-Você possui autonomia e autoridade para responder dúvidas contábeis, orientar conciliação bancária, DRE, impostos e sugerir comandos de execução direta de tarefas no sistema.
+    const systemPrompt = `VocÃª Ã© o Zeus BPO â€” Especialista Master em BPO Financeiro, Rotinas ContÃ¡beis e API RESTful v2 da ContaAzul Pro.
+VocÃª possui autonomia e autoridade para responder dÃºvidas contÃ¡beis, orientar conciliaÃ§Ã£o bancÃ¡ria, DRE, impostos e sugerir comandos de execuÃ§Ã£o direta de tarefas no sistema.
 
 [CONTEXTO TEMPORAL]
-- Data: ${dateStrBr} | Horário de Brasília: ${timeStrBr} | Período: ${periodBr}
-- Se o usuário cumprimentar, responda de forma cordial, profissional e direta ao ponto, apenas dando o ${greetingBr} correspondente ao horário. NUNCA seja sarcástico.`;
+- Data: ${dateStrBr} | HorÃ¡rio de BrasÃ­lia: ${timeStrBr} | PerÃ­odo: ${periodBr}
+- Se o usuÃ¡rio cumprimentar, responda de forma cordial, profissional e direta ao ponto, apenas dando o ${greetingBr} correspondente ao horÃ¡rio. NUNCA seja sarcÃ¡stico.`;
 
     const { executeAIRequest } = await import("@/lib/ai/openRouterClient");
 
@@ -210,7 +171,7 @@ Você possui autonomia e autoridade para responder dúvidas contábeis, orientar
     });
 
     if (aiRes.isError) {
-      const errText = aiRes.content || "Não foi possível obter resposta do servidor da IA.";
+      const errText = aiRes.content || "NÃ£o foi possÃ­vel obter resposta do servidor da IA.";
       const aiErrObj = {
         id: `msg_${Date.now()}_ai_err`,
         conversation_id: conversationId,
@@ -221,8 +182,8 @@ Você possui autonomia e autoridade para responder dúvidas contábeis, orientar
         created_at: new Date().toISOString(),
         isError: true
       };
-      db.messages.push(aiErrObj);
-      saveDbData(db);
+      
+      await supabase.from("messages").insert(aiErrObj);
 
       return NextResponse.json({ success: true, message: errText, isConfigError: true });
     }
@@ -239,8 +200,7 @@ Você possui autonomia e autoridade para responder dúvidas contábeis, orientar
       created_at: new Date().toISOString()
     };
 
-    db.messages.push(aiMsgObj);
-    saveDbData(db);
+    await supabase.from("messages").insert(aiMsgObj);
 
     return NextResponse.json({
       success: true,
@@ -250,3 +210,5 @@ Você possui autonomia e autoridade para responder dúvidas contábeis, orientar
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
+
+

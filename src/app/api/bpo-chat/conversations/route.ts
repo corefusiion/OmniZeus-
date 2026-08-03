@@ -1,42 +1,14 @@
-import { NextResponse, NextRequest } from "next/server";
-import fs from "fs";
-import path from "path";
+﻿import { NextResponse, NextRequest } from "next/server";
+import { supabase } from "@/lib/db/supabaseClient";
 import { getSession } from "@/lib/auth/session";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
+export const runtime = "edge";
 
-function getDbData() {
-  try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    if (!fs.existsSync(DB_FILE_PATH)) {
-      const defaultDb = { conversations: [], messages: [] };
-      fs.writeFileSync(DB_FILE_PATH, JSON.stringify(defaultDb, null, 2), "utf-8");
-      return defaultDb;
-    }
-    let raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
-    if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
-    const parsed = JSON.parse(raw);
-    if (!parsed.conversations) parsed.conversations = [];
-    if (!parsed.messages) parsed.messages = [];
-    return parsed;
-  } catch (e) {
-    return { conversations: [], messages: [] };
-  }
-}
-
-function saveDbData(data: any) {
-  try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(data, null, 2), "utf-8");
-  } catch (e) {
-    console.error("Error saving DB data:", e);
-  }
-}
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = getSession(req);
+    const session = await getSession(req);
     const { searchParams } = new URL(req.url);
     const superAdminOverride = searchParams.get("companyId") || req.headers.get("x-company-id");
 
@@ -45,18 +17,19 @@ export async function GET(req: NextRequest) {
       ? superAdminOverride
       : (session?.companyId || superAdminOverride || "comp_zenitus");
 
-    const db = getDbData();
+    let query = supabase.from("conversations").select("*").eq("deleted", 0);
+    
+    // Sort by pinned desc, last_message_at desc
+    const { data: dbConversations, error } = await query
+      .order("pinned", { ascending: false })
+      .order("last_message_at", { ascending: false });
 
-    const filtered = (db.conversations || []).filter((c: any) => 
+    if (error) throw error;
+
+    const filtered = (dbConversations || []).filter((c: any) => 
       (c.user_id === userId || session?.role === "super_adm") && 
-      (c.company_id === companyId || !c.company_id) && 
-      !c.deleted
-    ).sort((a: any, b: any) => {
-      if ((b.pinned ? 1 : 0) !== (a.pinned ? 1 : 0)) {
-        return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
-      }
-      return new Date(b.last_message_at || b.updated_at).getTime() - new Date(a.last_message_at || a.updated_at).getTime();
-    });
+      (c.company_id === companyId || !c.company_id)
+    );
 
     return NextResponse.json({ success: true, conversations: filtered });
   } catch (err: any) {
@@ -66,15 +39,13 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = getSession(req);
+    const session = await getSession(req);
     const body = await req.json();
     const { title, model, provider } = body;
     
     const userId = session?.userId || body.userId || "super_adm";
     const companyId = session?.companyId || body.companyId || "comp_zenitus";
     const tenantId = body.tenantId || companyId;
-
-    const db = getDbData();
 
     const convId = `conv_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const now = new Date().toISOString();
@@ -95,8 +66,8 @@ export async function POST(req: NextRequest) {
       deleted: 0
     };
 
-    db.conversations.unshift(newConv);
-    saveDbData(db);
+    const { error } = await supabase.from("conversations").insert(newConv);
+    if (error) throw error;
 
     return NextResponse.json({ success: true, conversation: newConv });
   } catch (err: any) {
@@ -107,12 +78,9 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const { id, pinned } = await req.json();
-    const db = getDbData();
-
-    db.conversations = (db.conversations || []).map((c: any) => 
-      c.id === id ? { ...c, pinned: pinned ? 1 : 0 } : c
-    );
-    saveDbData(db);
+    
+    const { error } = await supabase.from("conversations").update({ pinned: pinned ? 1 : 0 }).eq("id", id);
+    if (error) throw error;
 
     return NextResponse.json({ success: true, message: "Status fixado atualizado." });
   } catch (err: any) {
@@ -122,7 +90,7 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const session = getSession(req);
+    const session = await getSession(req);
     const { searchParams } = new URL(req.url);
     const convId = searchParams.get("id");
 
@@ -130,23 +98,21 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: false, error: "ID da conversa ausente." }, { status: 400 });
     }
 
-    const db = getDbData();
-    db.conversations = (db.conversations || []).map((c: any) => {
-      if (c.id === convId) {
-        // Only allow delete if owner or super_adm
-        if (session && session.role !== "super_adm" && c.company_id && c.company_id !== session.companyId) {
-          return c;
-        }
-        return { ...c, deleted: 1 };
+    const { data: conv } = await supabase.from("conversations").select("*").eq("id", convId).single();
+    if (conv) {
+      // Only allow delete if owner or super_adm
+      if (session && session.role !== "super_adm" && conv.company_id && conv.company_id !== session.companyId) {
+        return NextResponse.json({ success: false, error: "NÃ£o autorizado a excluir." }, { status: 403 });
       }
-      return c;
-    });
-    db.messages = (db.messages || []).filter((m: any) => m.conversation_id !== convId);
-    saveDbData(db);
+      
+      await supabase.from("conversations").update({ deleted: 1 }).eq("id", convId);
+      await supabase.from("messages").delete().eq("conversation_id", convId);
+    }
 
-    return NextResponse.json({ success: true, message: "Conversa excluída com sucesso." });
+    return NextResponse.json({ success: true, message: "Conversa excluÃ­da com sucesso." });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
+
 

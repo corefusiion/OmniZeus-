@@ -1,3 +1,4 @@
+﻿export const dynamic = "force-dynamic";
 // API Route: POST /api/auth/change-password
 // Endpoint for first login / mandatory password change.
 // Validates password security rules, hashes new password, sets must_change_password = false.
@@ -5,114 +6,96 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, setSessionCookie } from "@/lib/auth/session";
 import { validatePasswordRequirements, hashPassword } from "@/lib/auth/passwordUtils";
-import path from "path";
-import fs from "fs";
+import { supabase } from "@/lib/db/supabaseClient";
 
-export const runtime = "nodejs";
-
-const DB_FILE = path.join(process.cwd(), "data", "omnizeus_local_sql_database.json");
-
-function getDb(): any {
-  try {
-    if (fs.existsSync(DB_FILE)) return JSON.parse(fs.readFileSync(DB_FILE, "utf-8"));
-  } catch {}
-  return {};
-}
-
-function saveDb(data: any): boolean {
-  try {
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
-    return true;
-  } catch {
-    return false;
-  }
-}
+export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
   try {
-    const session = getSession(req);
+    const session = await getSession(req);
     if (!session) {
-      return NextResponse.json({ error: "Sessão inválida ou expirada. Faça login novamente." }, { status: 401 });
+      return NextResponse.json({ error: "SessÃ£o invÃ¡lida ou expirada. FaÃ§a login novamente." }, { status: 401 });
     }
 
     const { newPassword, confirmPassword } = await req.json();
 
-    // O alvo vem SEMPRE da sessão. Aceitar userId do body permitiria a qualquer
-    // pessoa trocar a senha de outro usuário.
+    // O alvo vem SEMPRE da sessÃ£o. Aceitar userId do body permitiria a qualquer
+    // pessoa trocar a senha de outro usuÃ¡rio.
     const targetUserId = session.userId;
 
     if (!newPassword || !confirmPassword) {
-      return NextResponse.json({ error: "Nova senha e confirmação são obrigatórias." }, { status: 400 });
+      return NextResponse.json({ error: "Nova senha e confirmaÃ§Ã£o sÃ£o obrigatÃ³rias." }, { status: 400 });
     }
 
     if (newPassword !== confirmPassword) {
-      return NextResponse.json({ error: "A nova senha e a confirmação não coincidem." }, { status: 400 });
+      return NextResponse.json({ error: "A nova senha e a confirmaÃ§Ã£o nÃ£o coincidem." }, { status: 400 });
     }
 
     // Validate security rules
     const validation = validatePasswordRequirements(newPassword);
     if (!validation.isValid) {
       return NextResponse.json({
-        error: "A senha não atende a todos os requisitos de segurança exigidos.",
+        error: "A senha nÃ£o atende a todos os requisitos de seguranÃ§a exigidos.",
         checks: validation.checks
       }, { status: 400 });
     }
 
     const hashedPassword = await hashPassword(newPassword);
-    const db = getDb();
-    const employees: any[] = Array.isArray(db.employees) ? db.employees : [];
 
-    const empIndex = employees.findIndex((e: any) => e.id === targetUserId || e.email?.toLowerCase() === session?.email?.toLowerCase());
+    const { data: employees, error: fetchError } = await supabase
+      .from("employees")
+      .select("*")
+      .or(`id.eq.${targetUserId},email.ilike.${session.email}`);
 
-    if (empIndex < 0) {
-      return NextResponse.json({ error: "Usuário não encontrado para atualização de senha." }, { status: 404 });
+    if (fetchError || !employees || employees.length === 0) {
+      return NextResponse.json({ error: "UsuÃ¡rio nÃ£o encontrado para atualizaÃ§Ã£o de senha." }, { status: 404 });
     }
 
+    const employee = employees[0];
     const now = new Date().toISOString();
-    employees[empIndex] = {
-      ...employees[empIndex],
-      password_hash: hashedPassword,
-      passwordHash: hashedPassword,
-      must_change_password: false,
-      mustChangePassword: false,
-      password_changed_at: now,
-      passwordChangedAt: now,
-      status: "Ativo"
-    };
-    // Remove credenciais legadas em texto puro, senão a senha antiga continua aceita
-    delete employees[empIndex].password;
-    delete employees[empIndex].temporary_password;
-    delete employees[empIndex].temporaryPassword;
 
-    db.employees = employees;
+    const { error: updateError } = await supabase
+      .from("employees")
+      .update({
+        password_hash: hashedPassword,
+        passwordHash: hashedPassword,
+        must_change_password: false,
+        mustChangePassword: false,
+        password_changed_at: now,
+        passwordChangedAt: now,
+        status: "Ativo",
+        password: null,
+        temporary_password: null,
+        temporaryPassword: null
+      })
+      .eq("id", employee.id);
+
+    if (updateError) {
+      throw updateError;
+    }
 
     // Log audit entry
-    if (!Array.isArray(db.audit_logs)) db.audit_logs = [];
-    db.audit_logs.unshift({
-      id: `log_${Date.now()}`,
-      company_id: employees[empIndex].company_id || employees[empIndex].companyId || "global",
-      user_name: employees[empIndex].name || "Usuário",
-      action: "Senha alterada no primeiro acesso pelo próprio usuário",
-      resource: "Autenticação",
-      created_at: now
-    });
-
-    saveDb(db);
+    await supabase.from("audit_logs").insert([{
+      company_id: employee.company_id || employee.companyId || "global",
+      user_name: employee.name || "UsuÃ¡rio",
+      action: "Senha alterada no primeiro acesso pelo prÃ³prio usuÃ¡rio",
+      resource: "AutenticaÃ§Ã£o"
+    }]);
 
     const res = NextResponse.json({
       success: true,
       message: "Senha alterada com sucesso! Seu acesso foi liberado.",
       user: {
-        id: employees[empIndex].id,
-        name: employees[empIndex].name,
-        email: employees[empIndex].email,
-        role: employees[empIndex].role,
-        companyId: employees[empIndex].company_id || employees[empIndex].companyId
+        id: employee.id,
+        name: employee.name,
+        email: employee.email,
+        role: employee.role,
+        companyId: employee.company_id || employee.companyId
       }
     });
 
     if (session) {
-      return setSessionCookie(res, {
+      return await setSessionCookie(res, {
         ...session,
         mustChangePassword: false
       });
@@ -123,3 +106,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err.message || "Erro interno ao alterar senha." }, { status: 500 });
   }
 }
+
+
+

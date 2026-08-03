@@ -1,11 +1,9 @@
+﻿export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
 import { getSession } from "@/lib/auth/session";
-import { PurchaseOrder } from "@/lib/db/serverDb";
+import { supabase } from "@/lib/db/supabaseClient";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
+export const runtime = "edge";
 
 // Helper to generate a secure random 12-character temporary password
 function generateSecureTempPassword(): string {
@@ -31,7 +29,7 @@ function generateSecureTempPassword(): string {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = getSession(req);
+    const session = await getSession(req);
     // Allow if super_adm or during initial dev demo
     if (session && session.role !== "super_adm") {
       return NextResponse.json(
@@ -44,47 +42,32 @@ export async function POST(req: NextRequest) {
     const { order_id } = body;
 
     if (!order_id) {
-      return NextResponse.json({ error: "ID do pedido não informado." }, { status: 400 });
+      return NextResponse.json({ error: "ID do pedido nÃ£o informado." }, { status: 400 });
     }
 
-    if (!fs.existsSync(DB_FILE_PATH)) {
-      return NextResponse.json({ error: "Banco de dados não encontrado." }, { status: 500 });
+    const { data: order, error: findError } = await supabase.from('purchase_orders')
+      .select('*')
+      .or(`id.eq.${order_id},order_number.eq.${order_id}`)
+      .maybeSingle();
+
+    if (findError || !order) {
+      return NextResponse.json({ error: "Pedido de compra nÃ£o encontrado." }, { status: 404 });
     }
-
-    let raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
-    if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
-    const dbData = JSON.parse(raw);
-
-    if (!Array.isArray(dbData.purchase_orders)) {
-      return NextResponse.json({ error: "Tabela de pedidos de compra vazia." }, { status: 404 });
-    }
-
-    const orderIndex = dbData.purchase_orders.findIndex(
-      (o: PurchaseOrder) => o.id === order_id || o.order_number === order_id
-    );
-
-    if (orderIndex === -1) {
-      return NextResponse.json({ error: "Pedido de compra não encontrado." }, { status: 404 });
-    }
-
-    const order: PurchaseOrder = dbData.purchase_orders[orderIndex];
 
     if (order.status === "PROVISIONADO") {
       return NextResponse.json(
         {
-          error: "Este pedido de compra já foi provisionado anteriormente.",
+          error: "Este pedido de compra jÃ¡ foi provisionado anteriormente.",
           provisioned_company_id: order.provisioned_company_id
         },
         { status: 400 }
       );
     }
 
-    // Segurança contábil: só provisiona após pagamento confirmado.
-    // Impede que uma empresa não paga entre como "Ativa" no MRR do Dashboard Master.
     if (order.status !== "PAGAMENTO_CONFIRMADO") {
       return NextResponse.json(
         {
-          error: "Este pedido não pode ser provisionado: o pagamento ainda não foi confirmado. Aguarde o webhook do Stripe confirmar o pagamento (status PAGAMENTO_CONFIRMADO)."
+          error: "Este pedido nÃ£o pode ser provisionado: o pagamento ainda nÃ£o foi confirmado. Aguarde o webhook do Stripe confirmar o pagamento (status PAGAMENTO_CONFIRMADO)."
         },
         { status: 400 }
       );
@@ -99,7 +82,7 @@ export async function POST(req: NextRequest) {
       id: newCompanyId,
       corporate_name: order.empresa_nome,
       cnpj: order.empresa_cnpj,
-      city: "São Paulo",
+      city: "SÃ£o Paulo",
       state: "SP",
       plan: order.plan_id,
       coins_franchise: order.coins_franchise,
@@ -111,11 +94,10 @@ export async function POST(req: NextRequest) {
       created_at: new Date().toISOString(),
       tradeName: order.empresa_nome,
       activeClientsCount: 0,
-      company_context: `Empresa provisionada via Pedido de Compra ${order.order_number}. Segmento: ${order.empresa_segmento}. Responsável: ${order.responsavel_nome} (${order.responsavel_email}). Observações: ${order.empresa_observacoes || "Nenhuma"}.`
+      company_context: `Empresa provisionada via Pedido de Compra ${order.order_number}. Segmento: ${order.empresa_segmento}. ResponsÃ¡vel: ${order.responsavel_nome} (${order.responsavel_email}). ObservaÃ§Ãµes: ${order.empresa_observacoes || "Nenhuma"}.`
     };
 
-    if (!Array.isArray(dbData.companies)) dbData.companies = [];
-    dbData.companies.push(newCompany);
+    await supabase.from('companies').insert([newCompany]);
 
     // 2. Create Gestor Employee User with must_change_password: true
     const newGestor = {
@@ -123,7 +105,7 @@ export async function POST(req: NextRequest) {
       company_id: newCompanyId,
       name: order.responsavel_nome,
       email: order.responsavel_email,
-      department: "Diretoria / Gestão Master",
+      department: "Diretoria / GestÃ£o Master",
       role: "gestor",
       allowed_modules: [
         "dashboard",
@@ -141,11 +123,9 @@ export async function POST(req: NextRequest) {
       created_at: new Date().toISOString()
     };
 
-    if (!Array.isArray(dbData.employees)) dbData.employees = [];
-    dbData.employees.push(newGestor);
+    await supabase.from('employees').insert([newGestor]);
 
     // 3. Assign 9 Native AI Agents Context to the new company
-    if (!Array.isArray(dbData.custom_agents)) dbData.custom_agents = [];
     const builtinAgentIds = [
       "agente_geral",
       "geral",
@@ -158,40 +138,36 @@ export async function POST(req: NextRequest) {
       "diretoria"
     ];
 
-    builtinAgentIds.forEach((agentId) => {
-      dbData.custom_agents.push({
-        id: `agent_${agentId}_${newCompanyId}`,
-        company_id: newCompanyId,
-        label: agentId.toUpperCase().replace("_", " "),
-        category: "Nativo",
-        system_prompt: `Assistente especializado da empresa ${order.empresa_nome}.`,
-        color: "bg-blue-50 text-blue-700 border-blue-200",
-        is_custom: false,
-        created_at: new Date().toISOString()
-      });
-    });
+    const agentsToInsert = builtinAgentIds.map((agentId) => ({
+      id: `agent_${agentId}_${newCompanyId}`,
+      company_id: newCompanyId,
+      label: agentId.toUpperCase().replace("_", " "),
+      category: "Nativo",
+      system_prompt: `Assistente especializado da empresa ${order.empresa_nome}.`,
+      color: "bg-blue-50 text-blue-700 border-blue-200",
+      is_custom: false,
+      created_at: new Date().toISOString()
+    }));
+    await supabase.from('custom_agents').insert(agentsToInsert);
 
     // 4. Update Order Status
-    order.status = "PROVISIONADO";
-    order.provisioned_at = new Date().toISOString();
-    order.provisioned_company_id = newCompanyId;
-    dbData.purchase_orders[orderIndex] = order;
+    await supabase.from('purchase_orders').update({
+      status: "PROVISIONADO",
+      provisioned_at: new Date().toISOString(),
+      provisioned_company_id: newCompanyId
+    }).eq('id', order.id);
 
     // 5. Add Audit Log Entry
-    if (!Array.isArray(dbData.audit_logs)) dbData.audit_logs = [];
-    dbData.audit_logs.push({
+    await supabase.from('audit_logs').insert([{
       id: `log_${Date.now()}`,
       company_id: newCompanyId,
       user_id: session?.userId || "super_adm",
       user_name: session?.name || "Super Admin",
       action: "PROVISIONAMENTO_EMPRESA",
       resource: "purchase_orders",
-      details: `Empresa ${order.empresa_nome} (${order.empresa_cnpj}) provisionada com sucesso a partir do pedido ${order.order_number}. Credenciais do Gestor criadas com troca de senha obrigatória no primeiro acesso.`,
+      details: `Empresa ${order.empresa_nome} (${order.empresa_cnpj}) provisionada com sucesso a partir do pedido ${order.order_number}. Credenciais do Gestor criadas com troca de senha obrigatÃ³ria no primeiro acesso.`,
       created_at: new Date().toISOString()
-    });
-
-    // Save updated DB file
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(dbData, null, 2), "utf-8");
+    }]);
 
     return NextResponse.json({
       success: true,
@@ -215,3 +191,6 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+
+

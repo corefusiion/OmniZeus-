@@ -1,5 +1,8 @@
+export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { saveContaAzulTokens } from "@/lib/contaazul/store";
+
+export const runtime = "edge";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -104,3 +107,4 @@ export async function POST(req: Request) {
     );
   }
 }
+

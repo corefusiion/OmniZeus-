@@ -1,40 +1,41 @@
+export const dynamic = "force-dynamic";
 import { NextResponse, NextRequest } from "next/server";
 import { getContaAzulTokens, saveContaAzulTokens } from "@/lib/contaazul/store";
-import fs from "fs";
-import path from "path";
+import { supabase } from "@/lib/db/supabaseClient";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
+export const runtime = "edge";
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const companyId = searchParams.get("companyId") || req.headers.get("x-company-id") || "comp_zenitus";
 
-    const tokens = getContaAzulTokens(companyId);
+    const tokens = await getContaAzulTokens(companyId);
 
     let lastSyncAt: string | null = null;
     let nextSyncAt: string | null = null;
     let lastLog: any = null;
 
-    if (fs.existsSync(DB_FILE_PATH)) {
-      try {
-        let raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
-        if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
-        const dbData = JSON.parse(raw);
+    const { data: configs } = await supabase
+      .from("contaazul_config")
+      .select("*")
+      .eq("company_id", companyId)
+      .limit(1);
+    
+    if (configs && configs.length > 0) {
+      lastSyncAt = configs[0].last_sync_at || null;
+      nextSyncAt = configs[0].next_sync_at || null;
+    }
 
-        if (Array.isArray(dbData.contaazul_config)) {
-          const cfg = dbData.contaazul_config.find((c: any) => c.company_id === companyId);
-          if (cfg) {
-            lastSyncAt = cfg.last_sync_at || null;
-            nextSyncAt = cfg.next_sync_at || null;
-          }
-        }
-
-        if (Array.isArray(dbData.contaazul_sync_logs)) {
-          lastLog = dbData.contaazul_sync_logs.find((l: any) => l.company_id === companyId || l.company_id === "global") || null;
-        }
-      } catch (e) {}
+    const { data: logs } = await supabase
+      .from("contaazul_sync_logs")
+      .select("*")
+      .in("company_id", [companyId, "global"])
+      .order("completed_at", { ascending: false })
+      .limit(1);
+    
+    if (logs && logs.length > 0) {
+      lastLog = logs[0];
     }
 
     return NextResponse.json({
@@ -58,9 +59,12 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { companyId = "comp_zenitus", ...tokens } = body;
-    const updated = saveContaAzulTokens(companyId, tokens);
+    const updated = await saveContaAzulTokens(companyId, tokens);
     return NextResponse.json({ success: true, company_id: companyId, tokens: updated });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
+
+
+

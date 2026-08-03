@@ -1,5 +1,8 @@
+export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { fetchWithAutoRefresh } from "@/lib/contaazul/store";
+
+export const runtime = "edge";
 
 export async function PUT(req: Request) {
   try {
@@ -161,3 +164,4 @@ export async function PUT(req: Request) {
     );
   }
 }
+

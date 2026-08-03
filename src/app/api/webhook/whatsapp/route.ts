@@ -1,5 +1,8 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { sqlDb } from "@/lib/db/sqlite";
+
+export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,3 +29,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message || "Erro no Webhook" }, { status: 400 });
   }
 }
+

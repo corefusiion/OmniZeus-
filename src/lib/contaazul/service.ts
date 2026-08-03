@@ -1,6 +1,5 @@
-import fs from "fs";
-import path from "path";
 import { fetchWithAutoRefresh, getContaAzulTokens } from "./store";
+import { supabase } from "@/lib/db/supabaseClient";
 import { 
   ContaAzulClient, 
   ContaAzulSupplier, 
@@ -8,60 +7,36 @@ import {
   ContaAzulCategory 
 } from "./types";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
-
-function getLocalDb() {
-  try {
-    const raw = fs.readFileSync(DB_FILE, "utf-8");
-    return JSON.parse(raw);
-  } catch (e) {
-    return {};
-  }
-}
-
 /**
- * Retorna todos os clientes do banco local
+ * Retorna todos os clientes do banco do Supabase
  */
 export async function listClients(): Promise<ContaAzulClient[]> {
-  const db = getLocalDb();
-  if (db.contaazul_clients && db.contaazul_clients.length > 0) {
-    return db.contaazul_clients;
-  }
-  return [];
+  const { data } = await supabase.from('contaazul_clients').select('*');
+  return data || [];
 }
 
 /**
- * Retorna todos os fornecedores do banco local
+ * Retorna todos os fornecedores do banco do Supabase
  */
 export async function listSuppliers(): Promise<ContaAzulSupplier[]> {
-  const db = getLocalDb();
-  if (db.contaazul_suppliers && db.contaazul_suppliers.length > 0) {
-    return db.contaazul_suppliers;
-  }
-  return [];
+  const { data } = await supabase.from('contaazul_suppliers').select('*');
+  return data || [];
 }
 
 /**
- * Retorna todos os eventos financeiros do banco local
+ * Retorna todos os eventos financeiros do banco do Supabase
  */
 export async function listEntries(): Promise<ContaAzulEntry[]> {
-  const db = getLocalDb();
-  if (db.contaazul_entries && db.contaazul_entries.length > 0) {
-    return db.contaazul_entries;
-  }
-  return [];
+  const { data } = await supabase.from('contaazul_entries').select('*');
+  return data || [];
 }
 
 /**
- * Retorna todas as categorias (plano de contas) do banco local
+ * Retorna todas as categorias (plano de contas) do banco do Supabase
  */
 export async function listCategories(): Promise<ContaAzulCategory[]> {
-  const db = getLocalDb();
-  if (db.contaazul_categories && db.contaazul_categories.length > 0) {
-    return db.contaazul_categories;
-  }
-  return [];
+  const { data } = await supabase.from('contaazul_categories').select('*');
+  return data || [];
 }
 
 /**
@@ -121,24 +96,29 @@ export async function createEntry(data: Partial<ContaAzulEntry>): Promise<ContaA
 }
 
 /**
- * Busca textual em todas as tabelas locais
+ * Busca textual nas tabelas do Supabase
  */
 export async function searchAll(query: string) {
-  const db = getLocalDb();
-  const q = query.toLowerCase();
+  const q = `%${query}%`;
   
-  const clients = (db.contaazul_clients || []).filter((c: any) => c.nome?.toLowerCase().includes(q) || c.documento?.includes(q));
-  const suppliers = (db.contaazul_suppliers || []).filter((s: any) => s.nome?.toLowerCase().includes(q) || s.documento?.includes(q));
-  const entries = (db.contaazul_entries || []).filter((e: any) => e.descricao?.toLowerCase().includes(q));
+  const [clientsRes, suppliersRes, entriesRes] = await Promise.all([
+    supabase.from('contaazul_clients').select('*').or(`nome.ilike.${q},documento.ilike.${q}`),
+    supabase.from('contaazul_suppliers').select('*').or(`nome.ilike.${q},documento.ilike.${q}`),
+    supabase.from('contaazul_entries').select('*').ilike('descricao', q)
+  ]);
   
-  return { clients, suppliers, entries };
+  return { 
+    clients: clientsRes.data || [], 
+    suppliers: suppliersRes.data || [], 
+    entries: entriesRes.data || [] 
+  };
 }
 
 /**
  * Dispara a sincronização de todos os dados
  */
 export async function syncAll() {
-  const tokens = getContaAzulTokens();
+  const tokens = await getContaAzulTokens();
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const res = await fetch(`${baseUrl}/api/contaazul/sync`, {
     method: "POST",
@@ -152,9 +132,11 @@ export async function syncAll() {
  * Verifica o status da conexão da integração
  */
 export async function getConnectionStatus() {
-  const tokens = getContaAzulTokens();
+  const tokens = await getContaAzulTokens();
   return {
     isConnected: !!(tokens.accessToken && tokens.refreshToken),
     updatedAt: tokens.updatedAt
   };
 }
+
+

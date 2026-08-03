@@ -1,30 +1,12 @@
+export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { fetchWithAutoRefresh } from "@/lib/contaazul/store";
 import { decryptContaAzulFields, encryptContaAzulFields } from "@/lib/crypto/atRest";
+import { supabase } from "@/lib/db/supabaseClient";
+
+export const runtime = "edge";
 
 export async function POST(req: Request) {
-  const fs = require("fs");
-  const path = require("path");
-  const DATA_DIR = path.join(process.cwd(), "data");
-  const DB_FILE_PATH = path.join(DATA_DIR, "omnizeus_local_sql_database.json");
-  
-  function getLocalDbFile(): any {
-    try {
-      if (fs.existsSync(DB_FILE_PATH)) {
-        return JSON.parse(fs.readFileSync(DB_FILE_PATH, "utf-8"));
-      }
-    } catch (e) {}
-    return {};
-  }
-
-  function saveLocalDbFile(db: any): void {
-    try {
-      if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-      fs.writeFileSync(DB_FILE_PATH, JSON.stringify(db, null, 2), "utf-8");
-    } catch (err) {
-      console.error("[IA-Workspace] Erro ao salvar DB local:", err);
-    }
-  }
   try {
     const { 
       accessToken, refreshToken, clientId, clientSecret, 
@@ -78,12 +60,17 @@ export async function POST(req: Request) {
       } : undefined
     };
 
-    const db = getLocalDbFile();
+    const targetCompanyId = companyId || "comp_zenitus";
+    
     // Tokens podem estar criptografados em repouso (enc:v1:) — descriptografa antes de usar
-    const configRaw = db.contaazul_config || {};
-    const config = Array.isArray(configRaw)
-      ? (decryptContaAzulFields(configRaw.find((c: any) => c.company_id === (companyId || "comp_zenitus")) || {}) as any)
-      : decryptContaAzulFields(configRaw);
+    const { data: configRows } = await supabase
+      .from("contaazul_config")
+      .select("*")
+      .eq("company_id", targetCompanyId)
+      .limit(1);
+    
+    const configRaw = configRows && configRows.length > 0 ? configRows[0] : {};
+    const config = await decryptContaAzulFields(configRaw) as any;
 
     const finalAccessToken = accessToken || config.access_token;
     const finalRefreshToken = refreshToken || config.refresh_token;
@@ -147,11 +134,10 @@ export async function POST(req: Request) {
       );
     }
 
-    // Se a chamada oficial tiver sucesso real na API externa, salvamos no cache local
-    if (!Array.isArray(db.contaazul_clients)) db.contaazul_clients = [];
-    db.contaazul_clients.push({
+    // Se a chamada oficial tiver sucesso real na API externa, salvamos no banco de dados local
+    await supabase.from("contaazul_clients").insert({
       id: data.id || `cliente_${Date.now()}`,
-      company_id: companyId || "comp_zenitus",
+      company_id: targetCompanyId,
       nome: name.trim(),
       name: name.trim(),
       cpf_cnpj: cleanDoc,
@@ -162,32 +148,21 @@ export async function POST(req: Request) {
       ativo: true
     });
     
-    // Atualiza tokens sem destruir o formato array do contaazul_config (criptografados em repouso)
+    // Atualiza tokens
     if (newAccessToken && newRefreshToken) {
-      const encryptedTokens = encryptContaAzulFields({
+      const encryptedTokens = await encryptContaAzulFields({
         access_token: newAccessToken,
         refresh_token: newRefreshToken
       });
-      if (Array.isArray(db.contaazul_config)) {
-        // Formato array (multi-tenant): atualizar a entrada da empresa
-        const cfgIdx = db.contaazul_config.findIndex((c: any) => c.company_id === (companyId || "comp_zenitus"));
-        if (cfgIdx !== -1) {
-          db.contaazul_config[cfgIdx].access_token = encryptedTokens.access_token;
-          db.contaazul_config[cfgIdx].refresh_token = encryptedTokens.refresh_token;
-          db.contaazul_config[cfgIdx].updated_at = new Date().toISOString();
-        }
-      } else {
-        // Legado objeto plano
-        db.contaazul_config = {
-          ...db.contaazul_config,
+      await supabase
+        .from("contaazul_config")
+        .update({
           access_token: encryptedTokens.access_token,
           refresh_token: encryptedTokens.refresh_token,
           updated_at: new Date().toISOString()
-        };
-      }
+        })
+        .eq("company_id", targetCompanyId);
     }
-    
-    saveLocalDbFile(db);
 
     return NextResponse.json({
       success: true,
@@ -203,3 +178,6 @@ export async function POST(req: Request) {
     );
   }
 }
+
+
+
