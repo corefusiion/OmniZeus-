@@ -1,6 +1,5 @@
-export const dynamic = "force-dynamic";
 // API Route: POST /api/auth/login
-// Server-side authentication â€” sets a signed HttpOnly cookie with the session.
+// Server-side authentication — sets a signed HttpOnly cookie with the session.
 // This is the ONLY way the frontend should authenticate. Never trust client-side state for auth.
 
 import { NextRequest, NextResponse } from "next/server";
