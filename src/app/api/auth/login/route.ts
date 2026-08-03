@@ -90,43 +90,55 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Check dynamically created employees in DB
-    const { data: employees } = await supabase.from('employees').select('*');
-    const safeEmployees = employees || [];
+    let employees: any[] = [];
+    try {
+      const { data } = await supabase.from('employees').select('*');
+      employees = data || [];
+    } catch (dbErr) {
+      console.error("[LOGIN DB FETCH ERROR]:", dbErr);
+    }
 
     const { verifyPassword } = await import("@/lib/auth/passwordUtils");
 
     let empIndex = -1;
-    for (let i = 0; i < safeEmployees.length; i++) {
-      const e = safeEmployees[i];
+    for (let i = 0; i < employees.length; i++) {
+      const e = employees[i];
       if ((e.email || "").toLowerCase() !== cleanEmail) continue;
       const stored = e.passwordHash || e.password_hash || e.password || e.temporary_password || e.temporaryPassword;
       if (stored && await verifyPassword(cleanPass, stored)) {
         empIndex = i;
+        break;
       }
-      break;
     }
 
     if (empIndex >= 0) {
-      const emp = safeEmployees[empIndex];
+      const emp = employees[empIndex];
       clearRateLimit(rateKey);
 
       // Check if user account is blocked or inactive
       if (emp.status === "Bloqueado" || emp.status === "Inativo") {
         return NextResponse.json(
-          { success: false, error: "Esta conta estÃ¡ desativada ou bloqueada. Entre em contato com o Gestor da sua empresa." },
+          { success: false, error: "Esta conta está desativada ou bloqueada. Entre em contato com o Gestor da sua empresa." },
           { status: 403 }
         );
       }
 
       // Update last login timestamp
       const now = new Date().toISOString();
-      await supabase.from('employees').update({ last_login_at: now }).eq('id', emp.id);
+      try {
+        await supabase.from('employees').update({ last_login_at: now }).eq('id', emp.id);
+      } catch {}
 
       const mustChangePassword = emp.must_change_password === true || emp.mustChangePassword === true;
 
       // Resolve company name
-      const { data: company } = await supabase.from('companies').select('*').eq('id', emp.company_id || emp.companyId).single();
-      const companyName = emp.companyName || company?.tradeName || company?.corporate_name || emp.companyId || "";
+      let companyName = emp.companyName || emp.companyId || "";
+      try {
+        const { data: company } = await supabase.from('companies').select('*').eq('id', emp.company_id || emp.companyId).single();
+        if (company) {
+          companyName = company.tradeName || company.corporate_name || companyName;
+        }
+      } catch {}
 
       const res = NextResponse.json({
         success: true,
@@ -160,7 +172,11 @@ export async function POST(req: NextRequest) {
       { status: 401 }
     );
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Erro interno no servidor." }, { status: 500 });
+    console.error("[LOGIN CRITICAL ERROR]:", err);
+    return NextResponse.json(
+      { success: false, error: err?.message || "Erro interno no servidor." },
+      { status: 500 }
+    );
   }
 }
 
