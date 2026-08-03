@@ -32,7 +32,15 @@ function clearRateLimit(key: string): void {
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password } = await req.json();
+    let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      console.error("Auth Login: Failed to parse request body", e);
+      return NextResponse.json({ error: "Invalid JSON format." }, { status: 400 });
+    }
+
+    const { email, password } = body;
 
     if (!email || !password) {
       return NextResponse.json({ error: "E-mail e senha sÃ£o obrigatÃ³rios." }, { status: 400 });

@@ -65,10 +65,11 @@ export default function LoginPage() {
           window.location.href = data.user.role === "super_adm" ? "/dashboard-master" : "/dashboard";
         }
       } else {
-        setErrorMsg(data.error || "Credenciais inválidas.");
+        setErrorMsg(data.error || `Erro (${res.status}): Credenciais inválidas.`);
       }
-    } catch {
-      setErrorMsg("Falha de conexão. Tente novamente.");
+    } catch (err: any) {
+      console.error("Login fetch error:", err);
+      setErrorMsg(`Falha de conexão (${err?.message || "Erro de resposta"}). Tente novamente.`);
     } finally {
       setIsLoading(false);
     }

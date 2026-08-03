@@ -1,21 +1,32 @@
 // Cloudflare Workers & Node.js Edge Environment Resolver — OmniZeus
-// In Cloudflare Workers with @cloudflare/next-on-pages, environment variables and secrets
-// are stored in getRequestContext().env, while in Node/Next dev they are in process.env.
-// This helper resolves variables from both sources safely.
-
-import { getRequestContext } from "@cloudflare/next-on-pages";
+// Safe environment variable lookup across Node.js, Next.js Edge Runtime and Cloudflare Workers
 
 export function getEnv(key: string): string | undefined {
-  if (typeof process !== "undefined" && process.env && process.env[key]) {
-    return process.env[key];
-  }
+  // 1. Standard process.env
   try {
-    const ctx = getRequestContext();
-    if (ctx && ctx.env && (ctx.env as any)[key]) {
-      return String((ctx.env as any)[key]);
+    if (typeof process !== "undefined" && process.env && process.env[key] !== undefined) {
+      const val = process.env[key];
+      if (val) return val;
     }
-  } catch {
-    // getRequestContext is unavailable during static build or outside request context
-  }
+  } catch {}
+
+  // 2. Cloudflare Workers getRequestContext().env
+  try {
+    const { getRequestContext } = require("@cloudflare/next-on-pages");
+    const ctx = getRequestContext();
+    if (ctx && ctx.env && ctx.env[key] !== undefined) {
+      const val = String(ctx.env[key]);
+      if (val) return val;
+    }
+  } catch {}
+
+  // 3. Global env fallback (Cloudflare Workers global scope)
+  try {
+    const g = globalThis as any;
+    if (g && g[key] !== undefined) {
+      return String(g[key]);
+    }
+  } catch {}
+
   return undefined;
 }
