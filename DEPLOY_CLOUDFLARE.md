@@ -27,10 +27,14 @@ Na tela de setup, preencha exatamente com estes dados:
 - **Project name:** `omnizeus` (ou o nome que preferir)
 - **Production branch:** `main` (ou `develop` se estiver criando um ambiente de homologação/testes).
 - **Framework preset:** Escolha **Next.js**.
-- **Build command:** `npm run build` *(o script `build` do `package.json` é `node scripts/build.js`: roda `next build` e depois `next-on-pages --skip-build`, que gera o Worker `.vercel/output/static/_worker.js` — sem depender de variável de ambiente do Cloudflare)*.
+- **Build command:** `npm run build` *(o script `build` do `package.json` é `node scripts/build.js`. No Windows roda apenas `next build`; no Linux/macOS (ambiente da Cloudflare) roda o pipeline **completo** do `next-on-pages`, que gera o Worker `.vercel/output/static/_worker.js` — ver aviso abaixo)*.
 - **Build output directory:** `.vercel/output/static` *(gerado pelo adapter; contém o `_worker.js` que é o entry-point do Worker — o `wrangler.jsonc` declara `main: ".vercel/output/static/_worker.js"`)*.
 
-> ⚠️ **IMPORTANTE (Next.js 14)**: o projeto usa `next@14.2.15`, que NÃO é compatível com o adapter oficial atual `@opennextjs/cloudflare` (exige Next ≥15.5.21). Por isso usamos `@cloudflare/next-on-pages@1.13.15` (devDependency já instalada) + o arquivo `wrangler.jsonc` na raiz do repo, que declara `main: ".vercel/output/static/_worker.js"` e `assets.directory` — é o que faz o `wrangler versions upload` (deploy do novo fluxo Cloudflare) encontrar o entry-point. O `.npmrc` com `legacy-peer-deps=true` é necessário para o `npm clean-install` resolver o conflito de peers (wrangler/workers-types). **Nota**: o fluxo "Workers Builds" da Cloudflare NÃO injeta `CF_PAGES=1`, então o script `build.js` NÃO usa variável de ambiente para decidir — ele sempre roda `next-on-pages --skip-build` após o `next build` (no Windows isso falha por limitação do shellac e o script apenas avisa e continua; na Cloudflare/Linux o Worker é gerado normalmente).
+> ⚠️ **IMPORTANTE (Next.js 14)**: o projeto usa `next@14.2.15`, que NÃO é compatível com o adapter oficial atual `@opennextjs/cloudflare` (exige Next ≥15.5.21). Por isso usamos `@cloudflare/next-on-pages@1.13.15` (devDependency já instalada) + o arquivo `wrangler.jsonc` na raiz do repo, que declara `main: ".vercel/output/static/_worker.js"` e `assets.directory` — é o que faz o `wrangler versions upload` (deploy do novo fluxo Cloudflare) encontrar o entry-point. O `.npmrc` com `legacy-peer-deps=true` é necessário para o `npm clean-install` resolver o conflito de peers (wrangler/workers-types).
+
+> ⚠️ **NÃO use `--skip-build` no adapter**: a flag faz o `next-on-pages` pular o "Vercel build" interno, que é quem gera o `.vercel/output/config.json` — sem ele o adapter falha com `Could not read the '.vercel/output/config.json' file.` O script `build.js` roda o pipeline completo (`next-on-pages` sem flags) no Linux, exatamente como o adapter espera.
+
+> ⚠️ **NÃO use `pnpm run build` como build command**: o projeto é configurado para **npm** (`package-lock.json` existe; `pnpm-lock.yaml` não). Rodar via pnpm faz o adapter avisar `The project is set up for npm but it is currently being run via pnpm this might lead to build errors`. Use **`npm run build`** no painel.
 
 ---
 
