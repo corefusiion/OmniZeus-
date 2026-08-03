@@ -263,26 +263,23 @@ npm run build
 **BUG CRÍTICO CORRIGIDO — Dashboard "sem CSS"/congelado (2026-08-01):**
 - **Sintoma**: usuário relatou dashboard "quebrado, desformatado, CSS não carregou".
 - **Causa raiz**: loop infinito de fetch em `src/lib/coins/store.ts` + `src/components/layout/Header.tsx`. O Header chama `getCoinBalance('comp_zenitus')` (default) quando não acha a empresa ativa; como `comp_zenitus` não existe no banco, `fetchCoinBalanceFromServer` **nunca populava o cache** → cada `.then()` disparava `omnizeus_coins_change` → Header chamava `getCoinBalance` de novo → **loop infinito** (centenas de `GET /api/db?table=companies` por minuto, lendo o JSON inteiro do disco a cada request → servidor/browser inundados, página parecia quebrada).
-- **Correção (em `coins/store.ts`)**: `fetchCoinBalanceFromServer` agora **sempre popula o cache** (`inMemoryBalances[companyId]` = saldo real OU 0 quando empresa não encontrada; também 0 no catch). `getCoinBalance` só dispara `omnizeus_coins_change` quando o valor **realmente muda**. Loop eliminado.
-- **Validação**: dev server testado — antes: 778 chamadas `?table=companies`; depois do fix: **11 chamadas e estável**. HTML do dashboard retorna 200 com `layout.css` linkado e sem markers de erro.
-- **Observação**: bug pré-existente (não causado pelas melhorias do Dashboard), mas explodia justamente com o Super Admin logado em contexto 'global' + seed multi-tenant.
-
-**Decisões / combinados:**
-- Manter este log sempre atualizado ao longo da conversa.
-- Revisão menu a menu; o usuário aponta o próximo menu ao fechar o atual.
-- Usuário escolheu "Implementar tudo" no Dashboard (sem alterar seed).
-
-**Próximos passos:**
-- Usuário valida o Dashboard Executivo no navegador (com o fix do loop de Coins, a página deve carregar formatada) e confirma os novos painéis (Coins & IA, alertas, atividade).
-- (Pendente, não priorizado) investigar build quebrado de `/contaazul` e `/api/agents/improve`.
-- Seguir para o próximo menu indicado pelo usuário.
-
-**Pendências / bloqueios:**
-- Build de produção da branch main falha em páginas pré-existentes (`/contaazul` prerender, `/api/agents/improve` page data) — não causado pelas mudanças do Dashboard.
-42. ? **MIGRA��O DE BANCO DE DADOS: JSON PARA SUPABASE (POSTGRESQL)** (2026-08-02): O sistema foi migrado de armazenamento JSON local (omnizeus_local_sql_database.json) para uma arquitetura robusta no Supabase (PostgreSQL). Devido a bloqueios na porta TCP 5432 no VPS do cliente, adotamos a abordagem REST HTTPS atrav�s da biblioteca oficial @supabase/supabase-js. O src/app/api/db/route.ts foi completamente reescrito para rotear as requisi��es (GET e POST) diretamente para o Supabase, mantendo a camada de seguran�a de multi-tenant e RLS. Tabelas criadas via painel master com schema pr�prio.
-43. ? **REFATORA��O COMPLETA PARA EDGE COMPUTING (CLOUDFLARE)** (2026-08-02): Para permitir o deploy na Cloudflare Pages, varremos e reescrevemos 28 arquivos na pasta \src/\ que ainda importavam a biblioteca \s\ (File System). Toda a l�gica de leitura/escrita JSON (incluindo autentica��o, bpo-chat, sincroniza��o Conta Azul e pagamentos) foi reescrita de forma paralela via agentes IA para usar consultas ativas ao Supabase (\@/lib/db/supabaseClient\). O projeto est� agora 100% serverless / edge-compatible.
 42. ✅ **DEPLOYS NA CLOUDFLARE E RESOLUÇÃO DE BUILDS** (2026-08-02):
     - **Causa Raiz Resolvida (Lazy Initialization Proxy)**: O erro fatal no build (Supabase credentials are missing) ocorria porque a Cloudflare Next-on-Pages instanciava módulos de Edge Runtime estaticamente (em momento de compilação), executando o createClient do Supabase antes das variáveis de ambiente (process.env) existirem. A correção arquitetural foi aplicada envolvendo a exportação do Supabase em um Proxy (Lazy Loading) dentro de src/lib/db/supabaseClient.ts, garantindo que o cliente só seja inicializado na primeira chamada *runtime*.
     - **Proteção do Wrangler Assets (.assetsignore)**: A Cloudflare estava rejeitando o deploy porque o framework 
 ext-on-pages cria uma pasta _worker.js dentro dos assets estáticos. O Wrangler por segurança bloqueava o upload avisando que poderia vazar código de servidor. Corrigido com a criação do arquivo public/.assetsignore contendo _worker.js, o que oculta o worker como asset estático e permite a implantação.
     - **Estratégia de Branching (main vs develop)**: Todo o desenvolvimento, testes iterativos e refatorações de código ocorreram na branch develop. Como a Cloudflare Pages aponta para produção usando a branch main, foi necessário fazer o git merge develop para a main e git push origin main. A partir de agora, testes continuam na develop, mas para refletir na Cloudflare o deploy oficial precisa ser feito na branch main.
+43. 🚨 **AUDITORIA DE ERROS & CORREÇÕES DO CLOUDFLARE EDGE WORKER** (2026-08-03):
+    - **Erro 1 — Bloqueio de Rede Corporativa/Firewall FortiGuard (`workers.dev`)**:
+      - **Sintoma**: `Falha de conexão. Tente novamente.` no navegador em redes empresariais.
+      - **Causa**: O firewall de borda (Fortinet/FortiGuard) intercepta chamadas para domínios genéricos gratuitos da Cloudflare (`*.workers.dev`) sob a categoria *Web Hosting* e retorna uma página HTML de bloqueio corporativo (`FortiGuard Intrusion Prevention - Access Blocked`).
+      - **Solução/Recomendação**: Adicionar um Domínio Próprio (Custom Domain) no painel da Cloudflare (*Workers & Pages > omnizeus > Domínios / Custom Domains*, ex: `omnizeus.controllserv.com.br`).
+    - **Erro 2 — `Unexpected end of JSON input` / Status 500 HTML (`X-Matched-Path: /500`)**:
+      - **Sintoma**: `POST /api/auth/login 500 (Internal Server Error)` e `SyntaxError: Unexpected end of JSON input` em `await res.json()`.
+      - **Causa Raiz A (`require` dinâmico em Edge Runtime)**: Em `src/lib/env.ts`, havia um `require("@cloudflare/next-on-pages")` dinâmico. Como o Edge Runtime do Next.js/Cloudflare é puramente ES Modules (sem CommonJS `require`), ocorria um `ReferenceError: require is not defined` durante o carregamento de módulo no Worker, fazendo o Next.js abortar e retornar a página HTML de erro `/500`.
+      - **Causa Raiz B (Mutação de `NextResponse.cookies.set`)**: O uso de `res.cookies.set()` sobre um objeto `NextResponse.json(...)` em Edge Runtime gerava exceções não-tratadas no gerador de respostas do `@cloudflare/next-on-pages`.
+      - **Causa Raiz C (Conflito de exportações)**: Rotas com `export const dynamic = "force-dynamic"` acumulado com `export const runtime = "edge"` geravam redundância no parser de rotas Edge.
+    - **Correções Aplicadas (`commits c6fb57b, 5f9aeab, 824ff36, d2eee77, edef1b1`)**:
+      - **`src/lib/env.ts`**: Restaurado import ES puro `import { getRequestContext } from "@cloudflare/next-on-pages";` dentro de bloco `try...catch` seguro.
+      - **`src/lib/auth/session.ts`**: Criado `createAuthResponse(jsonBody, payload, status)` que constrói nativamente `new NextResponse(JSON.stringify(jsonBody), { status, headers: { "Content-Type": "application/json", "Set-Cookie": cookieHeader } })` sem mutações posteriores de headers.
+      - **`src/app/api/auth/login/route.ts` & `src/app/api/auth/me/route.ts`**: Removida a diretiva duplicada `export const dynamic = "force-dynamic"`, mantendo exclusivamente `export const runtime = "edge"`.
+      - **`src/app/login/page.tsx`**: A tela exibe detalhadamente a mensagem de erro da API.
