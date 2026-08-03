@@ -49,15 +49,31 @@ Na tela de setup, preencha exatamente com estes dados:
 1. Na mesma tela de setup, role um pouco para baixo e clique em **Environment variables (advanced)**.
 2. Você precisará adicionar cada uma das variáveis do seu arquivo local. Clique em **Add variable** para cada uma delas. 
 
-Exemplo das variáveis cruciais (pegue os valores exatos do seu `.env.local` local):
-- `DATABASE_URL` = (sua string postgres)
-- `SUPABASE_URL` = (sua url do supabase)
-- `SUPABASE_ANON_KEY` = (sua chave anon)
-- `SUPABASE_SERVICE_ROLE_KEY` = (sua chave service role)
-- `JWT_SECRET` / `SESSION_SECRET` = (sua chave criptográfica)
-- `SUPER_ADMIN_PASSWORD` = (senha de emergência)
-- `CONTA_AZUL_CLIENT_ID` = (chave pública do app Conta Azul)
-- `CONTA_AZUL_CLIENT_SECRET` = (chave secreta do app Conta Azul)
+**Lista COMPLETA de variáveis** (pegue os valores exatos do seu `.env.local` local; o `.env.local.example` documenta cada uma):
+
+| Variável | Obrigatória? | Função |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | ✅ | URL do projeto Supabase (cliente) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Chave anon do Supabase (cliente) |
+| `SUPABASE_URL` | ✅ | URL do Supabase (alias servidor) |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Chave service role — usada pelo `getSupabase()` no backend |
+| `SESSION_SECRET` | ✅ | Assinatura HMAC-SHA256 do cookie de sessão (mín. 32 chars) |
+| `SUPER_ADMIN_PASSWORD` | ✅ | Senha de emergência do Super Admin (fallback `Design20`) |
+| `OMNIZEUS_ENCRYPTION_KEY` | ✅ | Chave AES-256-GCM dos tokens Conta Azul em repouso (mín. 32 chars) |
+| `OPENROUTER_API_KEY` | ✅ | Chave master OpenRouter (fallback quando a empresa não tem chave própria) |
+| `CONTA_AZUL_CLIENT_ID` | 🔵 | OAuth Conta Azul (renovação de tokens) |
+| `CONTA_AZUL_CLIENT_SECRET` | 🔵 | OAuth Conta Azul (renovação de tokens) |
+| `STRIPE_WEBHOOK_SECRET` | 🔵 | Assinatura dos eventos do Stripe (`whsec_...`) |
+| `WHATSAPP_WEBHOOK_TOKEN` | 🔵 | Token compartilhado da Evolution API |
+| `NEXT_PUBLIC_APP_URL` | 🔵 | URL pública da aplicação (callbacks/redirects) |
+| `DATABASE_URL` | ❌ | Apenas para scripts locais (drizzle); o app usa Supabase REST |
+
+> ⚠️ **Gere `SESSION_SECRET` e `OMNIZEUS_ENCRYPTION_KEY` com valores novos** (não reutilize os do dev local se possível):
+> ```
+> node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+> node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"
+> ```
+> Sem `OMNIZEUS_ENCRYPTION_KEY` em produção, qualquer gravação de token Conta Azul lança erro no runtime (`Encryption key missing`).
 
 ---
 

@@ -122,7 +122,7 @@ export async function createAuthResponse(
   status: number = 200
 ): Promise<NextResponse> {
   const token = await createSessionCookie(payload);
-  const isProd = process.env.NODE_ENV === "production";
+  const isProd = isProduction();
   const cookieHeader = `${SESSION_COOKIE}=${token}; Path=/; Max-Age=86400; HttpOnly; SameSite=Lax${isProd ? "; Secure" : ""}`;
 
   const res = NextResponse.json(jsonBody, { status });
@@ -134,7 +134,7 @@ export async function createAuthResponse(
 
 export async function setSessionCookie(res: NextResponse, payload: Omit<SessionPayload, "issuedAt" | "expiresAt">): Promise<NextResponse> {
   const token = await createSessionCookie(payload);
-  const isProd = process.env.NODE_ENV === "production";
+  const isProd = isProduction();
   const cookieHeader = `${SESSION_COOKIE}=${token}; Path=/; Max-Age=86400; HttpOnly; SameSite=Lax${isProd ? "; Secure" : ""}`;
   
   try {

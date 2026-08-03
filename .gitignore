@@ -43,3 +43,10 @@ yarn-error.log*
 
 # Vercel CLI local (peer do next-on-pages)
 .vercel/
+
+# Diagnostic / scratch junk (nunca versionar)
+/erro.log
+/temp_conf.txt
+/prompt_draft.md
+/cf_logs*.json
+*.tsbuildinfo
