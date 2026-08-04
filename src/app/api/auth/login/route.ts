@@ -7,6 +7,7 @@ import { createAuthResponse } from "@/lib/auth/session";
 import { PRODUCTION_USERS } from "@/lib/auth/roles";
 import { supabase } from "@/lib/db/supabaseClient";
 import { getEnv } from "@/lib/env";
+import { verifyPassword } from "@/lib/auth/passwordUtils";
 
 export const runtime = "edge";
 
@@ -98,7 +99,6 @@ export async function POST(req: NextRequest) {
       console.error("[LOGIN DB FETCH ERROR]:", dbErr);
     }
 
-    const { verifyPassword } = await import("@/lib/auth/passwordUtils");
 
     let empIndex = -1;
     for (let i = 0; i < employees.length; i++) {
