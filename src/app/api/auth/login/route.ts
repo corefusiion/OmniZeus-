@@ -1,15 +1,38 @@
 // API Route: POST /api/auth/login
 // Server-side authentication — sets a signed HttpOnly cookie with the session.
 // This is the ONLY way the frontend should authenticate. Never trust client-side state for auth.
+//
+// EDGE-SAFE: todas as respostas usam `new Response(...)` nativo (não NextResponse.json)
+// para compatibilidade total com Cloudflare Workers / next-on-pages.
 
-import { NextRequest, NextResponse } from "next/server";
-import { createAuthResponse } from "@/lib/auth/session";
+import type { NextRequest } from "next/server";
+import { createSessionCookie } from "@/lib/auth/session";
 import { PRODUCTION_USERS } from "@/lib/auth/roles";
 import { supabase } from "@/lib/db/supabaseClient";
 import { getEnv } from "@/lib/env";
 import { verifyPassword } from "@/lib/auth/passwordUtils";
 
 export const runtime = "edge";
+
+// ─── Helpers de resposta (nativos, sem NextResponse) ─────────────────────────
+
+function jsonResponse(body: Record<string, any>, status = 200, extraHeaders?: Record<string, string>): Response {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...extraHeaders,
+  };
+  return new Response(JSON.stringify(body), { status, headers });
+}
+
+function isProduction(): boolean {
+  try {
+    return typeof process !== "undefined" && process.env?.NODE_ENV === "production";
+  } catch {
+    return false;
+  }
+}
+
+// ─── Rate limiter (por isolate — aceitável em edge) ──────────────────────────
 
 const MAX_ATTEMPTS = 8;
 const LOCKOUT_MS = 15 * 60 * 1000;
@@ -30,44 +53,43 @@ function clearRateLimit(key: string): void {
   attempts.delete(key);
 }
 
+// ─── POST /api/auth/login ────────────────────────────────────────────────────
+
 export async function POST(req: NextRequest) {
   try {
-    let body;
+    // 1. Parse body
+    let body: any;
     try {
       body = await req.json();
-    } catch (e) {
-      console.error("Auth Login: Failed to parse request body", e);
-      return NextResponse.json({ error: "Invalid JSON format." }, { status: 400 });
+    } catch {
+      return jsonResponse({ error: "Invalid JSON format." }, 400);
     }
 
     const { email, password } = body;
-
     if (!email || !password) {
-      return NextResponse.json({ error: "E-mail e senha são obrigatórios." }, { status: 400 });
+      return jsonResponse({ error: "E-mail e senha são obrigatórios." }, 400);
     }
 
     const cleanEmail = email.trim().toLowerCase();
     const cleanPass = password.trim();
 
-    // Trava de força bruta por e-mail + IP
+    // 2. Rate limit
     const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";
     const rateKey = `${cleanEmail}|${clientIp}`;
     if (!checkRateLimit(rateKey)) {
-      return NextResponse.json(
+      return jsonResponse(
         { success: false, error: "Muitas tentativas de login. Tente novamente em 15 minutos." },
-        { status: 429 }
+        429
       );
     }
 
-    // 1. Check hardcoded production users (super admin etc.)
-    const prodUser = PRODUCTION_USERS.find(
-      u => u.email.toLowerCase() === cleanEmail
-    );
-
-    const superAdminPassword = getEnv("SUPER_ADMIN_PASSWORD") || 'Design20';
+    // 3. Check hardcoded production users (super admin)
+    const prodUser = PRODUCTION_USERS.find(u => u.email.toLowerCase() === cleanEmail);
+    const superAdminPassword = getEnv("SUPER_ADMIN_PASSWORD") || "Design20";
 
     if (prodUser && cleanPass === superAdminPassword) {
       clearRateLimit(rateKey);
+
       const userData = {
         id: prodUser.id,
         name: prodUser.name,
@@ -77,7 +99,7 @@ export async function POST(req: NextRequest) {
         companyName: prodUser.companyName,
       };
 
-      return await createAuthResponse(
+      return await buildAuthResponse(
         { success: true, user: userData },
         {
           userId: prodUser.id,
@@ -90,22 +112,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. Check dynamically created employees in DB
+    // 4. Check dynamically created employees in Supabase
     let employees: any[] = [];
     try {
-      const { data } = await supabase.from('employees').select('*');
+      const { data } = await supabase.from("employees").select("*");
       employees = data || [];
     } catch (dbErr) {
-      console.error("[LOGIN DB FETCH ERROR]:", dbErr);
+      console.error("[LOGIN] Supabase employees fetch failed:", dbErr);
     }
-
 
     let empIndex = -1;
     for (let i = 0; i < employees.length; i++) {
       const e = employees[i];
       if ((e.email || "").toLowerCase() !== cleanEmail) continue;
       const stored = e.passwordHash || e.password_hash || e.password || e.temporary_password || e.temporaryPassword;
-      if (stored && await verifyPassword(cleanPass, stored)) {
+      if (stored && (await verifyPassword(cleanPass, stored))) {
         empIndex = i;
         break;
       }
@@ -115,18 +136,16 @@ export async function POST(req: NextRequest) {
       const emp = employees[empIndex];
       clearRateLimit(rateKey);
 
-      // Check if user account is blocked or inactive
       if (emp.status === "Bloqueado" || emp.status === "Inativo") {
-        return NextResponse.json(
+        return jsonResponse(
           { success: false, error: "Esta conta está desativada ou bloqueada. Entre em contato com o Gestor da sua empresa." },
-          { status: 403 }
+          403
         );
       }
 
-      // Update last login timestamp
-      const now = new Date().toISOString();
+      // Update last login (fire-and-forget)
       try {
-        await supabase.from('employees').update({ last_login_at: now }).eq('id', emp.id);
+        await supabase.from("employees").update({ last_login_at: new Date().toISOString() }).eq("id", emp.id);
       } catch {}
 
       const mustChangePassword = emp.must_change_password === true || emp.mustChangePassword === true;
@@ -134,7 +153,11 @@ export async function POST(req: NextRequest) {
       // Resolve company name
       let companyName = emp.companyName || emp.companyId || "";
       try {
-        const { data: company } = await supabase.from('companies').select('*').eq('id', emp.company_id || emp.companyId).single();
+        const { data: company } = await supabase
+          .from("companies")
+          .select("*")
+          .eq("id", emp.company_id || emp.companyId)
+          .single();
         if (company) {
           companyName = company.tradeName || company.corporate_name || companyName;
         }
@@ -148,10 +171,10 @@ export async function POST(req: NextRequest) {
         companyId: emp.company_id || emp.companyId,
         companyName,
         mustChangePassword,
-        allowedModules: emp.allowed_modules || emp.allowedModules || []
+        allowedModules: emp.allowed_modules || emp.allowedModules || [],
       };
 
-      return await createAuthResponse(
+      return await buildAuthResponse(
         { success: true, mustChangePassword, user: userData },
         {
           userId: emp.id,
@@ -161,34 +184,78 @@ export async function POST(req: NextRequest) {
           companyId: emp.company_id || emp.companyId,
           companyName,
           mustChangePassword,
-          allowedModules: emp.allowed_modules || emp.allowedModules || []
+          allowedModules: emp.allowed_modules || emp.allowedModules || [],
         }
       );
     }
 
-    return NextResponse.json(
+    // 5. No match
+    return jsonResponse(
       { success: false, error: "E-mail ou senha incorretos. Verifique suas credenciais." },
-      { status: 401 }
+      401
     );
   } catch (err: any) {
     console.error("[LOGIN CRITICAL ERROR]:", err);
-    return NextResponse.json(
+    // Resposta nativa — nunca depende de NextResponse
+    return jsonResponse(
       { success: false, error: err?.message || "Erro interno no servidor." },
-      { status: 500 }
+      500
     );
   }
 }
 
-// POST /api/auth/logout (DELETE)
-// Edge-safe: define o cookie de sessão expirado via header Set-Cookie
-// (evita mutação de NextResponse.cookies em runtime Cloudflare).
-export async function DELETE(_req: NextRequest) {
-  const res = NextResponse.json({ success: true, message: "Sessão encerrada." });
+// ─── Constrói a resposta com Set-Cookie (autenticação) ───────────────────────
+// Usa `new Response` nativo em vez de NextResponse.json + headers.set
+// para evitar crashes do adapter next-on-pages em Cloudflare Workers.
+
+async function buildAuthResponse(
+  jsonBody: Record<string, any>,
+  payload: {
+    userId: string;
+    email: string;
+    name: string;
+    role: string;
+    companyId: string;
+    companyName: string;
+    mustChangePassword?: boolean;
+    allowedModules?: string[];
+  }
+): Promise<Response> {
   try {
-    res.headers.set(
-      "Set-Cookie",
-      "omnizeus_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax"
+    const token = await createSessionCookie(payload as any);
+    const isProd = isProduction();
+    const cookieHeader = `omnizeus_session=${token}; Path=/; Max-Age=86400; HttpOnly; SameSite=Lax${isProd ? "; Secure" : ""}`;
+
+    return new Response(JSON.stringify(jsonBody), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Set-Cookie": cookieHeader,
+      },
+    });
+  } catch (cookieErr: any) {
+    // Se a criação do cookie falhar (crypto.subtle indisponível, etc.),
+    // retornamos o JSON de sucesso SEM cookie — o frontend mostra o dashboard
+    // mas o usuário precisará logar de novo no próximo refresh.
+    console.error("[LOGIN] Cookie creation failed:", cookieErr);
+    return jsonResponse(
+      { ...jsonBody, warning: "Sessão não pôde ser criada. Tente novamente." },
+      200
     );
-  } catch {}
-  return res;
+  }
+}
+
+// ─── DELETE /api/auth/login (logout) ─────────────────────────────────────────
+
+export async function DELETE() {
+  return new Response(
+    JSON.stringify({ success: true, message: "Sessão encerrada." }),
+    {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Set-Cookie": "omnizeus_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax",
+      },
+    }
+  );
 }
