@@ -97,8 +97,8 @@ function toHex(bytes: Uint8Array): string {
 
 async function pbkdf2(password: string, saltHex: string): Promise<string> {
   const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits(
+  const key = await globalThis.crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await globalThis.crypto.subtle.deriveBits(
     { name: "PBKDF2", salt: enc.encode(saltHex), iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
     key,
     PBKDF2_KEYLEN * 8
@@ -135,7 +135,7 @@ export async function verifyPassword(password: string, stored: string): Promise<
 
   // Legado: SHA-256 sem salt (64 chars hex)
   if (/^[a-f0-9]{64}$/i.test(stored)) {
-    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
+    const buf = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
     const sha = toHex(new Uint8Array(buf));
     return timingSafeEqualHex(sha, stored.toLowerCase());
   }

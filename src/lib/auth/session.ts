@@ -64,14 +64,14 @@ function base64UrlToBytes(value: string): Uint8Array {
 // ─── Assinatura HMAC-SHA256 com comparação em tempo constante ──────────────────
 
 async function sign(data: string): Promise<string> {
-  const key = await crypto.subtle.importKey(
+  const key = await globalThis.crypto.subtle.importKey(
     "raw",
     encoder.encode(getSessionSecret()),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"]
   );
-  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(data));
+  const sig = await globalThis.crypto.subtle.sign("HMAC", key, encoder.encode(data));
   return bytesToBase64Url(new Uint8Array(sig));
 }
 
