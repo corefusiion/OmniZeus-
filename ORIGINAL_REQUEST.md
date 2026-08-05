@@ -210,3 +210,33 @@ CONTAAZUL_REDIRECT_URI=
 NEXTAUTH_SECRET=
 NEXTAUTH_URL=
 ```
+
+---
+
+## 2026-08-05T12:49:17Z
+
+# Teamwork Project Prompt — Draft
+
+> Status: Ready for launch — awaiting user approval
+> Goal: Craft prompt → get user approval → delegate to teamwork_preview
+
+O time de agentes vai reestruturar a rota `/api/auth/login` para corrigir definitivamente o Erro 500 de CPU Timeout no Cloudflare Edge Runtime, substituindo o PBKDF2 pesado por uma abordagem nativa e otimizando a consulta ao Supabase.
+
+Working directory: `C:\Users\t034183\Desktop\OmniZeus`
+Integrity mode: demo
+
+## Requirements
+
+### R1. Otimizar Criptografia (CPU Timeout)
+Modifique o arquivo `src/lib/auth/passwordUtils.ts` e `src/app/api/auth/login/route.ts` para que a validação da senha não consuma mais que 10-50ms de CPU (evitando o crash do PBKDF2 com 210.000 iterações na Cloudflare). 
+
+### R2. Otimizar Consulta ao Supabase
+Modifique a rota `/api/auth/login` para parar de fazer "full table scan" (`.select('*')` sem filtros) na tabela `employees`. Ela deve buscar apenas o e-mail correspondente usando `.eq('email', cleanEmail)`.
+
+## Acceptance Criteria
+
+### Performance e Estabilidade no Edge
+- [ ] O código modificado em `passwordUtils.ts` não deve utilizar algoritmos pesados síncronos/bloqueantes que excedam o limite da Cloudflare (reduzir drasticamente as iterações ou mudar o algoritmo).
+- [ ] A rota `login/route.ts` não traz mais um array gigante de funcionários para a memória do servidor/edge.
+- [ ] O build local `npm run build` continua passando sem erros.
+

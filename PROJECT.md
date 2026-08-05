@@ -50,6 +50,7 @@
 |---|------|-------|-------------|--------|
 | E2E | E2E Testing Suite | Requirements-based E2E test infra & test cases (Tiers 1-4) | None | DONE |
 | 1 | App Shell & Authentication | Sidebar, Header, Supabase Auth, Route Guard, Login Page | None | IN_PROGRESS |
+| M-LOGIN | Login Edge Optimization | Edge password hashing 10-50ms CPU (Web Crypto), query filtering `.eq('email', cleanEmail)` on employees | None | DONE |
 | 2 | Omni IA Multi-LLM Chat Hub | Multi-LLM streaming chat, persona prompts, chat history | M1 | IN_PROGRESS |
 | 3 | Document & Presentation Generators | PDF doc generator, styled preview, Gamma-like presentation generator, offline HTML export | M1 | DONE |
 | 4 | WhatsApp Bot, ContaAzul & Settings | Evolution API dashboard/webhook, ContaAzul OAuth & Financial dashboard, Config page | M1 | IN_PROGRESS |

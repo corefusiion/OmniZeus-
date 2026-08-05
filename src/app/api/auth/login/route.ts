@@ -93,8 +93,11 @@ export async function POST(req: NextRequest) {
     // 2. Check dynamically created employees in DB
     let employees: any[] = [];
     try {
-      const { data } = await supabase.from('employees').select('*');
-      employees = data || [];
+      const { data: employeesData, error: empErr } = await supabase
+        .from('employees')
+        .select('id, name, email, role, status, company_id, companyId, companyName, password_hash, passwordHash, password, temporary_password, temporaryPassword, must_change_password, mustChangePassword, allowed_modules, allowedModules')
+        .ilike('email', cleanEmail);
+      employees = employeesData || [];
     } catch (dbErr) {
       console.error("[LOGIN DB FETCH ERROR]:", dbErr);
     }
@@ -132,13 +135,20 @@ export async function POST(req: NextRequest) {
       const mustChangePassword = emp.must_change_password === true || emp.mustChangePassword === true;
 
       // Resolve company name
-      let companyName = emp.companyName || emp.companyId || "";
-      try {
-        const { data: company } = await supabase.from('companies').select('*').eq('id', emp.company_id || emp.companyId).single();
-        if (company) {
-          companyName = company.tradeName || company.corporate_name || companyName;
-        }
-      } catch {}
+      const companyId = emp.company_id || emp.companyId;
+      let companyName = emp.companyName || companyId || "";
+      if (companyId) {
+        try {
+          const { data: company } = await supabase
+            .from('companies')
+            .select('id, name, tradeName, corporate_name, trade_name')
+            .eq('id', companyId)
+            .maybeSingle();
+          if (company) {
+            companyName = company.tradeName || company.trade_name || company.corporate_name || company.name || companyName;
+          }
+        } catch {}
+      }
 
       const userData = {
         id: emp.id,

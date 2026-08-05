@@ -58,8 +58,8 @@ function encryptFields(obj) {
 
 function hashPassword(plain) {
   const salt = crypto.randomBytes(16).toString("hex");
-  const derived = crypto.pbkdf2Sync(plain, salt, 210000, 32, "sha256").toString("hex");
-  return `pbkdf2$210000$${salt}$${derived}`;
+  const derived = crypto.pbkdf2Sync(plain, salt, 10000, 32, "sha256").toString("hex");
+  return `pbkdf2$10000$${salt}$${derived}`;
 }
 
 function looksLikeLegacyPassword(value) {

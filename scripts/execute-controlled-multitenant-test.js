@@ -119,11 +119,11 @@ const departments = [
 ];
 
 // Gera o hash PBKDF2-SHA256 (mesmo formato de src/lib/auth/passwordUtils.ts):
-// pbkdf2$210000$<salt hex>$<derived hex>
+// pbkdf2$10000$<salt hex>$<derived hex>
 function hashTestPassword(password) {
   const salt = crypto.randomBytes(16).toString("hex");
-  const derived = crypto.pbkdf2Sync(password, salt, 210000, 32, "sha256").toString("hex");
-  return `pbkdf2$210000$${salt}$${derived}`;
+  const derived = crypto.pbkdf2Sync(password, salt, 10000, 32, "sha256").toString("hex");
+  return `pbkdf2$10000$${salt}$${derived}`;
 }
 
 const generatedEmployees = [];

@@ -89,19 +89,23 @@ export function validatePasswordRequirements(password: string): PasswordValidati
   };
 }
 
-const PBKDF2_ITERATIONS = 210000;
+export const DEFAULT_PBKDF2_ITERATIONS = 10000;
 const PBKDF2_KEYLEN = 32;
 
 function toHex(bytes: Uint8Array): string {
   return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function pbkdf2(password: string, saltHex: string): Promise<string> {
+async function pbkdf2(
+  password: string,
+  salt: string,
+  iterations: number = DEFAULT_PBKDF2_ITERATIONS
+): Promise<string> {
   const enc = new TextEncoder();
   const cryptoAPI = globalThis.crypto || (typeof crypto !== 'undefined' ? crypto : ((globalThis as any).crypto || (typeof crypto !== 'undefined' ? crypto : {})));
   const key = await cryptoAPI.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
   const bits = await cryptoAPI.subtle.deriveBits(
-    { name: "PBKDF2", salt: enc.encode(saltHex), iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
+    { name: "PBKDF2", salt: enc.encode(salt), iterations: iterations, hash: "SHA-256" },
     key,
     PBKDF2_KEYLEN * 8
   );
@@ -117,8 +121,8 @@ export async function hashPassword(password: string): Promise<string> {
   const cryptoAPI = globalThis.crypto || (typeof crypto !== 'undefined' ? crypto : ((globalThis as any).crypto || (typeof crypto !== 'undefined' ? crypto : {})));
   cryptoAPI.getRandomValues(saltBytes);
   const salt = toHex(saltBytes);
-  const derived = await pbkdf2(password, salt);
-  return `pbkdf2$${PBKDF2_ITERATIONS}$${salt}$${derived}`;
+  const derived = await pbkdf2(password, salt, DEFAULT_PBKDF2_ITERATIONS);
+  return `pbkdf2$${DEFAULT_PBKDF2_ITERATIONS}$${salt}$${derived}`;
 }
 
 /**
@@ -130,10 +134,13 @@ export async function verifyPassword(password: string, stored: string): Promise<
   if (!password || !stored) return false;
 
   if (stored.startsWith("pbkdf2$")) {
-    const [, , salt, expected] = stored.split("$");
-    if (!salt || !expected) return false;
-    const derived = await pbkdf2(password, salt);
-    return timingSafeEqualHex(derived, expected);
+    const parts = stored.split("$");
+    const iterations = parseInt(parts[1], 10) || DEFAULT_PBKDF2_ITERATIONS;
+    const salt = parts[2];
+    const expectedHash = parts[3];
+    if (!salt || !expectedHash) return false;
+    const computed = await pbkdf2(password, salt, iterations);
+    return computed === expectedHash;
   }
 
   // Legado: SHA-256 sem salt (64 chars hex)
