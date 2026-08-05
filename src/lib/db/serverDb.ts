@@ -381,10 +381,10 @@ export interface PurchaseOrder {
 }
 
 export async function fetchAuditLogs() { return fetchServerTable('audit_logs'); }
-export async function fetchPurchaseOrders(): Promise<PurchaseOrder[]> { return fetchServerTable<PurchaseOrder>('purchase_orders'); }
-export async function insertPurchaseOrder(order: PurchaseOrder) { return insertServerTable('purchase_orders', order); }
-export async function updatePurchaseOrder(order: PurchaseOrder) { return updateServerTableRecord('purchase_orders', order); }
-export async function deletePurchaseOrder(id: string) { return deleteServerTableRecord('purchase_orders', id); }
+export async function fetchPurchaseOrders(): Promise<PurchaseOrder[]> { return fetchServerTable<PurchaseOrder>('pedidos_saas'); }
+export async function insertPurchaseOrder(order: PurchaseOrder) { return insertServerTable('pedidos_saas', order); }
+export async function updatePurchaseOrder(order: PurchaseOrder) { return updateServerTableRecord('pedidos_saas', order); }
+export async function deletePurchaseOrder(id: string) { return deleteServerTableRecord('pedidos_saas', id); }
 
 export async function insertAuditLog(log: {
   companyId?: string;

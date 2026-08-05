@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "ID do pedido nÃ£o informado." }, { status: 400 });
     }
 
-    const { data: order, error: findError } = await supabase.from('purchase_orders')
+    const { data: order, error: findError } = await supabase.from('pedidos_saas')
       .select('*')
       .or(`id.eq.${order_id},order_number.eq.${order_id}`)
       .maybeSingle();
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { error: deleteError } = await supabase.from('purchase_orders').delete().eq('id', order.id);
+    const { error: deleteError } = await supabase.from('pedidos_saas').delete().eq('id', order.id);
 
     if (deleteError) {
       throw new Error(deleteError.message);
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       user_id: session?.userId || "super_adm",
       user_name: session?.name || "Super Admin",
       action: "EXCLUSAO_PEDIDO_COMPRA",
-      resource: "purchase_orders",
+      resource: "pedidos_saas",
       details: `Pedido ${order.order_number || order.id} (${order.empresa_nome || ""}) excluÃ­do antes do provisionamento. Origem: ${order.origin_source || "landing_page"}.`,
       created_at: new Date().toISOString()
     }]);

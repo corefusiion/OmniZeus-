@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "ID do pedido nÃ£o informado." }, { status: 400 });
     }
 
-    const { data: order, error: findError } = await supabase.from('purchase_orders')
+    const { data: order, error: findError } = await supabase.from('pedidos_saas')
       .select('*')
       .or(`id.eq.${order_id},order_number.eq.${order_id}`)
       .maybeSingle();
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
     await supabase.from('custom_agents').insert(agentsToInsert);
 
     // 4. Update Order Status
-    await supabase.from('purchase_orders').update({
+    await supabase.from('pedidos_saas').update({
       status: "PROVISIONADO",
       provisioned_at: new Date().toISOString(),
       provisioned_company_id: newCompanyId
@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
       user_id: session?.userId || "super_adm",
       user_name: session?.name || "Super Admin",
       action: "PROVISIONAMENTO_EMPRESA",
-      resource: "purchase_orders",
+      resource: "pedidos_saas",
       details: `Empresa ${order.empresa_nome} (${order.empresa_cnpj}) provisionada com sucesso a partir do pedido ${order.order_number}. Credenciais do Gestor criadas com troca de senha obrigatÃ³ria no primeiro acesso.`,
       created_at: new Date().toISOString()
     }]);

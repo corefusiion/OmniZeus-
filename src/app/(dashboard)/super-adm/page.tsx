@@ -313,7 +313,7 @@ export default function SuperADMPage() {
   const loadPurchaseOrders = async () => {
     setLoadingOrders(true);
     try {
-      const res = await fetch("/api/db?table=purchase_orders");
+      const res = await fetch("/api/db?table=pedidos_saas");
       if (res.ok) {
         const json = await res.json();
         setPurchaseOrders(json.data || []);

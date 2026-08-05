@@ -15,17 +15,17 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const [{ data: companies }, { data: employees }, { data: purchase_orders }, { data: audit_logs }] = await Promise.all([
+    const [{ data: companies }, { data: employees }, { data: pedidos_saas }, { data: audit_logs }] = await Promise.all([
       supabase.from('companies').select('*'),
       supabase.from('employees').select('*'),
-      supabase.from('purchase_orders').select('*'),
+      supabase.from('pedidos_saas').select('*'),
       supabase.from('audit_logs').select('*')
     ]);
 
     const sqlData = {
       companies: companies || [],
       employees: employees || [],
-      purchase_orders: purchase_orders || [],
+      pedidos_saas: pedidos_saas || [],
       audit_logs: audit_logs || []
     };
 

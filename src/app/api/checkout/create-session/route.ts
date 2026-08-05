@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
     };
 
     // Save order to Supabase
-    const { error: insertError } = await supabase.from('purchase_orders').insert([newOrder]);
+    const { error: insertError } = await supabase.from('pedidos_saas').insert([newOrder]);
     if (insertError) {
       console.error("Error inserting order:", insertError);
       return NextResponse.json({ error: `Erro ao salvar pedido: ${insertError.message}` }, { status: 500 });
@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
 
     // Update order with stripe session id
     newOrder.stripe_session_id = stripeJson.id;
-    await supabase.from('purchase_orders').update({ stripe_session_id: stripeJson.id }).eq('id', orderId);
+    await supabase.from('pedidos_saas').update({ stripe_session_id: stripeJson.id }).eq('id', orderId);
 
     return NextResponse.json({
       success: true,

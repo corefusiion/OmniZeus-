@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
       const paymentIntentId = typeof session?.payment_intent === "string" ? session.payment_intent : session?.payment_intent?.id;
 
       if (orderId) {
-        const { data: order } = await supabase.from('purchase_orders')
+        const { data: order } = await supabase.from('pedidos_saas')
           .select('*')
           .or(`id.eq.${orderId},order_number.eq.${orderId}`)
           .maybeSingle();
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
           if (customerId) updateData.stripe_customer_id = customerId;
           if (subscriptionId) updateData.stripe_subscription_id = subscriptionId;
 
-          await supabase.from('purchase_orders').update(updateData).eq('id', order.id);
+          await supabase.from('pedidos_saas').update(updateData).eq('id', order.id);
 
           // If company is already provisioned, update subscription status to active immediately
           if (order.provisioned_company_id) {
@@ -197,11 +197,11 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        const { data: orders } = await supabase.from('purchase_orders').select('*').or(orCondition);
+        const { data: orders } = await supabase.from('pedidos_saas').select('*').or(orCondition);
         if (orders && orders.length > 0) {
           for (const order of orders) {
             if (order.status === "PENDENTE_PAGAMENTO") {
-              await supabase.from('purchase_orders').update({
+              await supabase.from('pedidos_saas').update({
                 status: "PAGAMENTO_CONFIRMADO",
                 paid_at: new Date().toISOString()
               }).eq('id', order.id);

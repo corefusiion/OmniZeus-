@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
     // Fallback: search purchase orders for matching customer ID
     if (!customerId) {
-      const { data: matchingOrder } = await supabase.from('purchase_orders')
+      const { data: matchingOrder } = await supabase.from('pedidos_saas')
         .select('stripe_customer_id')
         .eq('provisioned_company_id', company_id)
         .not('stripe_customer_id', 'is', null)

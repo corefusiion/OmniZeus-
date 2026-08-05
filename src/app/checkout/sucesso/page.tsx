@@ -22,7 +22,7 @@ function SuccessContent() {
 
   const fetchOrder = async () => {
     try {
-      const res = await fetch("/api/db?table=purchase_orders");
+      const res = await fetch("/api/db?table=pedidos_saas");
       if (res.ok) {
         const json = await res.json();
         const orders = json.data || [];

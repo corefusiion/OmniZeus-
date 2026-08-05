@@ -25,7 +25,7 @@ const GLOBAL_TABLES = [
   "custom_job_roles",
   "dashboard_metrics",
   "ai_stress_test_logs",
-  "purchase_orders"
+  "pedidos_saas"
 ];
 
 const SENSITIVE_FIELDS = [
@@ -42,7 +42,7 @@ const SENSITIVE_FIELDS = [
 ];
 
 const WRITABLE_TABLES = new Set([
-  "settings", "companies", "employees", "purchase_orders",
+  "settings", "companies", "employees", "pedidos_saas",
   "ai_usage_logs", "custom_agents", "contaazul_config",
   "purchase_requests", "contracts", "tasks", "payables",
   "contaazul_customers", "contaazul_clients", "contaazul_suppliers",
