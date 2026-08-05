@@ -26,7 +26,7 @@ async function verifyStripeSignature(rawBody: string, signatureHeader: string, w
     if (!Number.isFinite(ageSec) || ageSec > SIGNATURE_TOLERANCE_SEC) return false;
 
     const payload = `${timestamp}.${rawBody}`;
-    const cryptoAPI = globalThis.crypto || (typeof crypto !== 'undefined' ? crypto : require('node:crypto').webcrypto);
+    const cryptoAPI = globalThis.crypto || (typeof crypto !== 'undefined' ? crypto : {} as any);
     const key = await cryptoAPI.subtle.importKey(
       "raw",
       new TextEncoder().encode(webhookSecret),

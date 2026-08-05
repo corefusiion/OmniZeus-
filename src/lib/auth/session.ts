@@ -64,7 +64,7 @@ function base64UrlToBytes(value: string): Uint8Array {
 // ─── Assinatura HMAC-SHA256 com comparação em tempo constante ──────────────────
 
 async function sign(data: string): Promise<string> {
-  const cryptoAPI = globalThis.crypto || (typeof crypto !== 'undefined' ? crypto : require('node:crypto').webcrypto);
+  const cryptoAPI = globalThis.crypto || (typeof crypto !== 'undefined' ? crypto : {} as any);
   const key = await cryptoAPI.subtle.importKey(
     "raw",
     encoder.encode(getSessionSecret()),
