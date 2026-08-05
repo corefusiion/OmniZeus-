@@ -136,6 +136,9 @@ export async function verifyPassword(password: string, stored: string): Promise<
   if (stored.startsWith("pbkdf2$")) {
     const parts = stored.split("$");
     const iterations = parseInt(parts[1], 10) || DEFAULT_PBKDF2_ITERATIONS;
+    if (iterations > 15000) {
+      throw new Error("LEGACY_HASH_UNSUPPORTED");
+    }
     const salt = parts[2];
     const expectedHash = parts[3];
     if (!salt || !expectedHash) return false;

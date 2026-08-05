@@ -108,9 +108,21 @@ export async function POST(req: NextRequest) {
       const e = employees[i];
       if ((e.email || "").toLowerCase() !== cleanEmail) continue;
       const stored = e.passwordHash || e.password_hash || e.password || e.temporary_password || e.temporaryPassword;
-      if (stored && await verifyPassword(cleanPass, stored)) {
-        empIndex = i;
-        break;
+      if (stored) {
+        try {
+          const isValid = await verifyPassword(cleanPass, stored);
+          if (isValid) {
+            empIndex = i;
+            break;
+          }
+        } catch (err: any) {
+          if (err.message === "LEGACY_HASH_UNSUPPORTED") {
+            return NextResponse.json(
+              { success: false, error: "A criptografia da sua senha é incompatível com a nova versão do sistema (segurança Cloudflare Edge). Solicite a redefinição de senha ao gestor, ou redefina rodando o sistema localmente." },
+              { status: 401 }
+            );
+          }
+        }
       }
     }
 
