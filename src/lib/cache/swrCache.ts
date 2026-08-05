@@ -10,7 +10,7 @@ const CACHE_TTL_MS = 60 * 1000; // 60 seconds TTL
 
 export function getActiveTenantKey(companyId?: string): string {
   if (companyId) return companyId;
-  if (typeof window !== "undefined") {
+  if (typeof localStorage !== "undefined") {
     return localStorage.getItem("omnizeus_active_company_id") || "global";
   }
   return "global";

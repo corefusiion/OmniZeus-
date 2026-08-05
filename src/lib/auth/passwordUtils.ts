@@ -21,10 +21,10 @@ export interface PasswordValidationResult {
 function secureRandomInt(max: number): number {
   const buf = new Uint32Array(1);
   // Rejeição do resto para evitar viés de módulo
-  const limit = Math.floor(0xFFFFFFFF / max) * max;
+  const cryptoAPI = globalThis.crypto || (typeof crypto !== 'undefined' ? crypto : require('node:crypto').webcrypto);
   let value: number;
   do {
-    globalThis.crypto.getRandomValues(buf);
+    cryptoAPI.getRandomValues(buf);
     value = buf[0];
   } while (value >= limit);
   return value % max;
@@ -97,8 +97,9 @@ function toHex(bytes: Uint8Array): string {
 
 async function pbkdf2(password: string, saltHex: string): Promise<string> {
   const enc = new TextEncoder();
-  const key = await globalThis.crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await globalThis.crypto.subtle.deriveBits(
+  const cryptoAPI = globalThis.crypto || (typeof crypto !== 'undefined' ? crypto : require('node:crypto').webcrypto);
+  const key = await cryptoAPI.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await cryptoAPI.subtle.deriveBits(
     { name: "PBKDF2", salt: enc.encode(saltHex), iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
     key,
     PBKDF2_KEYLEN * 8
@@ -112,7 +113,8 @@ async function pbkdf2(password: string, saltHex: string): Promise<string> {
  */
 export async function hashPassword(password: string): Promise<string> {
   const saltBytes = new Uint8Array(16);
-  globalThis.crypto.getRandomValues(saltBytes);
+  const cryptoAPI = globalThis.crypto || (typeof crypto !== 'undefined' ? crypto : require('node:crypto').webcrypto);
+  cryptoAPI.getRandomValues(saltBytes);
   const salt = toHex(saltBytes);
   const derived = await pbkdf2(password, salt);
   return `pbkdf2$${PBKDF2_ITERATIONS}$${salt}$${derived}`;
@@ -135,7 +137,8 @@ export async function verifyPassword(password: string, stored: string): Promise<
 
   // Legado: SHA-256 sem salt (64 chars hex)
   if (/^[a-f0-9]{64}$/i.test(stored)) {
-    const buf = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
+    const cryptoAPI = globalThis.crypto || (typeof crypto !== 'undefined' ? crypto : require('node:crypto').webcrypto);
+    const buf = await cryptoAPI.subtle.digest("SHA-256", new TextEncoder().encode(password));
     const sha = toHex(new Uint8Array(buf));
     return timingSafeEqualHex(sha, stored.toLowerCase());
   }

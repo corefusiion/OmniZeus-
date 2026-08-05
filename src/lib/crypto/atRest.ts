@@ -34,8 +34,27 @@ function getEncryptionKey(): string {
 }
 
 async function deriveKey(): Promise<CryptoKey> {
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(getEncryptionKey()));
-  return globalThis.crypto.subtle.importKey("raw", digest, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+  const enc = new TextEncoder();
+  const cryptoAPI = globalThis.crypto || (typeof crypto !== 'undefined' ? crypto : require('node:crypto').webcrypto);
+  const keyMaterial = await cryptoAPI.subtle.importKey(
+    "raw",
+    enc.encode(getEncryptionKey()),
+    { name: "PBKDF2" },
+    false,
+    ["deriveBits", "deriveKey"]
+  );
+  return cryptoAPI.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: enc.encode("omnizeus-at-rest-salt-static"),
+      iterations: 100000,
+      hash: "SHA-256"
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
 }
 
 function bytesToBase64Url(bytes: Uint8Array): string {
@@ -56,9 +75,10 @@ function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> {
 /** Criptografa uma string em repouso. Retorna vazio se a entrada for vazia. */
 export async function encryptSecret(plaintext: string): Promise<string> {
   if (!plaintext) return "";
-  const iv = globalThis.crypto.getRandomValues(new Uint8Array(IV_LEN));
+  const cryptoAPI = globalThis.crypto || (typeof crypto !== 'undefined' ? crypto : require('node:crypto').webcrypto);
+  const iv = cryptoAPI.getRandomValues(new Uint8Array(IV_LEN));
   const key = await deriveKey();
-  const cipher = await globalThis.crypto.subtle.encrypt(
+  const cipher = await cryptoAPI.subtle.encrypt(
     { name: "AES-GCM", iv, tagLength: 128 },
     key,
     new TextEncoder().encode(plaintext)
@@ -85,7 +105,8 @@ export async function decryptSecret(value: string): Promise<string> {
       ...base64UrlToBytes(dataB64u),
       ...base64UrlToBytes(tagB64u),
     ]);
-    const decrypted = await crypto.subtle.decrypt(
+    const cryptoAPI = globalThis.crypto || (typeof crypto !== 'undefined' ? crypto : require('node:crypto').webcrypto);
+    const decrypted = await cryptoAPI.subtle.decrypt(
       { name: "AES-GCM", iv: base64UrlToBytes(ivB64u), tagLength: 128 },
       key,
       cipher

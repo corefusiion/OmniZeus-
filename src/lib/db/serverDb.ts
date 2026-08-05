@@ -89,7 +89,7 @@ export async function updateServerSettings(settings: Partial<SystemSettings>): P
 
 function getActiveCompanyIdForRequest(overrideCompId?: string): string {
   if (overrideCompId) return overrideCompId;
-  if (typeof window !== "undefined") {
+  if (typeof localStorage !== "undefined") {
     return localStorage.getItem("omnizeus_active_company_id") || "global";
   }
   return "global";

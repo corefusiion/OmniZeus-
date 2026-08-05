@@ -71,7 +71,7 @@ export async function fetchCoinBalanceFromServer(companyId: string): Promise<num
 // ─── Get cached balance (triggers async fetch on first call) ───────────────
 
 function resolveDefaultCompanyId(): string {
-  if (typeof window === 'undefined') return 'comp_zenitus';
+  if (typeof localStorage === 'undefined') return 'comp_zenitus';
   return localStorage.getItem('omnizeus_active_company_id') || 'comp_zenitus';
 }
 

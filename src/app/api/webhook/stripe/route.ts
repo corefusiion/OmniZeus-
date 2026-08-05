@@ -26,14 +26,15 @@ async function verifyStripeSignature(rawBody: string, signatureHeader: string, w
     if (!Number.isFinite(ageSec) || ageSec > SIGNATURE_TOLERANCE_SEC) return false;
 
     const payload = `${timestamp}.${rawBody}`;
-    const key = await globalThis.crypto.subtle.importKey(
+    const cryptoAPI = globalThis.crypto || (typeof crypto !== 'undefined' ? crypto : require('node:crypto').webcrypto);
+    const key = await cryptoAPI.subtle.importKey(
       "raw",
       new TextEncoder().encode(webhookSecret),
       { name: "HMAC", hash: "SHA-256" },
       false,
       ["sign"]
     );
-    const sigBytes = new Uint8Array(await globalThis.crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)));
+    const sigBytes = new Uint8Array(await cryptoAPI.subtle.sign("HMAC", key, new TextEncoder().encode(payload)));
     const expectedSignature = Array.from(sigBytes).map(b => b.toString(16).padStart(2, "0")).join("");
 
     // comparação em tempo constante (hex)

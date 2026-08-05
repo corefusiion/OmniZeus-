@@ -40,7 +40,7 @@ let activeUserSession: UserProfile = {
 // Master Admin Active Tenant Context Switcher
 // null = modo SaaS (Super ADM no centro de controle da plataforma)
 // string = tenant ativo (Super ADM "entrou" na empresa / Tenant sempre na sua empresa)
-let activeTenantContextId: string | null = typeof window !== 'undefined'
+let activeTenantContextId: string | null = typeof localStorage !== 'undefined'
   ? (localStorage.getItem('omnizeus_active_company_id') || null)
   : null;
 
