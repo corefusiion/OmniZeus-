@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
     const { error: insertError } = await supabase.from('purchase_orders').insert([newOrder]);
     if (insertError) {
       console.error("Error inserting order:", insertError);
-      return NextResponse.json({ error: "Erro ao salvar pedido." }, { status: 500 });
+      return NextResponse.json({ error: `Erro ao salvar pedido: ${insertError.message}` }, { status: 500 });
     }
 
     // Fetch Master Stripe Key
