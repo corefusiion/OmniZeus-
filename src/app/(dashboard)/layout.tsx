@@ -86,6 +86,7 @@ function DashboardShell({
         checkCompanyStatus();
       } else {
         checkCompanyStatus();
+        router.replace("/login");
       }
     });
 
