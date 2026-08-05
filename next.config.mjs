@@ -7,7 +7,12 @@ const nextConfig = {
   webpack: (config, { isServer, nextRuntime }) => {
     if (isServer && nextRuntime === "edge") {
       const { IgnorePlugin } = require("next/dist/compiled/webpack/webpack-lib.js");
-      config.plugins.push(new IgnorePlugin({ resourceRegExp: /^node:/ }));
+      // Ignora imports do Node apenas quando originados do pacote pptxgenjs, 
+      // preservando os módulos Node essenciais (crypto, buffer, etc.) no runtime do Next/Cloudflare
+      config.plugins.push(new IgnorePlugin({ 
+        resourceRegExp: /^node:/,
+        contextRegExp: /pptxgenjs/
+      }));
     }
     return config;
   },
