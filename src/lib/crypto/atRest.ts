@@ -34,8 +34,8 @@ function getEncryptionKey(): string {
 }
 
 async function deriveKey(): Promise<CryptoKey> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(getEncryptionKey()));
-  return crypto.subtle.importKey("raw", digest, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(getEncryptionKey()));
+  return globalThis.crypto.subtle.importKey("raw", digest, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
 }
 
 function bytesToBase64Url(bytes: Uint8Array): string {
@@ -56,9 +56,9 @@ function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> {
 /** Criptografa uma string em repouso. Retorna vazio se a entrada for vazia. */
 export async function encryptSecret(plaintext: string): Promise<string> {
   if (!plaintext) return "";
-  const iv = crypto.getRandomValues(new Uint8Array(IV_LEN));
+  const iv = globalThis.crypto.getRandomValues(new Uint8Array(IV_LEN));
   const key = await deriveKey();
-  const cipher = await crypto.subtle.encrypt(
+  const cipher = await globalThis.crypto.subtle.encrypt(
     { name: "AES-GCM", iv, tagLength: 128 },
     key,
     new TextEncoder().encode(plaintext)

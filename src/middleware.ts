@@ -50,10 +50,10 @@ async function verifyAndDecode(token: string): Promise<any | null> {
 
   try {
     const enc = new TextEncoder();
-    const key = await crypto.subtle.importKey(
+    const key = await globalThis.crypto.subtle.importKey(
       "raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
     );
-    const sigBytes = await crypto.subtle.sign("HMAC", key, enc.encode(encoded));
+    const sigBytes = await globalThis.crypto.subtle.sign("HMAC", key, enc.encode(encoded));
     const expected = btoa(String.fromCharCode(...new Uint8Array(sigBytes)))
       .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
