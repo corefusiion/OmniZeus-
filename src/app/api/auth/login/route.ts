@@ -195,8 +195,8 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error("[LOGIN CRITICAL ERROR]:", err);
     return NextResponse.json(
-      { success: false, error: err?.message || "Erro interno no servidor." },
-      { status: 500 }
+      { success: false, error: "DEBUG CRITICAL ERROR: " + (err?.message || "Erro interno no servidor.") },
+      { status: 400 }
     );
   }
 }
