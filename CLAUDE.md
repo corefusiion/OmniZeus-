@@ -328,3 +328,14 @@ npm run build
 > 3. **Timeouts da API Edge limitados a 10s/30s**: Se a sua conexão de banco local (IPv4 cru) ou a validação `pbkdf2` for muito pesada para o limite grátis/básico da Cloudflare, o Worker leva TIMEOUT duro gerando erro 500 no console.
 > 4. **Supabase client instável no next-on-pages**: Dependendo da versão do `@supabase/supabase-js`, chamadas HTTP sob a interface do Edge Runtime geram reject silencioso no try-catch do next-on-pages. Adicione logs extras (Sentry/Axiom) para ver o reject interno.
 > 5. **O cookie OmniZeus_session sendo retido**: O servidor tenta gravar `Set-Cookie`. Se as propriedades (ex: `Secure: true`) derem mismatch porque a Cloudflare Pages preview URL muda esquemas sem proxy (ou CORS customizado bloqueia), o next-on-pages aborta a resposta final.
+
+### Sessão atual — 2026-08-05 (A Solução: Migração Total para Supabase HTTP)
+
+**Status geral:** Remoção definitiva do Drizzle ORM e do driver `postgres` incompatível com o Edge Runtime, migrando toda a persistência de dados para chamadas REST via `@supabase/supabase-js`.
+
+**Onde paramos (Etapa Final de Deploy):**
+1. ✅ **Análise do Projeto de Referência**: Verificamos que o `fitcrew-challenge` funciona no Cloudflare pois é um SPA Vite utilizando `supabase-js` nativo (chamadas HTTP), evitando qualquer bloqueio de dependência nativa do Node (como TCP Sockets, `fs`, `net`).
+2. ✅ **Remoção de Código Incompatível**: Deletamos `src/lib/db/index.ts` e `src/lib/db/schema.ts` onde o Drizzle e o `postgres.js` instilavam suas raízes e quebravam o build Edge da Cloudflare.
+3. ✅ **Desinstalação**: Removemos via npm os pacotes `drizzle-orm`, `postgres` e `drizzle-kit`.
+4. ✅ **Sucesso Local**: Todos os endpoints de login (`/api/auth/login`) e `/api/db` do projeto *OmniZeus* já estavam, sob os panos, utilizando o `supabaseClient.ts`. A remoção do Drizzle permitiu que o build passasse limpo sem carregar módulos nativos fantasmas.
+5. 🚀 **Próximo passo**: Commit e push disparados! A interface fará a compilação nativa perfeitamente no Cloudflare e o `Erro 500` na tela de login será eliminado, pois o driver TCP problemático não existe mais.

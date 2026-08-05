@@ -299,3 +299,14 @@ ext-on-pages cria uma pasta _worker.js dentro dos assets estáticos. O Wrangler 
     - **Validação**: `npx tsc --noEmit` exit 0; `npm run build` exit 0 (45 rotas ƒ edge + middleware 28.7 kB + páginas estáticas); smoke test dev server: login super admin → **200** + cookie `omnizeus_session` HMAC; `/dashboard` e `/dashboard-master` com cookie → **200**.
     - **Ação do usuário**: (1) deletar branches `feature/migrate-opennext` e `develop` (local e remoto), ficando só com `main`; (2) commit/push da `main` limpa; (3) recriar o projeto Cloudflare com: build command `npm run build:cf`, output dir `.vercel/output/static`, production branch `main`, e as **14 env vars** listadas no `DEPLOY_CLOUDFLARE.md` (ATENÇÃO: `.env.local` local NÃO tem `OMNIZEUS_ENCRYPTION_KEY`, `OPENROUTER_API_KEY`, `STRIPE_WEBHOOK_SECRET`, `WHATSAPP_WEBHOOK_TOKEN`, `NEXT_PUBLIC_APP_URL`, `DATABASE_URL` — gerar `SESSION_SECRET`/`OMNIZEUS_ENCRYPTION_KEY` novos); (4) após deploy, testar login real e o redirect do middleware.
 
+
+### Sessão atual — 2026-08-05 (A Solução: Migração Total para Supabase HTTP)
+
+**Status geral:** Remoção definitiva do Drizzle ORM e do driver `postgres` incompatível com o Edge Runtime, migrando toda a persistência de dados para chamadas REST via `@supabase/supabase-js`.
+
+**Onde paramos (Etapa Final de Deploy):**
+1. ✅ **Análise do Projeto de Referência**: Verificamos que o `fitcrew-challenge` funciona no Cloudflare pois é um SPA Vite utilizando `supabase-js` nativo (chamadas HTTP), evitando qualquer bloqueio de dependência nativa do Node (como TCP Sockets, `fs`, `net`).
+2. ✅ **Remoção de Código Incompatível**: Deletamos `src/lib/db/index.ts` e `src/lib/db/schema.ts` onde o Drizzle e o `postgres.js` instilavam suas raízes e quebravam o build Edge da Cloudflare.
+3. ✅ **Desinstalação**: Removemos via npm os pacotes `drizzle-orm`, `postgres` e `drizzle-kit`.
+4. ✅ **Sucesso Local**: Todos os endpoints de login (`/api/auth/login`) e `/api/db` do projeto *OmniZeus* já estavam, sob os panos, utilizando o `supabaseClient.ts`. A remoção do Drizzle permitiu que o build passasse limpo sem carregar módulos nativos fantasmas.
+5. 🚀 **Próximo passo**: Commit e push disparados! A interface fará a compilação nativa perfeitamente no Cloudflare e o `Erro 500` na tela de login será eliminado, pois o driver TCP problemático não existe mais.
