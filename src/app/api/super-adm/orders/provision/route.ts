@@ -1,4 +1,4 @@
-﻿export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { supabase } from "@/lib/db/supabaseClient";
@@ -92,12 +92,13 @@ export async function POST(req: NextRequest) {
       stripe_customer_id: order.stripe_customer_id || null,
       stripe_subscription_id: order.stripe_subscription_id || null,
       created_at: new Date().toISOString(),
-      tradeName: order.empresa_nome,
-      activeClientsCount: 0,
-      company_context: `Empresa provisionada via Pedido de Compra ${order.order_number}. Segmento: ${order.empresa_segmento}. ResponsÃ¡vel: ${order.responsavel_nome} (${order.responsavel_email}). ObservaÃ§Ãµes: ${order.empresa_observacoes || "Nenhuma"}.`
+      trade_name: order.empresa_nome,
+      active_clients_count: 0,
+      company_context: `Empresa provisionada via Pedido de Compra ${order.order_number}. Segmento: ${order.empresa_segmento}. Responsável: ${order.responsavel_nome} (${order.responsavel_email}). Observações: ${order.empresa_observacoes || "Nenhuma"}.`
     };
 
-    await supabase.from('companies').insert([newCompany]);
+    const { error: companyErr } = await supabase.from('companies').insert([newCompany]);
+    if (companyErr) throw new Error("Erro ao inserir company: " + JSON.stringify(companyErr));
 
     // 2. Create Gestor Employee User with must_change_password: true
     const newGestor = {
@@ -123,7 +124,8 @@ export async function POST(req: NextRequest) {
       created_at: new Date().toISOString()
     };
 
-    await supabase.from('employees').insert([newGestor]);
+    const { error: empErr } = await supabase.from('employees').insert([newGestor]);
+    if (empErr) throw new Error("Erro ao inserir employee: " + JSON.stringify(empErr));
 
     // 3. Assign 9 Native AI Agents Context to the new company
     const builtinAgentIds = [
@@ -148,7 +150,8 @@ export async function POST(req: NextRequest) {
       is_custom: false,
       created_at: new Date().toISOString()
     }));
-    await supabase.from('custom_agents').insert(agentsToInsert);
+    const { error: agentErr } = await supabase.from('custom_agents').insert(agentsToInsert);
+    if (agentErr) console.error("Erro insert custom_agents", agentErr);
 
     // 4. Update Order Status
     await supabase.from('pedidos_saas').update({

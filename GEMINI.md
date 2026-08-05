@@ -310,3 +310,38 @@ ext-on-pages cria uma pasta _worker.js dentro dos assets estáticos. O Wrangler 
 3. ✅ **Desinstalação**: Removemos via npm os pacotes `drizzle-orm`, `postgres` e `drizzle-kit`.
 4. ✅ **Sucesso Local**: Todos os endpoints de login (`/api/auth/login`) e `/api/db` do projeto *OmniZeus* já estavam, sob os panos, utilizando o `supabaseClient.ts`. A remoção do Drizzle permitiu que o build passasse limpo sem carregar módulos nativos fantasmas.
 5. 🚀 **Próximo passo**: Commit e push disparados! A interface fará a compilação nativa perfeitamente no Cloudflare e o `Erro 500` na tela de login será eliminado, pois o driver TCP problemático não existe mais.
+
+
+### Sess�o atual � 2026-08-05 (Resolu��o de Bugs Webhook Stripe, Banco de Dados e Provisionamento SaaS)
+
+**Status geral:** Corre��o de erros na comunica��o do Webhook da Stripe e na rota de Provisionamento de Empresas que estava falhando silenciosamente devido a colunas faltantes no banco de dados.
+
+**Onde paramos (Hist�rico da Sess�o e Passos para Continuar em Casa):**
+1. ?? **Problema 1: Webhook da Stripe Retornando 405.**
+   - **Causa:** A URL cadastrada na dashboard da Stripe apontava para a raiz do site (/) em vez da rota da API.
+   - **Solu��o:** O usu�rio alterou a URL na Stripe para https://omnizeus.controllserv.com.br/api/webhook/stripe.
+2. ?? **Problema 2: Webhook n�o encontrava tabelas no banco de dados.**
+   - **Causa:** Faltavam as tabelas processed_stripe_events e audit_logs no banco de dados.
+   - **Solu��o:** Rodamos um SQL para criar as duas tabelas e liberamos permiss�o (GRANT ALL) para o anon.
+3. ?? **Problema 3: Webhook dizendo que a Secret Key n�o estava configurada (apesar de estar).**
+   - **Causa:** O c�digo tentava buscar grace_period_days na tabela settings, mas essa coluna n�o existia, fazendo o select inteiro falhar e retornar nulo para a chave da Stripe.
+   - **Solu��o:** Injetamos a coluna grace_period_days no banco e o erro sumiu.
+4. ?? **Problema Cr�tico: Provisionamento da Empresa dizendo "Sucesso" sem criar o usu�rio.**
+   - **Causa (Bug Silencioso):** O usu�rio alterou o e-mail no pedido para glfx20@gmail.com e clicou em Provisionar. O pedido mudou para PROVISIONADO. Por�m, a cria��o nas tabelas companies e employees **falhou silenciosamente** porque faltavam v�rias colunas no banco (temporary_password, must_change_password, subscription_status, etc.) e o c�digo n�o tinha um verificador de erro.
+   - **Solu��o no C�digo:** Editamos src/app/api/super-adm/orders/provision/route.ts adicionando valida��o de erro para que o endpoint devolva HTTP 500 caso falhe o insert. Tamb�m corrigimos as colunas para o padr�o snake_case.
+5. ?? **O QUE VOC� PRECISA FAZER EM CASA PARA CONTINUAR:**
+   - Eu j� retornei via banco de dados o status do seu pedido ORD-2026-882736 para PAGAMENTO_CONFIRMADO, ent�o ele est� pronto para ser provisionado novamente no painel.
+   - **PASSO 1:** Ao chegar em casa, abra o SQL Editor do Supabase e rode o seguinte comando para criar as colunas que faltam:
+     ```sql
+     ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS subscription_status text;
+     ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS stripe_customer_id text;
+     ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS stripe_subscription_id text;
+     ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS grace_period_ends_at timestamp with time zone;
+     ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS suspension_reason text;
+     ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS temporary_password text;
+     ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS must_change_password boolean DEFAULT false;
+     NOTIFY pgrst, 'reload schema';
+     ```
+   - **PASSO 2:** Volte no Painel Super Admin -> Pedidos de Compra e clique novamente em **Provisionar Empresa**.
+   - **PASSO 3:** Dessa vez, a inser��o n�o vai quebrar. Uma janela surgir� na sua tela informando a **Senha Tempor�ria** do gestor glfx20@gmail.com.
+   - **PASSO 4:** Deslogue do Master, e entre com o glfx20@gmail.com + Senha Tempor�ria.
