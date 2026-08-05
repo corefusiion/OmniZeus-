@@ -35,14 +35,14 @@ export default function PostLoginBanner() {
   const firstName = (user?.name || "").split(" ")[0] || "Bem-vindo";
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-slate-800/60 bg-gradient-to-br from-slate-900 via-slate-900 to-primary/25 shadow-xl animate-in fade-in slide-in-from-top-4 duration-500">
+    <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl animate-in fade-in slide-in-from-top-4 duration-500">
       {/* Brilho decorativo */}
-      <div className="pointer-events-none absolute -top-24 -right-24 w-72 h-72 bg-primary/25 rounded-full blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-28 -left-20 w-64 h-64 bg-blue-400/10 rounded-full blur-3xl" />
+      <div className="pointer-events-none absolute -top-24 -right-24 w-72 h-72 bg-primary/5 rounded-full blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-28 -left-20 w-64 h-64 bg-blue-400/5 rounded-full blur-3xl" />
 
       <button
         onClick={() => setVisible(false)}
-        className="absolute top-3.5 right-3.5 z-10 w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-colors"
+        className="absolute top-3.5 right-3.5 z-10 w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors"
         title="Fechar lembrete"
         aria-label="Fechar lembrete"
       >
@@ -55,10 +55,10 @@ export default function PostLoginBanner() {
             <Sparkles className="w-5.5 h-5.5 text-white" strokeWidth={1.5} />
           </div>
           <div>
-            <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
+            <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
               Olá, {firstName}! Este é o resumo do seu dia.
             </h2>
-            <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
+            <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
               Pendências que precisam de atenção hoje e a projeção do caixa. Aproveite e feche o lembrete — ele só volta no próximo login.
             </p>
           </div>
@@ -70,7 +70,7 @@ export default function PostLoginBanner() {
             <CashFlowProjection />
           </div>
         ) : (
-          <p className="text-xs text-slate-300 leading-relaxed">
+          <p className="text-xs text-slate-500 leading-relaxed">
             Você está no centro de controle da plataforma. Acesse o dashboard de uma empresa para ver o resumo diário e a projeção de caixa.
           </p>
         )}
