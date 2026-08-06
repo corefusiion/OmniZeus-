@@ -294,9 +294,9 @@ export function saveEmployee(empData: Omit<EmployeeUser, 'id' | 'createdAt'>): E
     status: newEmp.status,
     must_change_password: newEmp.mustChangePassword ?? false,
     password_hash: newEmp.passwordHash || '',
-    password_changed_at: newEmp.passwordChangedAt || '',
-    last_login_at: newEmp.lastLoginAt || '',
-    birth_date: newEmp.birthDate || '',
+    password_changed_at: newEmp.passwordChangedAt || undefined,
+    last_login_at: newEmp.lastLoginAt || undefined,
+    birth_date: newEmp.birthDate || undefined,
     created_at: newEmp.createdAt
   }, newEmp.companyId).catch(() => {});
 
