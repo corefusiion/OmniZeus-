@@ -370,3 +370,11 @@ Cloudflare deve conseguir compilar sem engasgos com os subm�dulos, o problema do
 o-store e os bugs de mustChangePassword (camelCase) sumiram das rotas de Auth.
 Amanh�, basta continuar o desenvolvimento!
 
+
+
+## 🧭 Sessão — 2026-08-06 (Padronização Conta Azul & Deploy Cloudflare)
+- **Padronização Nomenclatura Oficial Conta Azul**: Atualizados os rótulos de abas, tabelas e cabeçalhos em /contaazul para corresponder aos termos oficiais (Clientes, Fornecedores, Contas a Receber/Pagar e Plano de Contas).
+- **Remoção do Card de Sandbox/Seed**: Removido o encarte de Demonstração & Sandbox API e botão Popular Dados (Seed) da interface, alinhando a plataforma para consumir sincronização direta da conta Conta Azul via OAuth2.
+- **Persistência Multi-Tenant & Token Refresh**: Implementada persistência via contaazul_config garantindo SELECT + INSERT/UPDATE por company_id, resolvendo limitação de constraint única e assegurando sincronização 24/7 com suporte a Edge/Cloudflare.
+- **Cálculo Dinâmico de 8 KPIs e Gráficos**: Reestruturados os cards estatísticos e gráficos do Dashboard Conta Azul para realizar o cálculo acumulado/filtrado dinamicamente das entradas e saídas retornadas do Supabase.
+- **Git Commit & Cloudflare Auto-Deploy**: Realizado o commit e push para o branch main (origin/main) acionando a pipeline de deploy contínuo no Cloudflare Pages.
