@@ -97,8 +97,11 @@ export async function POST(req: NextRequest) {
     try {
       const { data: employeesData, error: empErr } = await supabase
         .from('employees')
-        .select('id, name, email, role, status, company_id, password_hash, password, temporary_password, must_change_password, allowed_modules')
+        .select('id, name, email, role, status, company_id, password_hash, temporary_password, must_change_password, allowed_modules')
         .ilike('email', cleanEmail);
+      if (empErr) {
+        console.error("[LOGIN DB FETCH ERROR]:", empErr);
+      }
       employees = employeesData || [];
     } catch (dbErr) {
       console.error("[LOGIN DB FETCH ERROR]:", dbErr);
