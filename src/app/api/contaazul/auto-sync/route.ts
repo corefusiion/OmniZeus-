@@ -84,35 +84,87 @@ export async function POST(req: NextRequest) {
           clientSecret: cfg.client_secret
         };
 
-        // 1. Fetch Pessoas (Clientes e Fornecedores)
-        let { res: customersRes, newAccessToken, newRefreshToken } = await fetchWithAutoRefresh(
-          "https://api-v2.contaazul.com/v1/pessoas",
-          { method: "GET" },
-          passedTokens,
-          companyId
-        );
-
+        // 1. Fetch Pessoas (Clientes e Fornecedores) com paginação e endpoints complementares
         let rawPessoas: any[] = [];
-        if (customersRes.ok) {
-          const data = await customersRes.json().catch(() => ({}));
-          rawPessoas = Array.isArray(data) ? data : (data.items || data.pessoas || data.customers || []);
-        }
+        let activeToken = cfg.access_token;
+        let activeRefresh = cfg.refresh_token;
 
-        const activeToken = newAccessToken || cfg.access_token;
-        const activeRefresh = newRefreshToken || cfg.refresh_token;
-
-        // 2. Fetch Eventos Financeiros / Contas a Pagar e Receber
-        let entriesData: any[] = [];
-        if (activeToken) {
-          const entriesRes = await fetchWithAutoRefresh(
-            "https://api.contaazul.com/v1/financeiro/eventos-financeiros",
+        // Tenta buscar no endpoint de Pessoas v2 (Paginado até 5 páginas de 100 itens)
+        for (let page = 1; page <= 5; page++) {
+          const { res: customersRes, newAccessToken, newRefreshToken } = await fetchWithAutoRefresh(
+            `https://api-v2.contaazul.com/v1/pessoas?pagina=${page}&tamanho_pagina=100&size=100`,
             { method: "GET" },
             { accessToken: activeToken, refreshToken: activeRefresh, clientId: cfg.client_id, clientSecret: cfg.client_secret },
             companyId
           );
-          if (entriesRes.res.ok) {
-            const eData = await entriesRes.res.json().catch(() => ({}));
-            entriesData = Array.isArray(eData) ? eData : (eData.items || eData.eventos || []);
+
+          if (newAccessToken) activeToken = newAccessToken;
+          if (newRefreshToken) activeRefresh = newRefreshToken;
+
+          if (customersRes.ok) {
+            const data = await customersRes.json().catch(() => ({}));
+            const list = Array.isArray(data) ? data : (data.items || data.pessoas || data.customers || []);
+            if (list.length === 0) break;
+            rawPessoas.push(...list);
+            if (list.length < 100) break;
+          } else {
+            break;
+          }
+        }
+
+        // Tenta buscar adicionalmente no endpoint Vendas Clientes v1 para garantir clientes criados diretamente no Conta Azul
+        if (activeToken) {
+          for (let page = 1; page <= 3; page++) {
+            const v1Res = await fetchWithAutoRefresh(
+              `https://api.contaazul.com/v1/vendas/clientes?pagina=${page}&tamanho_pagina=100&size=100`,
+              { method: "GET" },
+              { accessToken: activeToken, refreshToken: activeRefresh, clientId: cfg.client_id, clientSecret: cfg.client_secret },
+              companyId
+            );
+
+            if (v1Res.newAccessToken) activeToken = v1Res.newAccessToken;
+            if (v1Res.newRefreshToken) activeRefresh = v1Res.newRefreshToken;
+
+            if (v1Res.res.ok) {
+              const data = await v1Res.res.json().catch(() => ({}));
+              const list = Array.isArray(data) ? data : (data.items || data.clientes || []);
+              if (list.length === 0) break;
+              
+              for (const v1Client of list) {
+                const existing = rawPessoas.find((p: any) => p.id === v1Client.id);
+                if (!existing) {
+                  rawPessoas.push(v1Client);
+                }
+              }
+              if (list.length < 100) break;
+            } else {
+              break;
+            }
+          }
+        }
+
+        // 2. Fetch Eventos Financeiros / Contas a Pagar e Receber (Paginado)
+        let entriesData: any[] = [];
+        if (activeToken) {
+          for (let page = 1; page <= 5; page++) {
+            const entriesRes = await fetchWithAutoRefresh(
+              `https://api.contaazul.com/v1/financeiro/eventos-financeiros?pagina=${page}&tamanho_pagina=100&size=100`,
+              { method: "GET" },
+              { accessToken: activeToken, refreshToken: activeRefresh, clientId: cfg.client_id, clientSecret: cfg.client_secret },
+              companyId
+            );
+            if (entriesRes.newAccessToken) activeToken = entriesRes.newAccessToken;
+            if (entriesRes.newRefreshToken) activeRefresh = entriesRes.newRefreshToken;
+
+            if (entriesRes.res.ok) {
+              const eData = await entriesRes.res.json().catch(() => ({}));
+              const list = Array.isArray(eData) ? eData : (eData.items || eData.eventos || []);
+              if (list.length === 0) break;
+              entriesData.push(...list);
+              if (list.length < 100) break;
+            } else {
+              break;
+            }
           }
         }
 
@@ -125,6 +177,9 @@ export async function POST(req: NextRequest) {
             { accessToken: activeToken, refreshToken: activeRefresh, clientId: cfg.client_id, clientSecret: cfg.client_secret },
             companyId
           );
+          if (catsRes.newAccessToken) activeToken = catsRes.newAccessToken;
+          if (catsRes.newRefreshToken) activeRefresh = catsRes.newRefreshToken;
+
           if (catsRes.res.ok) {
             const cData = await catsRes.res.json().catch(() => ({}));
             categoriesData = Array.isArray(cData) ? cData : (cData.items || cData.categorias || []);

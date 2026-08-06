@@ -1,4 +1,4 @@
-# OmniZeus â€” Technical Architecture & Onboarding Guide (Gemini AI)
+ï»¿# OmniZeus â€” Technical Architecture & Onboarding Guide (Claude AI)
 
 > **Anthropic / Claude Technical Guide**: This document summarizes the technical stack, state management, security boundaries, file paths, and conversation logs of **OmniZeus** for fast onboarding across model switches or new development environments.
 
@@ -341,34 +341,34 @@ npm run build
 5. ðŸš€ **PrÃ³ximo passo**: Commit e push disparados! A interface farÃ¡ a compilaÃ§Ã£o nativa perfeitamente no Cloudflare e o `Erro 500` na tela de login serÃ¡ eliminado, pois o driver TCP problemÃ¡tico nÃ£o existe mais.
 
 
-## Sessão Atual - Debug Cloudflare Cache (2026-08-05)
+## Sessï¿½o Atual - Debug Cloudflare Cache (2026-08-05)
 
-1. Identificamos que o usuário já tinha feito um INSERT manual, o que causou o erro de chave duplicada no primeiro script.
-2. O usuário alterou as senhas diretamente pelo painel do Supabase com sucesso, mas o login ainda falhava.
-3. Identificamos que o Supabase tinha o RLS (Row Level Security) ativado nas tabelas principais, escondendo os dados da aplicação.
-4. O usuário desativou o RLS manualmente na UI, porém o sistema na Cloudflare continuou retornando   Empresas no Dashboard Master SaaS e falhando no login.
+1. Identificamos que o usuï¿½rio jï¿½ tinha feito um INSERT manual, o que causou o erro de chave duplicada no primeiro script.
+2. O usuï¿½rio alterou as senhas diretamente pelo painel do Supabase com sucesso, mas o login ainda falhava.
+3. Identificamos que o Supabase tinha o RLS (Row Level Security) ativado nas tabelas principais, escondendo os dados da aplicaï¿½ï¿½o.
+4. O usuï¿½rio desativou o RLS manualmente na UI, porï¿½m o sistema na Cloudflare continuou retornando   Empresas no Dashboard Master SaaS e falhando no login.
 5. **A Causa Raiz Final**: O etch agressivo do Next.js App Router (nativo da Cloudflare Workers) armazenou em cache a primeira resposta vazia quando o RLS ainda estava ativo. Como a assinatura do Fetch era a mesma, ele nunca mais consultou o Supabase.
-6. **A Correção**: Injetado global: { fetch: (url, opts) => fetch(url, { ...opts, cache: 'no-store' }) } no supabaseClient.ts e exportado dynamic = 'force-dynamic' na rota de login para quebrar o cache permanentemente.
+6. **A Correï¿½ï¿½o**: Injetado global: { fetch: (url, opts) => fetch(url, { ...opts, cache: 'no-store' }) } no supabaseClient.ts e exportado dynamic = 'force-dynamic' na rota de login para quebrar o cache permanentemente.
 
-### 5 Causas Prováveis de Falha para o Próximo Turno
-1. **Atraso de Propagação Cloudflare**: A Cloudflare pode demorar até 5 minutos para propagar o Worker globalmente e invalidar a CDN. Se falhar, aguarde alguns minutos e force um recarregamento da página (Ctrl+F5).
-2. **Incompatibilidade de Hash LEGACY_HASH_UNSUPPORTED**: Se o usuário colocar um Hash diferente que não seja PBKDF2 ou bcrypt/argon2 formatado corretamente, o Edge runtime lançará erro 401 por incompatibilidade criptográfica.
+### 5 Causas Provï¿½veis de Falha para o Prï¿½ximo Turno
+1. **Atraso de Propagaï¿½ï¿½o Cloudflare**: A Cloudflare pode demorar atï¿½ 5 minutos para propagar o Worker globalmente e invalidar a CDN. Se falhar, aguarde alguns minutos e force um recarregamento da pï¿½gina (Ctrl+F5).
+2. **Incompatibilidade de Hash LEGACY_HASH_UNSUPPORTED**: Se o usuï¿½rio colocar um Hash diferente que nï¿½o seja PBKDF2 ou bcrypt/argon2 formatado corretamente, o Edge runtime lanï¿½arï¿½ erro 401 por incompatibilidade criptogrï¿½fica.
 3. **CORS ou bloqueios de Rota da Cloudflare**: Pode haver uma regra de cache de borda (Edge Cache) no dashboard da Cloudflare (em Caching > Cache Rules) ignorando a regra de 
 o-store.
-4. **Supabase Environment Variables no Cloudflare**: Se por algum motivo as variáveis NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY estiverem ausentes no painel da Cloudflare (Settings > Variables), o sistema usará o mock silenciosamente para proteger o Build e não lerá dados.
-5. **Senha ou E-mail com espaços em branco (Trailing Spaces)**: Mesmo forçando a atualização manual no Supabase, se o campo de email copiado pelo usuário tiver um espaço extra invisível (glfx20@gmail.com ), a consulta .ilike exata pode falhar.
+4. **Supabase Environment Variables no Cloudflare**: Se por algum motivo as variï¿½veis NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY estiverem ausentes no painel da Cloudflare (Settings > Variables), o sistema usarï¿½ o mock silenciosamente para proteger o Build e nï¿½o lerï¿½ dados.
+5. **Senha ou E-mail com espaï¿½os em branco (Trailing Spaces)**: Mesmo forï¿½ando a atualizaï¿½ï¿½o manual no Supabase, se o campo de email copiado pelo usuï¿½rio tiver um espaï¿½o extra invisï¿½vel (glfx20@gmail.com ), a consulta .ilike exata pode falhar.
 
 
-## Atualização Final da Sessão (2026-08-05) - Bugs de Schema e Submódulos
+## Atualizaï¿½ï¿½o Final da Sessï¿½o (2026-08-05) - Bugs de Schema e Submï¿½dulos
 
-1. **Erro 'mustChangePassword' column not found:** O PostgREST do Supabase é estrito com nomes de colunas. Algumas rotas (login/route.ts, eset-password/route.ts, change-password/route.ts) estavam fazendo selects e updates usando chaves em camelCase por segurança, mas como elas não existem no Supabase (apenas snake_case), a API quebrava e o login/alteração de senha falhava silenciosamente. Todas as referências em camelCase foram removidas do backend.
-2. **Erro de compilação na Cloudflare (Submódulos do Git):** Ao rodar git add ., o Github adicionou a pasta do projeto de exemplo (SISTEMA/fitcrew-challenge e SITE/fitcrew-challenge) como um submódulo porque ele continha uma pasta oculta .git. Como não havia .gitmodules, o Cloudflare falhava ao tentar dar pull nesses submódulos invisíveis. Solução: Removemos as pastas ocultas .git de dentro dos exemplos para que sejam tratados apenas como arquivos normais.
+1. **Erro 'mustChangePassword' column not found:** O PostgREST do Supabase ï¿½ estrito com nomes de colunas. Algumas rotas (login/route.ts, eset-password/route.ts, change-password/route.ts) estavam fazendo selects e updates usando chaves em camelCase por seguranï¿½a, mas como elas nï¿½o existem no Supabase (apenas snake_case), a API quebrava e o login/alteraï¿½ï¿½o de senha falhava silenciosamente. Todas as referï¿½ncias em camelCase foram removidas do backend.
+2. **Erro de compilaï¿½ï¿½o na Cloudflare (Submï¿½dulos do Git):** Ao rodar git add ., o Github adicionou a pasta do projeto de exemplo (SISTEMA/fitcrew-challenge e SITE/fitcrew-challenge) como um submï¿½dulo porque ele continha uma pasta oculta .git. Como nï¿½o havia .gitmodules, o Cloudflare falhava ao tentar dar pull nesses submï¿½dulos invisï¿½veis. Soluï¿½ï¿½o: Removemos as pastas ocultas .git de dentro dos exemplos para que sejam tratados apenas como arquivos normais.
 
 ### STATUS ATUAL (Onde Paramos)
-O sistema foi comitado no repositório com 100% de sucesso.
-Cloudflare deve conseguir compilar sem engasgos com os submódulos, o problema do Cache foi corrigido no supabaseClient.ts com 
+O sistema foi comitado no repositï¿½rio com 100% de sucesso.
+Cloudflare deve conseguir compilar sem engasgos com os submï¿½dulos, o problema do Cache foi corrigido no supabaseClient.ts com 
 o-store e os bugs de mustChangePassword (camelCase) sumiram das rotas de Auth.
-Amanhã, basta continuar o desenvolvimento!
+Amanhï¿½, basta continuar o desenvolvimento!
 
 
 
@@ -378,3 +378,9 @@ Amanhã, basta continuar o desenvolvimento!
 - **PersistÃªncia Multi-Tenant & Token Refresh**: Implementada persistÃªncia via contaazul_config garantindo SELECT + INSERT/UPDATE por company_id, resolvendo limitaÃ§Ã£o de constraint Ãºnica e assegurando sincronizaÃ§Ã£o 24/7 com suporte a Edge/Cloudflare.
 - **CÃ¡lculo DinÃ¢mico de 8 KPIs e GrÃ¡ficos**: Reestruturados os cards estatÃ­sticos e grÃ¡ficos do Dashboard Conta Azul para realizar o cÃ¡lculo acumulado/filtrado dinamicamente das entradas e saÃ­das retornadas do Supabase.
 - **Git Commit & Cloudflare Auto-Deploy**: Realizado o commit e push para o branch main (origin/main) acionando a pipeline de deploy contÃ­nuo no Cloudflare Pages.
+
+## Sessao 2026-08-06 (Melhoria Auto-Sync Pessoas & Clientes Conta Azul)
+- **Correcao da Sincronizacao de Novos Clientes**: Implementado suporte a busca paginada (ate 5 paginas de 100 itens) no endpoint `https://api-v2.contaazul.com/v1/pessoas` para garantir o retorno de todos os cadastros novos e antigos.
+- **Fallback para Endpoint Vendas Clientes**: Adicionada busca secundaria no endpoint `https://api.contaazul.com/v1/vendas/clientes` para obter cadastros efetuados diretamente na interface Web de Vendas da Conta Azul.
+- **Paginacao de Eventos Financeiros**: Atualizado a busca de eventos financeiros para tambem paginar ate 5 paginas de 100 registros.
+- **Validacao de Build**: `npm run build` executado e aprovado com sucesso.
