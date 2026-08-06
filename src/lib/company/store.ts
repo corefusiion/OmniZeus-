@@ -294,11 +294,15 @@ export function saveEmployee(empData: Omit<EmployeeUser, 'id' | 'createdAt'>): E
     status: newEmp.status,
     must_change_password: newEmp.mustChangePassword ?? false,
     password_hash: newEmp.passwordHash || '',
-    password_changed_at: newEmp.passwordChangedAt || undefined,
-    last_login_at: newEmp.lastLoginAt || undefined,
-    birth_date: newEmp.birthDate || undefined,
     created_at: newEmp.createdAt
-  }, newEmp.companyId).catch(() => {});
+  }, newEmp.companyId).then(success => {
+    if (!success) {
+      alert("Falha crítica: O banco de dados recusou salvar este colaborador. Verifique se as datas e os campos estão preenchidos corretamente.");
+    }
+  }).catch((err) => {
+    alert("Erro crítico ao salvar funcionário no banco: " + err.message);
+    console.error(err);
+  });
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('omnizeus_employees_change'));
@@ -319,12 +323,9 @@ export function updateEmployee(employeeData: Partial<EmployeeUser> & { id: strin
       department: target.department,
       role: target.role,
       allowed_modules: target.allowedModules,
-      birth_date: target.birthDate,
       status: target.status,
       must_change_password: target.mustChangePassword,
-      password_hash: target.passwordHash,
-      password_changed_at: target.passwordChangedAt,
-      last_login_at: target.lastLoginAt
+      password_hash: target.passwordHash
     }).catch(() => {});
   }
 
