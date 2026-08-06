@@ -9,8 +9,6 @@ export const runtime = "edge";
 const SUPER_ADMIN_ONLY_TABLES = [
   "settings",
   "purchase_requests",
-  "payables",
-  "payables_list",
   "custom_job_roles",
   "dashboard_metrics",
   "ai_stress_test_logs"
@@ -20,8 +18,6 @@ const GLOBAL_TABLES = [
   "companies",
   "settings",
   "purchase_requests",
-  "payables",
-  "payables_list",
   "custom_job_roles",
   "dashboard_metrics",
   "ai_stress_test_logs",

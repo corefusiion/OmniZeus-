@@ -384,3 +384,7 @@ Amanh�, basta continuar o desenvolvimento!
 - **Fallback para Endpoint Vendas Clientes**: Adicionada busca secundaria no endpoint `https://api.contaazul.com/v1/vendas/clientes` para obter cadastros efetuados diretamente na interface Web de Vendas da Conta Azul.
 - **Paginacao de Eventos Financeiros**: Atualizado a busca de eventos financeiros para tambem paginar ate 5 paginas de 100 registros.
 - **Validacao de Build**: `npm run build` executado e aprovado com sucesso.
+## Sessao 2026-08-06 (Permissoes Gestor Financeiro / Conta Azul API / 403 Forbidden Fix)
+- **Desbloqueio de Permissao payables e payables_list**: Removidas as restricoes exclusivas de Super Admin das tabelas de contas a pagar/receber na rota /api/db. Agora os perfis Gestor conseguem acessar e sincronizar a DRE e contas financeiras da propria empresa sem erros 403 Forbidden.
+- **Isolamento de Dados Mantido**: Consultas filtram estritamente por company_id do gestor autenticado.
+- **Validacao de Build**: `npm run build` executado e aprovado com sucesso.
