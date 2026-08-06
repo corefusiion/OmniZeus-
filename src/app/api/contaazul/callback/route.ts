@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
-import { saveContaAzulTokens } from "@/lib/contaazul/store";
+import { saveContaAzulTokens, getContaAzulTokens } from "@/lib/contaazul/store";
 
 export const runtime = "edge";
 
@@ -28,19 +28,34 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { code, clientId, clientSecret, redirectUri, companyId } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const code = body.code;
+    const companyId = body.companyId || "comp_techcontabil_01";
+    
+    // Obter tokens e credenciais salvas do banco se não fornecidas no body
+    const stored = await getContaAzulTokens(companyId);
+    
+    const clientId = (body.clientId || stored.clientId || "").trim();
+    const clientSecret = (body.clientSecret || stored.clientSecret || "").trim();
+    const redirectUri = body.redirectUri || stored.redirectUri || "https://contaazul.com";
 
-    if (!code || !clientId || !clientSecret) {
+    if (!code) {
       return NextResponse.json(
-        { error: "Parâmetros code, clientId e clientSecret são obrigatórios." },
+        { error: "O parâmetro 'code' de autorização é obrigatório." },
         { status: 400 }
       );
     }
 
-    const credentials = Buffer.from(`${clientId.trim()}:${clientSecret.trim()}`).toString("base64");
-    const cleanRedirectUri = redirectUri || "https://contaazul.com";
+    if (!clientId || !clientSecret) {
+      return NextResponse.json(
+        { error: "Client ID e Client Secret não configurados. Preencha na aba Credenciais & OAuth." },
+        { status: 400 }
+      );
+    }
 
-    // Attempt 1: https://api.contaazul.com/oauth2/token
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+
+    // Tentativa 1: https://api.contaazul.com/oauth2/token
     let tokenRes = await fetch("https://api.contaazul.com/oauth2/token", {
       method: "POST",
       headers: {
@@ -49,14 +64,14 @@ export async function POST(req: Request) {
       },
       body: new URLSearchParams({
         grant_type: "authorization_code",
-        redirect_uri: cleanRedirectUri,
+        redirect_uri: redirectUri,
         code: code.trim()
       })
     });
 
     let tokenData = await tokenRes.json().catch(() => ({}));
 
-    // Attempt 2: https://auth.contaazul.com/oauth2/token if Attempt 1 failed
+    // Tentativa 2: https://auth.contaazul.com/oauth2/token
     if (!tokenRes.ok || !tokenData.access_token) {
       tokenRes = await fetch("https://auth.contaazul.com/oauth2/token", {
         method: "POST",
@@ -66,17 +81,17 @@ export async function POST(req: Request) {
         },
         body: new URLSearchParams({
           grant_type: "authorization_code",
-          redirect_uri: cleanRedirectUri,
+          redirect_uri: redirectUri,
           code: code.trim(),
-          client_id: clientId.trim(),
-          client_secret: clientSecret.trim()
+          client_id: clientId,
+          client_secret: clientSecret
         })
       });
       tokenData = await tokenRes.json().catch(() => ({}));
     }
 
     if (!tokenRes.ok || !tokenData.access_token) {
-      const errorMsg = tokenData.error_description || tokenData.message || tokenData.error || `HTTP ${tokenRes.status}: Falha ao trocar código pelo token. O código pode ter sido usado ou expirou (válido por 3 min).`;
+      const errorMsg = tokenData.error_description || tokenData.message || tokenData.error || `HTTP ${tokenRes.status}: Falha ao trocar código pelo token. O código expira em 3 min ou já foi utilizado.`;
       return NextResponse.json(
         { 
           error: errorMsg,
@@ -86,25 +101,26 @@ export async function POST(req: Request) {
       );
     }
 
-    // PERSIST tokens isolados por empresa (companyId) — NUNCA default comp_zenitus
-    saveContaAzulTokens(companyId || "comp_zenitus", {
+    // Persistir os tokens recuperados com sucesso para a empresa
+    await saveContaAzulTokens(companyId, {
       accessToken: tokenData.access_token,
       refreshToken: tokenData.refresh_token,
-      clientId: clientId.trim(),
-      clientSecret: clientSecret.trim()
+      clientId,
+      clientSecret,
+      redirectUri
     });
 
     return NextResponse.json({
       success: true,
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token,
-      expires_in: tokenData.expires_in
+      companyId,
+      message: "Access Token trocado e salvo com sucesso!"
     });
   } catch (err: any) {
     return NextResponse.json(
-      { error: err.message || "Erro de conexão com o servidor da ContaAzul." },
+      { error: err.message || "Erro interno ao processar OAuth callback." },
       { status: 500 }
     );
   }
 }
-

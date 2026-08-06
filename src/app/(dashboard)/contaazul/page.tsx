@@ -272,8 +272,10 @@ function ContaAzulContent() {
     setRole(getActiveRole());
     loadContaAzulData();
 
-    // Carrega status permanente do token gravado em disco (data/omnizeus_contaazul_tokens.json)
-    fetch("/api/contaazul/status")
+    const activeCompanyId = typeof window !== 'undefined' ? (localStorage.getItem("omnizeus_active_company_id") || getActiveTenantId() || "comp_techcontabil_01") : "comp_techcontabil_01";
+
+    // Carrega status permanente do token gravado em disco/Supabase
+    fetch(`/api/contaazul/status?companyId=${encodeURIComponent(activeCompanyId)}`)
       .then(res => res.json())
       .then(data => {
         if (data.success && data.isConnected) {
@@ -572,10 +574,22 @@ function ContaAzulContent() {
     } catch (e) {}
   };
 
-  const exchangeCodeForToken = async (codeToUse: string) => {
+  const exchangeCodeForToken = async (rawCodeToUse: string) => {
     setIsConnecting(true);
     setNoticeMessage(null);
-    const activeCompanyId = getActiveTenantId() || localStorage.getItem("omnizeus_active_company_id") || "";
+
+    let codeToUse = rawCodeToUse.trim();
+    if (codeToUse.includes("code=")) {
+      try {
+        const urlObj = new URL(codeToUse.startsWith("http") ? codeToUse : `https://placeholder.com?${codeToUse.startsWith("?") ? codeToUse.slice(1) : codeToUse}`);
+        codeToUse = urlObj.searchParams.get("code") || codeToUse;
+      } catch (e) {
+        const match = codeToUse.match(/code=([^&]+)/);
+        if (match) codeToUse = match[1];
+      }
+    }
+
+    const activeCompanyId = typeof window !== 'undefined' ? (localStorage.getItem("omnizeus_active_company_id") || getActiveTenantId() || "comp_techcontabil_01") : "comp_techcontabil_01";
     try {
       const res = await fetch("/api/contaazul/callback", {
         method: "POST",
@@ -595,17 +609,21 @@ function ContaAzulContent() {
         setAccessToken(data.access_token);
         if (data.refresh_token) setRefreshToken(data.refresh_token);
         setManualTokenInput(data.access_token);
+        setManualCodeInput("");
         await saveConfig(true, data.access_token, data.refresh_token);
-        setNoticeMessage({ type: 'success', text: "Conexão de Produção autenticada! Auto-renovação silenciosa ativa (24/7)." });
+        setNoticeMessage({ type: 'success', text: "Conexão com a ContaAzul autenticada com SUCESSO! Access Token renovado." });
+        return { accessToken: data.access_token, refreshToken: data.refresh_token };
       } else {
         setNoticeMessage({ 
           type: 'error', 
           text: `Não foi possível validar o código de autorização. ${data.error || 'Por favor, gere um novo código.'}` 
         });
+        return null;
       }
     } catch (err: any) {
       setIsConnecting(false);
       setNoticeMessage({ type: 'error', text: `Falha de conexão com os servidores da ContaAzul.` });
+      return null;
     }
   };
 
@@ -663,22 +681,34 @@ function ContaAzulContent() {
     setNoticeMessage({ type: 'info', text: "Sessão com a ContaAzul encerrada." });
   };
 
-  const handleRealSync = async () => {
+  const handleRealSync = async (overrideTokens?: { accessToken?: string; refreshToken?: string } | React.MouseEvent) => {
     setIsSyncing(true);
-    setNoticeMessage(null);
+    setNoticeMessage({ type: 'info', text: 'Iniciando Sincronização 24/7 com Conta Azul...' });
 
-    const tokenToUse = accessToken || manualTokenInput.trim();
+    const tokensObj = (overrideTokens && 'accessToken' in overrideTokens) ? overrideTokens : undefined;
 
-    setNoticeMessage(null);
+    let tokenToUse: string | undefined = tokensObj?.accessToken || accessToken || manualTokenInput.trim();
+    let refreshToUse: string | undefined = tokensObj?.refreshToken || refreshToken;
 
-    const activeCompanyId = typeof window !== 'undefined' ? (localStorage.getItem("omnizeus_active_company_id") || getActiveTenantId() || "") : (getActiveTenantId() || "");
+    if (tokenToUse && (tokenToUse.startsWith("enc.v1:") || tokenToUse.startsWith("cyjr"))) {
+      tokenToUse = undefined;
+    }
+    if (refreshToUse && (refreshToUse.startsWith("enc.v1:") || refreshToUse.startsWith("cyjr"))) {
+      refreshToUse = undefined;
+    }
+
+    const activeCompanyId = typeof window !== 'undefined' ? (localStorage.getItem("omnizeus_active_company_id") || getActiveTenantId() || "comp_techcontabil_01") : "comp_techcontabil_01";
 
     try {
       const res = await fetch("/api/contaazul/auto-sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          company_id: activeCompanyId
+          company_id: activeCompanyId,
+          accessToken: tokenToUse,
+          refreshToken: refreshToUse,
+          clientId,
+          clientSecret
         })
       });
 
@@ -704,30 +734,6 @@ function ContaAzulContent() {
     } catch (e: any) {
       setIsSyncing(false);
       setNoticeMessage({ type: 'error', text: e.message || 'Erro ao conectar à API da ContaAzul.' });
-    }
-  };
-
-  const handleSeedSandboxData = async () => {
-    setIsSyncing(true);
-    setNoticeMessage({ type: 'info', text: 'Iniciando população completa de dados de teste (Clientes, Fornecedores, Serviços, Contas a Receber/Pagar) no Sandbox ContaAzul...' });
-    const activeCompanyId = typeof window !== 'undefined' ? (localStorage.getItem("omnizeus_active_company_id") || getActiveTenantId() || "comp_techcontabil_01") : "comp_techcontabil_01";
-    try {
-      const res = await fetch("/api/contaazul/seed", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyId: activeCompanyId })
-      });
-      const data = await res.json();
-      setIsSyncing(false);
-      if (res.ok && data.success) {
-        setNoticeMessage({ type: 'success', text: data.message || 'População concluída com sucesso!' });
-        await handleRealSync();
-      } else {
-        setNoticeMessage({ type: 'error', text: data.error || 'Falha no seed de dados. Verifique a autorização.' });
-      }
-    } catch(e: any) {
-      setIsSyncing(false);
-      setNoticeMessage({ type: 'error', text: e.message || 'Erro ao executar o seed.' });
     }
   };
 
@@ -1410,17 +1416,6 @@ function ContaAzulContent() {
             <span className="text-gray-300">|</span>
             <span className="text-slate-500">Próximo: ~10 min</span>
           </div>
-
-          <button
-            onClick={handleSeedSandboxData}
-            disabled={isSyncing}
-            className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-purple-700 hover:bg-purple-800 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
-            title="Popula o Sandbox do ContaAzul com Clientes, Fornecedores, Serviços, Receitas e Despesas"
-          >
-            <Database className="w-3.5 h-3.5 text-purple-200" />
-            <span>{isSyncing ? 'Populando...' : 'Popular Dados (Seed)'}</span>
-          </button>
-
           <button
             onClick={() => { setIsAiModalOpen(true); setIsAiMinimized(false); }}
             className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all shadow-xs border border-emerald-700"
@@ -2741,24 +2736,7 @@ function ContaAzulContent() {
                 </div>
               </div>
 
-              {/* CARD DE POPULAÇÃO DO SANDBOX (SEED) */}
-              <div className="bg-gradient-to-br from-purple-900 via-indigo-900 to-slate-900 rounded-xl border border-purple-800 p-6 space-y-4 shadow-lg text-white">
-                <div className="flex items-center gap-2">
-                  <Database className="w-5 h-5 text-purple-400" />
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-purple-200">Demonstração & Sandbox API</h3>
-                </div>
-                <p className="text-xs text-gray-300 leading-relaxed">
-                  Popule o ambiente Sandbox da API ContaAzul com **10 Clientes, 6 Fornecedores, 8 Serviços, 12 Receitas e 10 Despesas** com um único clique.
-                </p>
-                <button
-                  onClick={handleSeedSandboxData}
-                  disabled={isSyncing}
-                  className="w-full py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-50"
-                >
-                  <Sparkles className="w-4 h-4 text-purple-200" />
-                  <span>{isSyncing ? 'Populando e Sincronizando...' : 'Popular Sandbox com Dados de Demonstração'}</span>
-                </button>
-              </div>
+
             </div>
           </div>
         </div>

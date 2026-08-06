@@ -56,10 +56,18 @@ export async function saveContaAzulTokens(
 
   if (typeof tokensOrCompanyId === 'string') {
     companyId = tokensOrCompanyId;
-    tokens = tokensArg || {};
+    tokens = { ...(tokensArg || {}) };
   } else {
     companyId = 'comp_zenitus';
-    tokens = tokensOrCompanyId;
+    tokens = { ...(tokensOrCompanyId || {}) };
+  }
+
+  // Proteção contra sobrescrita com string já criptografada
+  if (tokens.accessToken && (tokens.accessToken.startsWith("enc.v1:") || tokens.accessToken.startsWith("cyjr"))) {
+    delete tokens.accessToken;
+  }
+  if (tokens.refreshToken && (tokens.refreshToken.startsWith("enc.v1:") || tokens.refreshToken.startsWith("cyjr"))) {
+    delete tokens.refreshToken;
   }
 
   try {
@@ -114,24 +122,34 @@ export async function fetchWithAutoRefresh(
   url: string,
   options: RequestInit = {},
   passedTokens?: { accessToken?: string; refreshToken?: string; clientId?: string; clientSecret?: string },
-  companyId: string = 'comp_zenitus'
+  companyId: string = 'comp_techcontabil_01'
 ): Promise<{ res: Response; newAccessToken?: string; newRefreshToken?: string }> {
   let stored = await getContaAzulTokens(companyId);
 
-  // Se o banco não possuir accessToken mas o frontend enviou, atualiza
-  if (!stored.accessToken && passedTokens?.accessToken) {
+  // Filtrar tokens criptografados enviados por engano
+  let cleanPassedAccess = passedTokens?.accessToken;
+  let cleanPassedRefresh = passedTokens?.refreshToken;
+  if (cleanPassedAccess && (cleanPassedAccess.startsWith("enc.v1:") || cleanPassedAccess.startsWith("cyjr"))) {
+    cleanPassedAccess = undefined;
+  }
+  if (cleanPassedRefresh && (cleanPassedRefresh.startsWith("enc.v1:") || cleanPassedRefresh.startsWith("cyjr"))) {
+    cleanPassedRefresh = undefined;
+  }
+
+  // Se o frontend ou chamador enviou tokens válidos explicitamente, salva no BD
+  if (cleanPassedAccess) {
     stored = await saveContaAzulTokens(companyId, {
-      accessToken: passedTokens.accessToken,
-      refreshToken: passedTokens.refreshToken || stored.refreshToken,
-      clientId: passedTokens.clientId || stored.clientId,
-      clientSecret: passedTokens.clientSecret || stored.clientSecret
+      accessToken: cleanPassedAccess,
+      refreshToken: cleanPassedRefresh || stored.refreshToken,
+      clientId: passedTokens?.clientId || stored.clientId,
+      clientSecret: passedTokens?.clientSecret || stored.clientSecret
     });
   }
 
-  let activeAccessToken = stored.accessToken || passedTokens?.accessToken;
-  let activeRefreshToken = stored.refreshToken || passedTokens?.refreshToken;
-  let activeClientId = stored.clientId || passedTokens?.clientId || "";
-  let activeClientSecret = stored.clientSecret || passedTokens?.clientSecret || "";
+  let activeAccessToken = cleanPassedAccess || stored.accessToken;
+  let activeRefreshToken = cleanPassedRefresh || stored.refreshToken;
+  let activeClientId = passedTokens?.clientId || stored.clientId || "";
+  let activeClientSecret = passedTokens?.clientSecret || stored.clientSecret || "";
 
 
   const buildHeaders = (token: string) => {

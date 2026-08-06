@@ -238,23 +238,21 @@ export async function fetchContaAzulConfig(companyId?: string) {
     if (companyId) {
       headers["x-company-id"] = companyId;
     }
-    const res = await fetch("/api/db?table=contaazul_config", { cache: "no-store", headers });
+    const targetCompanyId = companyId || "comp_techcontabil_01";
+    const res = await fetch(`/api/contaazul/config?companyId=${targetCompanyId}`, { cache: "no-store", headers });
     if (res.ok) {
       const json = await res.json();
-      const raw = json.data;
-
-      // contaazul_config pode ser array (multi-tenant) ou objeto (legado)
-      const dbCfg = Array.isArray(raw) ? (raw[0] || null) : (raw || null);
+      const dbCfg = json.data;
 
       if (dbCfg) {
         return {
-          clientId: dbCfg.client_id,
-          clientSecret: dbCfg.client_secret,
-          redirectUri: dbCfg.redirect_uri,
-          accessToken: dbCfg.access_token,
-          refreshToken: dbCfg.refresh_token,
-          isConnected: dbCfg.is_connected,
-          updatedAt: dbCfg.updated_at
+          clientId: dbCfg.clientId || dbCfg.client_id,
+          clientSecret: dbCfg.clientSecret || dbCfg.client_secret,
+          redirectUri: dbCfg.redirectUri || dbCfg.redirect_uri,
+          accessToken: dbCfg.accessToken || dbCfg.access_token,
+          refreshToken: dbCfg.refreshToken || dbCfg.refresh_token,
+          isConnected: dbCfg.isConnected ?? dbCfg.is_connected,
+          updatedAt: dbCfg.updatedAt || dbCfg.updated_at
         };
       }
       return null;
@@ -267,19 +265,16 @@ export async function fetchContaAzulConfig(companyId?: string) {
 
 export async function updateContaAzulConfig(config: any) {
   try {
-    const res = await fetch("/api/db", {
+    const res = await fetch("/api/contaazul/config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        action: "update_contaazul_config",
-        contaazul_config: {
-          company_id: config.companyId || config.company_id,
-          client_id: config.clientId,
-          client_secret: config.clientSecret,
-          access_token: config.accessToken,
-          refresh_token: config.refreshToken,
-          is_connected: config.isConnected
-        }
+        companyId: config.companyId || config.company_id,
+        clientId: config.clientId,
+        clientSecret: config.clientSecret,
+        accessToken: config.accessToken,
+        refreshToken: config.refreshToken,
+        isConnected: config.isConnected
       })
     });
     return res.ok;

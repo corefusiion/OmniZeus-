@@ -10,7 +10,20 @@ export async function POST(req: NextRequest) {
   const startTime = Date.now();
   try {
     const body = await req.json().catch(() => ({}));
-    const targetCompanyId = body.company_id || null;
+    const targetCompanyId = body.company_id || body.companyId || "comp_techcontabil_01";
+    const passedAccessToken = body.accessToken || body.access_token;
+    const passedRefreshToken = body.refreshToken || body.refresh_token;
+    const passedClientId = body.clientId || body.client_id;
+    const passedClientSecret = body.clientSecret || body.client_secret;
+
+    if (passedAccessToken && targetCompanyId) {
+      await saveContaAzulTokens(targetCompanyId, {
+        accessToken: passedAccessToken,
+        refreshToken: passedRefreshToken,
+        clientId: passedClientId,
+        clientSecret: passedClientSecret
+      });
+    }
 
     const { data: dbDataConfigs } = await supabase.from('contaazul_config').select('*');
     let configData = dbDataConfigs || [];
