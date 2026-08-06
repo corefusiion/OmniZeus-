@@ -72,7 +72,10 @@ export async function saveContaAzulTokens(
 
     const encrypted = await encryptContaAzulFields(updated);
 
+    const { data: existingRow } = await supabase.from('contaazul_config').select('id').eq('company_id', companyId).maybeSingle();
+
     const cfgEntry = {
+      id: existingRow?.id || crypto.randomUUID(),
       company_id: companyId,
       client_id: encrypted.clientId,
       client_secret: encrypted.clientSecret,
