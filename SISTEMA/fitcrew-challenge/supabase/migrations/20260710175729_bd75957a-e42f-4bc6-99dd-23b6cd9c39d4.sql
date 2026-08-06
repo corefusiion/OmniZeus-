@@ -1,0 +1,1 @@
+UPDATE public.challenges SET checkin_cooldown_min = 0;

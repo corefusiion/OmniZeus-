@@ -1,0 +1,8 @@
+
+ALTER TABLE public.challenge_members
+  ADD COLUMN IF NOT EXISTS bonus_points INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS forgiveness_tickets INT NOT NULL DEFAULT 0;
+
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS avatar_border_until TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS unlocked_emojis TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];

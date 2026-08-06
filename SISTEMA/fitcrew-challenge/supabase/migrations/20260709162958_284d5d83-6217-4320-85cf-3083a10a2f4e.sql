@@ -1,0 +1,1 @@
+ALTER TABLE public.challenges ADD COLUMN IF NOT EXISTS banner_url TEXT;
