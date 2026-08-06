@@ -55,8 +55,6 @@ export async function POST(req: NextRequest) {
         password_hash: hashedPassword,
         must_change_password: true,
         status: "Primeiro acesso pendente",
-        password_reset_at: now,
-        password: null, // Remove credenciais legadas em texto puro para invalidar a senha anterior
         temporary_password: null
       })
       .eq("id", employeeId);

@@ -59,9 +59,7 @@ export async function POST(req: NextRequest) {
       .update({
         password_hash: hashedPassword,
         must_change_password: false,
-        password_changed_at: now,
         status: "Ativo",
-        password: null,
         temporary_password: null
       })
       .eq("id", employee.id);
