@@ -3,6 +3,8 @@
 // This is the ONLY way the frontend should authenticate. Never trust client-side state for auth.
 
 import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
 import { createAuthResponse } from "@/lib/auth/session";
 import { PRODUCTION_USERS } from "@/lib/auth/roles";
 import { supabase } from "@/lib/db/supabaseClient";

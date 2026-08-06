@@ -28,6 +28,13 @@ export function getSupabase(): SupabaseClient {
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false
+    },
+    global: {
+      // O Next.js App Router no Cloudflare pode fazer cache agressivo do fetch global usado pelo Supabase.
+      // Passando esse override garantimos que os dados (login/dashboard) sempre venham frescos do banco.
+      fetch: (url, options) => {
+        return fetch(url, { ...options, cache: 'no-store' });
+      }
     }
   });
 
