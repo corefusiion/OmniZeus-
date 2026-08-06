@@ -53,7 +53,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+    const credentials = btoa(`${clientId}:${clientSecret}`);
 
     // Tentativa 1: https://api.contaazul.com/oauth2/token
     let tokenRes = await fetch("https://api.contaazul.com/oauth2/token", {

@@ -171,7 +171,7 @@ export async function fetchWithAutoRefresh(
   if (res.status === 401 && activeRefreshToken) {
     console.log("[ContaAzul Auto-Refresh] Token 401 detectado. Executando renovação silenciosa em segundo plano...");
     
-    const credentials = Buffer.from(`${activeClientId.trim()}:${activeClientSecret.trim()}`).toString("base64");
+    const credentials = btoa(`${activeClientId.trim()}:${activeClientSecret.trim()}`);
     
     let refreshRes = await fetch("https://auth.contaazul.com/oauth2/token", {
       method: "POST",

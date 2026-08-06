@@ -28,7 +28,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const credentials = Buffer.from(`${activeClientId.trim()}:${activeClientSecret.trim()}`).toString("base64");
+    const credentials = btoa(`${activeClientId.trim()}:${activeClientSecret.trim()}`);
 
     // Automatic silent OAuth token refresh via ContaAzul API
     let tokenRes = await fetch("https://auth.contaazul.com/oauth2/token", {
