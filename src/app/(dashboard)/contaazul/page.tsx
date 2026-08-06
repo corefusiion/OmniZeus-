@@ -1412,6 +1412,16 @@ function ContaAzulContent() {
           </div>
 
           <button
+            onClick={handleSeedSandboxData}
+            disabled={isSyncing}
+            className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-purple-700 hover:bg-purple-800 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
+            title="Popula o Sandbox do ContaAzul com Clientes, Fornecedores, Serviços, Receitas e Despesas"
+          >
+            <Database className="w-3.5 h-3.5 text-purple-200" />
+            <span>{isSyncing ? 'Populando...' : 'Popular Dados (Seed)'}</span>
+          </button>
+
+          <button
             onClick={() => { setIsAiModalOpen(true); setIsAiMinimized(false); }}
             className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all shadow-xs border border-emerald-700"
           >
@@ -2729,6 +2739,25 @@ function ContaAzulContent() {
                     </p>
                   </div>
                 </div>
+              </div>
+
+              {/* CARD DE POPULAÇÃO DO SANDBOX (SEED) */}
+              <div className="bg-gradient-to-br from-purple-900 via-indigo-900 to-slate-900 rounded-xl border border-purple-800 p-6 space-y-4 shadow-lg text-white">
+                <div className="flex items-center gap-2">
+                  <Database className="w-5 h-5 text-purple-400" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-purple-200">Demonstração & Sandbox API</h3>
+                </div>
+                <p className="text-xs text-gray-300 leading-relaxed">
+                  Popule o ambiente Sandbox da API ContaAzul com **10 Clientes, 6 Fornecedores, 8 Serviços, 12 Receitas e 10 Despesas** com um único clique.
+                </p>
+                <button
+                  onClick={handleSeedSandboxData}
+                  disabled={isSyncing}
+                  className="w-full py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-50"
+                >
+                  <Sparkles className="w-4 h-4 text-purple-200" />
+                  <span>{isSyncing ? 'Populando e Sincronizando...' : 'Popular Sandbox com Dados de Demonstração'}</span>
+                </button>
               </div>
             </div>
           </div>
