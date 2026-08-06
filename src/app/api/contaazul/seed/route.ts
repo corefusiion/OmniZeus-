@@ -1,4 +1,4 @@
-﻿export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { fetchWithAutoRefresh, getContaAzulTokens } from "@/lib/contaazul/store";
 
@@ -73,7 +73,7 @@ const DESPESAS = [
 
 async function tryPost(endpoint: string, body: any, passedTokens: any) {
   const { res } = await fetchWithAutoRefresh(
-    https://api.contaazul.com,
+    `https://api.contaazul.com${endpoint}`,
     { method: "POST", body: JSON.stringify(body) },
     passedTokens
   );
@@ -114,26 +114,26 @@ export async function POST(req: Request) {
 
     for (const c of CLIENTES) {
       const r = await tryPost("/v1/customers", { name: c.name, email: c.email, document: c.document, phone: c.phone, person_type: c.person_type }, passedTokens);
-      if (r.ok) { results.clientes.ok++; log.push([OK] Cliente: ); }
-      else if (r.status === 422 || r.status === 409) { results.clientes.warn++; log.push([JA EXISTE] ); }
-      else { results.clientes.err++; log.push([ERRO ] Cliente: ); }
+      if (r.ok) { results.clientes.ok++; log.push("[OK] Cliente: " + c.name); }
+      else if (r.status === 422 || r.status === 409) { results.clientes.warn++; log.push("[JA EXISTE] " + c.name); }
+      else { results.clientes.err++; log.push("[ERRO " + r.status + "] Cliente: " + c.name); }
       await sleep(300);
     }
 
     for (const f of FORNECEDORES) {
       const r = await tryPost("/v1/suppliers", { name: f.name, email: f.email, document: f.document, phone: f.phone, person_type: f.person_type }, passedTokens);
-      if (r.ok) { results.fornecedores.ok++; log.push([OK] Fornecedor: ); }
-      else if (r.status === 422 || r.status === 409) { results.fornecedores.warn++; log.push([JA EXISTE] ); }
-      else { results.fornecedores.err++; log.push([ERRO ] Fornecedor: ); }
+      if (r.ok) { results.fornecedores.ok++; log.push("[OK] Fornecedor: " + f.name); }
+      else if (r.status === 422 || r.status === 409) { results.fornecedores.warn++; log.push("[JA EXISTE] " + f.name); }
+      else { results.fornecedores.err++; log.push("[ERRO " + r.status + "] Fornecedor: " + f.name); }
       await sleep(300);
     }
 
     for (const s of SERVICOS) {
       const r = await tryPost("/v1/services", { name: s.name, value: s.value, description: s.description }, passedTokens);
-      if (r.ok) { results.servicos.ok++; log.push([OK] Servico: ); }
-      else if (r.status === 404) { results.servicos.warn++; log.push([N/A] Servico - endpoint indisponivel no plano); }
-      else if (r.status === 422 || r.status === 409) { results.servicos.warn++; log.push([JA EXISTE] ); }
-      else { results.servicos.err++; log.push([ERRO ] Servico: ); }
+      if (r.ok) { results.servicos.ok++; log.push("[OK] Servico: " + s.name); }
+      else if (r.status === 404) { results.servicos.warn++; log.push("[N/A] Servico - endpoint indisponivel no plano"); }
+      else if (r.status === 422 || r.status === 409) { results.servicos.warn++; log.push("[JA EXISTE] " + s.name); }
+      else { results.servicos.err++; log.push("[ERRO " + r.status + "] Servico: " + s.name); }
       await sleep(300);
     }
 
@@ -141,9 +141,9 @@ export async function POST(req: Request) {
       const recBody = { description: rec.description, value: rec.value, due_date: rec.due_date, status: rec.status, competence: today(-30) };
       let r = await tryPost("/v1/accounts-receivable", recBody, passedTokens);
       if (!r.ok && r.status === 404) r = await tryPost("/v1/entries", { ...recBody, type: "CREDIT" }, passedTokens);
-      if (r.ok) { results.receitas.ok++; log.push([OK] Receita: ); }
-      else if (r.status === 422 || r.status === 409) { results.receitas.warn++; log.push([JA EXISTE] ); }
-      else { results.receitas.err++; log.push([ERRO ] Receita: ); }
+      if (r.ok) { results.receitas.ok++; log.push("[OK] Receita: " + rec.description.slice(0, 50)); }
+      else if (r.status === 422 || r.status === 409) { results.receitas.warn++; log.push("[JA EXISTE] " + rec.description.slice(0, 45)); }
+      else { results.receitas.err++; log.push("[ERRO " + r.status + "] Receita: " + rec.description.slice(0, 40)); }
       await sleep(300);
     }
 
@@ -151,9 +151,9 @@ export async function POST(req: Request) {
       const despBody = { description: desp.description, value: desp.value, due_date: desp.due_date, status: desp.status, competence: today(-30) };
       let r = await tryPost("/v1/accounts-payable", despBody, passedTokens);
       if (!r.ok && r.status === 404) r = await tryPost("/v1/entries", { ...despBody, type: "DEBIT" }, passedTokens);
-      if (r.ok) { results.despesas.ok++; log.push([OK] Despesa: ); }
-      else if (r.status === 422 || r.status === 409) { results.despesas.warn++; log.push([JA EXISTE] ); }
-      else { results.despesas.err++; log.push([ERRO ] Despesa: ); }
+      if (r.ok) { results.despesas.ok++; log.push("[OK] Despesa: " + desp.description.slice(0, 50)); }
+      else if (r.status === 422 || r.status === 409) { results.despesas.warn++; log.push("[JA EXISTE] " + desp.description.slice(0, 45)); }
+      else { results.despesas.err++; log.push("[ERRO " + r.status + "] Despesa: " + desp.description.slice(0, 40)); }
       await sleep(300);
     }
 
@@ -166,7 +166,7 @@ export async function POST(req: Request) {
       totalCreated: totalOk,
       totalErrors: totalErr,
       log,
-      message: Seed concluido!  itens cadastrados no ContaAzul.,
+      message: "Seed concluido! " + totalOk + " itens cadastrados no ContaAzul.",
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
