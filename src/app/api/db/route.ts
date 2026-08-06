@@ -89,14 +89,16 @@ export async function GET(req: NextRequest) {
   }
 
   if (!table) {
-    return NextResponse.json({ error: "ParÃ¢metro 'table' Ã© obrigatÃ³rio.", code: "TABLE_REQUIRED" }, { status: 400 });
+    return NextResponse.json({ error: "Parâmetro 'table' é obrigatório.", code: "TABLE_REQUIRED" }, { status: 400 });
   }
 
   if (SUPER_ADMIN_ONLY_TABLES.includes(table) && !isSuperAdmin) {
     return NextResponse.json({ error: "Acesso negado.", code: "FORBIDDEN" }, { status: 403 });
   }
 
-  const effectiveCompanyId = isSuperAdmin ? (requestedCompanyId || "global") : session.companyId;
+  const effectiveCompanyId = isSuperAdmin 
+    ? ((requestedCompanyId && requestedCompanyId !== "global") ? requestedCompanyId : (session.companyId || "global")) 
+    : session.companyId;
 
   try {
     let query = supabase.from(table).select('*');
@@ -104,7 +106,7 @@ export async function GET(req: NextRequest) {
     if (table === "companies" && !isSuperAdmin) {
       query = query.eq('id', session.companyId);
     } else if (!GLOBAL_TABLES.includes(table)) {
-      if (!(isSuperAdmin && (effectiveCompanyId === "global" || !effectiveCompanyId))) {
+      if (effectiveCompanyId && effectiveCompanyId !== "global") {
         query = query.eq('company_id', effectiveCompanyId);
       }
     }
@@ -113,11 +115,9 @@ export async function GET(req: NextRequest) {
     
     if (error) {
       console.error(`Supabase GET Error on ${table}:`, error);
-      // Fallback empty array if table doesn't exist yet in Supabase (to avoid breaking UI)
       return NextResponse.json({ data: [] });
     }
 
-    // Wrap single object result (like settings) in array or return directly if expected
     if (table === "settings" && data && data.length > 0) {
       return NextResponse.json({ data: redact(data[0]) });
     }
@@ -142,13 +142,15 @@ export async function POST(req: NextRequest) {
 
     const isSuperAdmin = session.role === "super_adm";
     const canManageEmployees = session.role === "super_adm" || session.role === "gestor";
-    const requestedCompanyId = req.headers.get("x-company-id");
+    const requestedCompanyId = req.headers.get("x-company-id") || body.company_id || body.companyId;
 
     if (!isSuperAdmin && requestedCompanyId && requestedCompanyId !== session.companyId) {
       return NextResponse.json({ error: "Acesso negado.", code: "FORBIDDEN" }, { status: 403 });
     }
 
-    const effectiveCompanyId = isSuperAdmin ? (requestedCompanyId || session.companyId) : session.companyId;
+    const effectiveCompanyId = isSuperAdmin 
+      ? ((requestedCompanyId && requestedCompanyId !== "global") ? requestedCompanyId : (session.companyId || "comp_techcontabil_01")) 
+      : session.companyId;
 
     if (action === "update_settings" && settings) {
       if (!isSuperAdmin) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
@@ -240,11 +242,20 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "set_table" && table && record) {
-      // Usado para sobrescrever. Com Supabase, o ideal Ã© fazer upsert.
-      // Assumindo que `record` Ã© um array de objetos.
-      if (!isSuperAdmin) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+      if (!isWritableTable(table)) return NextResponse.json({ error: "Tabela inválida." }, { status: 400 });
+      if (SUPER_ADMIN_ONLY_TABLES.includes(table) && !isSuperAdmin) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+      
+      const canExecuteSetTable = isSuperAdmin || session.role === "gestor";
+      if (!canExecuteSetTable) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+
       if (Array.isArray(record) && record.length > 0) {
-         const { error } = await supabase.from(table).upsert(record);
+         const recordsWithTenant = record.map((item: any) => {
+           if (!GLOBAL_TABLES.includes(table) && typeof item === "object" && item !== null) {
+             return { ...item, company_id: item.company_id || item.companyId || effectiveCompanyId };
+           }
+           return item;
+         });
+         const { error } = await supabase.from(table).upsert(recordsWithTenant);
          if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       }
       return NextResponse.json({ success: true });

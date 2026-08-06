@@ -392,3 +392,19 @@ Amanh�, basta continuar o desenvolvimento!
 - **Ajuste de Timeout Edge**: Reduzidas iteracoes de pagina de 5 para 3 e simplificada busca secundaria de clientes para evitar exceder o tempo limite de 30 segundos dos Workers da Cloudflare (evitando erro HTTP 504 / 500).
 - **Tratamento de Resposta HTML/JSON**: Adicionado tratamento seguro em `handleAutoSync` para converter respostas HTML de erro de servidor em mensagens legiveis na UI em vez de quebrar a aplicacao com `Unexpected token '<'`.
 - **Validacao de Build**: Build concluido com sucesso.
+## Sessao 2026-08-06 (Diagnostico Completo & Correcao Multi-Tenant API / Auto-Sync Conta Azul)
+
+### 1. Correcoes no Motor de Auto-Sync (/api/contaazul/auto-sync)
+- **Paginacao Completa na API Conta Azul**: Atualizado o fetch de pessoas (https://api-v2.contaazul.com/v1/pessoas) para paginar ate 3 paginas de 100 itens (300 cadastros), trazendo todos os novos clientes e fornecedores criados manualmente no painel do Conta Azul.
+- **Endpoint Complementar de Vendas**: Integrada a consulta ao endpoint secundario https://api.contaazul.com/v1/vendas/clientes com merge por id para evitar omissoes de novos cadastros de clientes da interface Web Pro.
+- **Paginar Eventos Financeiros**: Paginacao estendida tambem para eventos financeiros / contas a pagar e receber.
+- **Otimizacao de Timeout Edge**: Ajustados os limites de iteracao para responder em menos de 8 segundos, evitando estourar o tempo limite de 30s da Cloudflare Edge.
+- **Tratamento de Resposta HTML/JSON**: Adicionada protecao com .catch() no frontend em handleAutoSync para evitar excecoes Unexpected token '<' quando o servidor retornar resposta HTML.
+
+### 2. Correcoes de Permissao Multi-Tenant no Backend (/api/db)
+- **Desbloqueio das Tabelas payables e payables_list**: Removidas do filtro SUPER_ADMIN_ONLY_TABLES, permitindo que o perfil gestor consulte e sincronize lancamentos financeiros e titulos DRE sem erro 403 Forbidden.
+- **Desbloqueio da Acao set_table**: Liberada a acao set_table para o perfil gestor em tabelas operacionais writable (contaazul_clients, contaazul_suppliers, contaazul_entries, contaazul_categories).
+- **Resoluçao de effectiveCompanyId para Super ADM em Modo Tenant**: Corrigido a resolucao do effectiveCompanyId quando o Super ADM visualiza/administra uma empresa especifica via header x-company-id ou company_id.
+
+### 3. Deploy
+- Codigos comitados e enviados no branch main com sucesso (origin/main).
