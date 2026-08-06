@@ -701,9 +701,33 @@ function ContaAzulContent() {
         });
       }
       setLastSyncTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
-    } catch (err: any) {
+    } catch (e: any) {
       setIsSyncing(false);
-      setNoticeMessage({ type: 'error', text: "Erro de comunicação com o servidor da ContaAzul." });
+      setNoticeMessage({ type: 'error', text: e.message || 'Erro ao conectar à API da ContaAzul.' });
+    }
+  };
+
+  const handleSeedSandboxData = async () => {
+    setIsSyncing(true);
+    setNoticeMessage({ type: 'info', text: 'Iniciando população completa de dados de teste (Clientes, Fornecedores, Serviços, Contas a Receber/Pagar) no Sandbox ContaAzul...' });
+    const activeCompanyId = typeof window !== 'undefined' ? (localStorage.getItem("omnizeus_active_company_id") || getActiveTenantId() || "comp_techcontabil_01") : "comp_techcontabil_01";
+    try {
+      const res = await fetch("/api/contaazul/seed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId: activeCompanyId })
+      });
+      const data = await res.json();
+      setIsSyncing(false);
+      if (res.ok && data.success) {
+        setNoticeMessage({ type: 'success', text: data.message || 'População concluída com sucesso!' });
+        await handleRealSync();
+      } else {
+        setNoticeMessage({ type: 'error', text: data.error || 'Falha no seed de dados. Verifique a autorização.' });
+      }
+    } catch(e: any) {
+      setIsSyncing(false);
+      setNoticeMessage({ type: 'error', text: e.message || 'Erro ao executar o seed.' });
     }
   };
 
