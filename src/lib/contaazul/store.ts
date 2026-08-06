@@ -85,10 +85,18 @@ export async function saveContaAzulTokens(
       updated_at: updated.updatedAt
     };
 
-    // Upsert into Supabase
-    await supabase
-      .from('contaazul_config')
-      .upsert(cfgEntry, { onConflict: 'company_id' });
+    // Since company_id doesn't have a unique constraint, upsert will fail.
+    // We check if the row exists and then do an UPDATE or INSERT.
+    if (existingRow) {
+      await supabase
+        .from('contaazul_config')
+        .update(cfgEntry)
+        .eq('company_id', companyId);
+    } else {
+      await supabase
+        .from('contaazul_config')
+        .insert(cfgEntry);
+    }
 
     return updated;
   } catch (e) {
