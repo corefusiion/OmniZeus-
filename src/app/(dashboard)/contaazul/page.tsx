@@ -2182,10 +2182,10 @@ function ContaAzulContent() {
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-gray-200 pb-px">
         <div className="flex items-center gap-1 overflow-x-auto max-w-full pb-0.5 shrink-0">
           {[
-            { id: 'clientes', label: `Clientes Reais (${syncedClients.length})`, icon: Users },
+            { id: 'clientes', label: `Clientes (${syncedClients.length})`, icon: Users },
             { id: 'fornecedores', label: `Fornecedores (${syncedSuppliers.length})`, icon: Building },
-            { id: 'financeiro', label: `Lançamentos & Cobranças (${syncedEntries.length})`, icon: DollarSign },
-            { id: 'categorias', label: `Plano de Contas & DRE (${categories.length})`, icon: Layers },
+            { id: 'financeiro', label: `Contas a Receber/Pagar (${syncedEntries.length})`, icon: DollarSign },
+            { id: 'categorias', label: `Plano de Contas (${categories.length})`, icon: Layers },
             { id: 'conexao', label: 'Credenciais & OAuth 2.0', icon: Key },
           ].map(t => {
             const Icon = t.icon;
@@ -2227,8 +2227,8 @@ function ContaAzulContent() {
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
           <div className="flex items-center justify-between border-b border-gray-100 pb-4">
             <div>
-              <h3 className="text-base font-bold text-gray-900">Clientes Reais da ContaAzul Pro</h3>
-              <p className="text-xs text-gray-500">Cadastro completo com consulta pública de CNPJ/CEP e importação de planilhas CSV</p>
+              <h3 className="text-base font-bold text-gray-900">Clientes</h3>
+              <p className="text-xs text-gray-500">Cadastro oficial de clientes integrado ao ContaAzul — consulta de CNPJ/CEP e importação via planilha</p>
             </div>
             <div className="flex items-center gap-2">
               {/* Menu Importar Inferior (Dropdown) */}
@@ -2421,8 +2421,8 @@ function ContaAzulContent() {
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
           <div className="flex items-center justify-between border-b border-gray-100 pb-4">
             <div>
-              <h3 className="text-base font-bold text-gray-900">Lançamentos Financeiros & Cobranças</h3>
-              <p className="text-xs text-gray-500">Títulos a pagar e receber integrados ao DRE Gerencial do OmniZeus</p>
+              <h3 className="text-base font-bold text-gray-900">Contas a Receber & Pagar</h3>
+              <p className="text-xs text-gray-500">Títulos a receber e a pagar integrados ao ContaAzul — sincronizados automaticamente</p>
             </div>
             <button
               onClick={() => { setModalErrorMessage(null); setIsAddEntryOpen(true); }}
