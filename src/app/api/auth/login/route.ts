@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
     try {
       const { data: employeesData, error: empErr } = await supabase
         .from('employees')
-        .select('id, name, email, role, status, company_id, companyId, companyName, password_hash, passwordHash, password, temporary_password, temporaryPassword, must_change_password, mustChangePassword, allowed_modules, allowedModules')
+        .select('id, name, email, role, status, company_id, password_hash, password, temporary_password, must_change_password, allowed_modules')
         .ilike('email', cleanEmail);
       employees = employeesData || [];
     } catch (dbErr) {

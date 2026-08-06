@@ -339,3 +339,21 @@ npm run build
 3. âœ… **DesinstalaÃ§Ã£o**: Removemos via npm os pacotes `drizzle-orm`, `postgres` e `drizzle-kit`.
 4. âœ… **Sucesso Local**: Todos os endpoints de login (`/api/auth/login`) e `/api/db` do projeto *OmniZeus* jÃ¡ estavam, sob os panos, utilizando o `supabaseClient.ts`. A remoÃ§Ã£o do Drizzle permitiu que o build passasse limpo sem carregar mÃ³dulos nativos fantasmas.
 5. ðŸš€ **PrÃ³ximo passo**: Commit e push disparados! A interface farÃ¡ a compilaÃ§Ã£o nativa perfeitamente no Cloudflare e o `Erro 500` na tela de login serÃ¡ eliminado, pois o driver TCP problemÃ¡tico nÃ£o existe mais.
+
+
+## Sessão Atual - Debug Cloudflare Cache (2026-08-05)
+
+1. Identificamos que o usuário já tinha feito um INSERT manual, o que causou o erro de chave duplicada no primeiro script.
+2. O usuário alterou as senhas diretamente pelo painel do Supabase com sucesso, mas o login ainda falhava.
+3. Identificamos que o Supabase tinha o RLS (Row Level Security) ativado nas tabelas principais, escondendo os dados da aplicação.
+4. O usuário desativou o RLS manualmente na UI, porém o sistema na Cloudflare continuou retornando   Empresas no Dashboard Master SaaS e falhando no login.
+5. **A Causa Raiz Final**: O etch agressivo do Next.js App Router (nativo da Cloudflare Workers) armazenou em cache a primeira resposta vazia quando o RLS ainda estava ativo. Como a assinatura do Fetch era a mesma, ele nunca mais consultou o Supabase.
+6. **A Correção**: Injetado global: { fetch: (url, opts) => fetch(url, { ...opts, cache: 'no-store' }) } no supabaseClient.ts e exportado dynamic = 'force-dynamic' na rota de login para quebrar o cache permanentemente.
+
+### 5 Causas Prováveis de Falha para o Próximo Turno
+1. **Atraso de Propagação Cloudflare**: A Cloudflare pode demorar até 5 minutos para propagar o Worker globalmente e invalidar a CDN. Se falhar, aguarde alguns minutos e force um recarregamento da página (Ctrl+F5).
+2. **Incompatibilidade de Hash LEGACY_HASH_UNSUPPORTED**: Se o usuário colocar um Hash diferente que não seja PBKDF2 ou bcrypt/argon2 formatado corretamente, o Edge runtime lançará erro 401 por incompatibilidade criptográfica.
+3. **CORS ou bloqueios de Rota da Cloudflare**: Pode haver uma regra de cache de borda (Edge Cache) no dashboard da Cloudflare (em Caching > Cache Rules) ignorando a regra de 
+o-store.
+4. **Supabase Environment Variables no Cloudflare**: Se por algum motivo as variáveis NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY estiverem ausentes no painel da Cloudflare (Settings > Variables), o sistema usará o mock silenciosamente para proteger o Build e não lerá dados.
+5. **Senha ou E-mail com espaços em branco (Trailing Spaces)**: Mesmo forçando a atualização manual no Supabase, se o campo de email copiado pelo usuário tiver um espaço extra invisível (glfx20@gmail.com ), a consulta .ilike exata pode falhar.
