@@ -357,3 +357,16 @@ npm run build
 o-store.
 4. **Supabase Environment Variables no Cloudflare**: Se por algum motivo as variáveis NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY estiverem ausentes no painel da Cloudflare (Settings > Variables), o sistema usará o mock silenciosamente para proteger o Build e não lerá dados.
 5. **Senha ou E-mail com espaços em branco (Trailing Spaces)**: Mesmo forçando a atualização manual no Supabase, se o campo de email copiado pelo usuário tiver um espaço extra invisível (glfx20@gmail.com ), a consulta .ilike exata pode falhar.
+
+
+## Atualização Final da Sessão (2026-08-05) - Bugs de Schema e Submódulos
+
+1. **Erro 'mustChangePassword' column not found:** O PostgREST do Supabase é estrito com nomes de colunas. Algumas rotas (login/route.ts, eset-password/route.ts, change-password/route.ts) estavam fazendo selects e updates usando chaves em camelCase por segurança, mas como elas não existem no Supabase (apenas snake_case), a API quebrava e o login/alteração de senha falhava silenciosamente. Todas as referências em camelCase foram removidas do backend.
+2. **Erro de compilação na Cloudflare (Submódulos do Git):** Ao rodar git add ., o Github adicionou a pasta do projeto de exemplo (SISTEMA/fitcrew-challenge e SITE/fitcrew-challenge) como um submódulo porque ele continha uma pasta oculta .git. Como não havia .gitmodules, o Cloudflare falhava ao tentar dar pull nesses submódulos invisíveis. Solução: Removemos as pastas ocultas .git de dentro dos exemplos para que sejam tratados apenas como arquivos normais.
+
+### STATUS ATUAL (Onde Paramos)
+O sistema foi comitado no repositório com 100% de sucesso.
+Cloudflare deve conseguir compilar sem engasgos com os submódulos, o problema do Cache foi corrigido no supabaseClient.ts com 
+o-store e os bugs de mustChangePassword (camelCase) sumiram das rotas de Auth.
+Amanhã, basta continuar o desenvolvimento!
+

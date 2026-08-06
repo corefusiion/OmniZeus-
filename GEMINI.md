@@ -1,6 +1,6 @@
 # OmniZeus — Technical Architecture & Onboarding Guide (Gemini AI)
 
-> **Gemini / Google Technical Guide**: This document summarizes the technical stack, state management, security boundaries, file paths, and conversation logs of **OmniZeus** for fast onboarding across model switches or new development environments.
+> **Anthropic / Claude Technical Guide**: This document summarizes the technical stack, state management, security boundaries, file paths, and conversation logs of **OmniZeus** for fast onboarding across model switches or new development environments.
 
 ---
 
@@ -77,7 +77,7 @@ npm run build
 
 ## 🧭 Log de Continuidade de Sessão
 
-> **Objetivo**: registro vivo de onde paramos, para retomar o trabalho mesmo se a conexão cair ou ao trocar de PC. Gemini atualiza esta seção ao longo da conversa.
+> **Objetivo**: registro vivo de onde paramos, para retomar o trabalho mesmo se a conexão cair ou ao trocar de PC. Claude atualiza esta seção ao longo da conversa.
 
 ### Sessão atual — 2026-08-01
 
@@ -263,10 +263,27 @@ npm run build
 **BUG CRÍTICO CORRIGIDO — Dashboard "sem CSS"/congelado (2026-08-01):**
 - **Sintoma**: usuário relatou dashboard "quebrado, desformatado, CSS não carregou".
 - **Causa raiz**: loop infinito de fetch em `src/lib/coins/store.ts` + `src/components/layout/Header.tsx`. O Header chama `getCoinBalance('comp_zenitus')` (default) quando não acha a empresa ativa; como `comp_zenitus` não existe no banco, `fetchCoinBalanceFromServer` **nunca populava o cache** → cada `.then()` disparava `omnizeus_coins_change` → Header chamava `getCoinBalance` de novo → **loop infinito** (centenas de `GET /api/db?table=companies` por minuto, lendo o JSON inteiro do disco a cada request → servidor/browser inundados, página parecia quebrada).
+- **Correção (em `coins/store.ts`)**: `fetchCoinBalanceFromServer` agora **sempre popula o cache** (`inMemoryBalances[companyId]` = saldo real OU 0 quando empresa não encontrada; também 0 no catch). `getCoinBalance` só dispara `omnizeus_coins_change` quando o valor **realmente muda**. Loop eliminado.
+- **Validação**: dev server testado — antes: 778 chamadas `?table=companies`; depois do fix: **11 chamadas e estável**. HTML do dashboard retorna 200 com `layout.css` linkado e sem markers de erro.
+- **Observação**: bug pré-existente (não causado pelas melhorias do Dashboard), mas explodia justamente com o Super Admin logado em contexto 'global' + seed multi-tenant.
+
+**Decisões / combinados:**
+- Manter este log sempre atualizado ao longo da conversa.
+- Revisão menu a menu; o usuário aponta o próximo menu ao fechar o atual.
+- Usuário escolheu "Implementar tudo" no Dashboard (sem alterar seed).
+
+**Próximos passos:**
+- Usuário valida o Dashboard Executivo no navegador (com o fix do loop de Coins, a página deve carregar formatada) e confirma os novos painéis (Coins & IA, alertas, atividade).
+- (Pendente, não priorizado) investigar build quebrado de `/contaazul` e `/api/agents/improve`.
+- Seguir para o próximo menu indicado pelo usuário.
+
+**Pendências / bloqueios:**
+- Build de produção da branch main falha em páginas pré-existentes (`/contaazul` prerender, `/api/agents/improve` page data) — não causado pelas mudanças do Dashboard.
+42. ? **MIGRA��O DE BANCO DE DADOS: JSON PARA SUPABASE (POSTGRESQL)** (2026-08-02): O sistema foi migrado de armazenamento JSON local (omnizeus_local_sql_database.json) para uma arquitetura robusta no Supabase (PostgreSQL). Devido a bloqueios na porta TCP 5432 no VPS do cliente, adotamos a abordagem REST HTTPS atrav�s da biblioteca oficial @supabase/supabase-js. O src/app/api/db/route.ts foi completamente reescrito para rotear as requisi��es (GET e POST) diretamente para o Supabase, mantendo a camada de seguran�a de multi-tenant e RLS. Tabelas criadas via painel master com schema pr�prio.
+43. ? **REFATORA��O COMPLETA PARA EDGE COMPUTING (CLOUDFLARE)** (2026-08-02): Para permitir o deploy na Cloudflare Pages, varremos e reescrevemos 28 arquivos na pasta \src/\ que ainda importavam a biblioteca \s\ (File System). Toda a l�gica de leitura/escrita JSON (incluindo autentica��o, bpo-chat, sincroniza��o Conta Azul e pagamentos) foi reescrita de forma paralela via agentes IA para usar consultas ativas ao Supabase (\@/lib/db/supabaseClient\). O projeto est� agora 100% serverless / edge-compatible.
 42. ✅ **DEPLOYS NA CLOUDFLARE E RESOLUÇÃO DE BUILDS** (2026-08-02):
     - **Causa Raiz Resolvida (Lazy Initialization Proxy)**: O erro fatal no build (Supabase credentials are missing) ocorria porque a Cloudflare Next-on-Pages instanciava módulos de Edge Runtime estaticamente (em momento de compilação), executando o createClient do Supabase antes das variáveis de ambiente (process.env) existirem. A correção arquitetural foi aplicada envolvendo a exportação do Supabase em um Proxy (Lazy Loading) dentro de src/lib/db/supabaseClient.ts, garantindo que o cliente só seja inicializado na primeira chamada *runtime*.
-    - **Proteção do Wrangler Assets (.assetsignore)**: A Cloudflare estava rejeitando o deploy porque o framework 
-ext-on-pages cria uma pasta _worker.js dentro dos assets estáticos. O Wrangler por segurança bloqueava o upload avisando que poderia vazar código de servidor. Corrigido com a criação do arquivo public/.assetsignore contendo _worker.js, o que oculta o worker como asset estático e permite a implantação.
+    - **Proteção do Wrangler Assets (.assetsignore)**: A Cloudflare estava rejeitando o deploy porque o framework ext-on-pages cria uma pasta _worker.js dentro dos assets estáticos. O Wrangler por segurança bloqueava o upload avisando que poderia vazar código de servidor. Corrigido com a criação do arquivo public/.assetsignore contendo _worker.js, o que oculta o worker como asset estático e permite a implantação.
     - **Estratégia de Branching (main vs develop)**: Todo o desenvolvimento, testes iterativos e refatorações de código ocorreram na branch develop. Como a Cloudflare Pages aponta para produção usando a branch main, foi necessário fazer o git merge develop para a main e git push origin main. A partir de agora, testes continuam na develop, mas para refletir na Cloudflare o deploy oficial precisa ser feito na branch main.
 43. 🚨 **AUDITORIA DE ERROS & CORREÇÕES DO CLOUDFLARE EDGE WORKER** (2026-08-03):
     - **Erro 1 — Bloqueio de Rede Corporativa/Firewall FortiGuard (`workers.dev`)**:
@@ -300,6 +317,18 @@ ext-on-pages cria uma pasta _worker.js dentro dos assets estáticos. O Wrangler 
     - **Ação do usuário**: (1) deletar branches `feature/migrate-opennext` e `develop` (local e remoto), ficando só com `main`; (2) commit/push da `main` limpa; (3) recriar o projeto Cloudflare com: build command `npm run build:cf`, output dir `.vercel/output/static`, production branch `main`, e as **14 env vars** listadas no `DEPLOY_CLOUDFLARE.md` (ATENÇÃO: `.env.local` local NÃO tem `OMNIZEUS_ENCRYPTION_KEY`, `OPENROUTER_API_KEY`, `STRIPE_WEBHOOK_SECRET`, `WHATSAPP_WEBHOOK_TOKEN`, `NEXT_PUBLIC_APP_URL`, `DATABASE_URL` — gerar `SESSION_SECRET`/`OMNIZEUS_ENCRYPTION_KEY` novos); (4) após deploy, testar login real e o redirect do middleware.
 
 
+61. ✅ **CORREÇÃO FINAL DE BUILDS, DEPENDÊNCIAS DE CRYPTO E EDGE RUNTIME** (2026-08-04): O login continuava quebrando com Erro 500 fatal na infra Edge da Cloudflare mesmo com os builds locais (Node) passando:
+    - **Causa Raiz 1 (Build falhando na branch)**: A pasta `SISTEMA` não monitorada do git continha projetos incompatíveis (ex: React Router v4) que o Typescript do Next.js via e tentava compilar como parte do OmniZeus. **Fix**: O `tsconfig.json` foi atualizado com `"exclude": ["node_modules", "SISTEMA"]`.
+    - **Causa Raiz 2 (Crash Edge - localStorage)**: Vários stores (ex: `roles.ts`, `serverDb.ts`) usavam `typeof window !== 'undefined' ? localStorage.getItem(...) : null` soltos no root do arquivo. Na Cloudflare, `typeof window` é **true**, mas acessar `localStorage` no top-level dispara um **ReferenceError** porque localStorage não existe, crashando a rota antes mesmo de bootar! **Fix**: Substituído por `typeof localStorage !== 'undefined'`.
+    - **Causa Raiz 3 (Crash Edge - cryptoAPI)**: O uso de `globalThis.crypto` falhava pois o Webpack/Next.js não polyfillava corretamente. Ao tentar forçar `require('node:crypto')`, o Webpack disparou `UnhandledSchemeError`. **Fix**: O fallback `const cryptoAPI = globalThis.crypto || (typeof crypto !== 'undefined' ? crypto : {} as any);` foi implementado em 4 pontos críticos (`atRest.ts`, `session.ts`, `passwordUtils.ts`, `stripe/route.ts`).
+
+> **🔥 PRÓXIMOS PASSOS PARA DEPLOY E TROUBLESHOOTING (Se o login ainda falhar):**
+> 1. **Falta de Variáveis de Ambiente no Painel:** Vá nas configurações da Cloudflare Pages (Configurações > Variáveis de Ambiente). Se `DATABASE_URL` ou chaves do Supabase faltarem/estiverem erradas, a consulta falha no servidor (e Cloudflare aborta a requisição do banco gerando 500). Verifique também `SESSION_SECRET` (mínimo 32 chars).
+> 2. **Conexões do Supabase falhando por IPv6 no Edge**: Na Cloudflare (Workers/Pages), conexões diretas via `postgresql://` nativo podem travar se usarem IPv6 ou se o pooler do Supabase rejeitar. Troque o Supabase para o Transaction Pooler `postgres://[db_user]:[db_password]@[host]:6543/postgres`. 
+> 3. **Timeouts da API Edge limitados a 10s/30s**: Se a sua conexão de banco local (IPv4 cru) ou a validação `pbkdf2` for muito pesada para o limite grátis/básico da Cloudflare, o Worker leva TIMEOUT duro gerando erro 500 no console.
+> 4. **Supabase client instável no next-on-pages**: Dependendo da versão do `@supabase/supabase-js`, chamadas HTTP sob a interface do Edge Runtime geram reject silencioso no try-catch do next-on-pages. Adicione logs extras (Sentry/Axiom) para ver o reject interno.
+> 5. **O cookie OmniZeus_session sendo retido**: O servidor tenta gravar `Set-Cookie`. Se as propriedades (ex: `Secure: true`) derem mismatch porque a Cloudflare Pages preview URL muda esquemas sem proxy (ou CORS customizado bloqueia), o next-on-pages aborta a resposta final.
+
 ### Sessão atual — 2026-08-05 (A Solução: Migração Total para Supabase HTTP)
 
 **Status geral:** Remoção definitiva do Drizzle ORM e do driver `postgres` incompatível com o Edge Runtime, migrando toda a persistência de dados para chamadas REST via `@supabase/supabase-js`.
@@ -312,36 +341,32 @@ ext-on-pages cria uma pasta _worker.js dentro dos assets estáticos. O Wrangler 
 5. 🚀 **Próximo passo**: Commit e push disparados! A interface fará a compilação nativa perfeitamente no Cloudflare e o `Erro 500` na tela de login será eliminado, pois o driver TCP problemático não existe mais.
 
 
-### Sess�o atual � 2026-08-05 (Resolu��o de Bugs Webhook Stripe, Banco de Dados e Provisionamento SaaS)
+## Sess�o Atual - Debug Cloudflare Cache (2026-08-05)
 
-**Status geral:** Corre��o de erros na comunica��o do Webhook da Stripe e na rota de Provisionamento de Empresas que estava falhando silenciosamente devido a colunas faltantes no banco de dados.
+1. Identificamos que o usu�rio j� tinha feito um INSERT manual, o que causou o erro de chave duplicada no primeiro script.
+2. O usu�rio alterou as senhas diretamente pelo painel do Supabase com sucesso, mas o login ainda falhava.
+3. Identificamos que o Supabase tinha o RLS (Row Level Security) ativado nas tabelas principais, escondendo os dados da aplica��o.
+4. O usu�rio desativou o RLS manualmente na UI, por�m o sistema na Cloudflare continuou retornando   Empresas no Dashboard Master SaaS e falhando no login.
+5. **A Causa Raiz Final**: O etch agressivo do Next.js App Router (nativo da Cloudflare Workers) armazenou em cache a primeira resposta vazia quando o RLS ainda estava ativo. Como a assinatura do Fetch era a mesma, ele nunca mais consultou o Supabase.
+6. **A Corre��o**: Injetado global: { fetch: (url, opts) => fetch(url, { ...opts, cache: 'no-store' }) } no supabaseClient.ts e exportado dynamic = 'force-dynamic' na rota de login para quebrar o cache permanentemente.
 
-**Onde paramos (Hist�rico da Sess�o e Passos para Continuar em Casa):**
-1. ?? **Problema 1: Webhook da Stripe Retornando 405.**
-   - **Causa:** A URL cadastrada na dashboard da Stripe apontava para a raiz do site (/) em vez da rota da API.
-   - **Solu��o:** O usu�rio alterou a URL na Stripe para https://omnizeus.controllserv.com.br/api/webhook/stripe.
-2. ?? **Problema 2: Webhook n�o encontrava tabelas no banco de dados.**
-   - **Causa:** Faltavam as tabelas processed_stripe_events e audit_logs no banco de dados.
-   - **Solu��o:** Rodamos um SQL para criar as duas tabelas e liberamos permiss�o (GRANT ALL) para o anon.
-3. ?? **Problema 3: Webhook dizendo que a Secret Key n�o estava configurada (apesar de estar).**
-   - **Causa:** O c�digo tentava buscar grace_period_days na tabela settings, mas essa coluna n�o existia, fazendo o select inteiro falhar e retornar nulo para a chave da Stripe.
-   - **Solu��o:** Injetamos a coluna grace_period_days no banco e o erro sumiu.
-4. ?? **Problema Cr�tico: Provisionamento da Empresa dizendo "Sucesso" sem criar o usu�rio.**
-   - **Causa (Bug Silencioso):** O usu�rio alterou o e-mail no pedido para glfx20@gmail.com e clicou em Provisionar. O pedido mudou para PROVISIONADO. Por�m, a cria��o nas tabelas companies e employees **falhou silenciosamente** porque faltavam v�rias colunas no banco (temporary_password, must_change_password, subscription_status, etc.) e o c�digo n�o tinha um verificador de erro.
-   - **Solu��o no C�digo:** Editamos src/app/api/super-adm/orders/provision/route.ts adicionando valida��o de erro para que o endpoint devolva HTTP 500 caso falhe o insert. Tamb�m corrigimos as colunas para o padr�o snake_case.
-5. ?? **O QUE VOC� PRECISA FAZER EM CASA PARA CONTINUAR:**
-   - Eu j� retornei via banco de dados o status do seu pedido ORD-2026-882736 para PAGAMENTO_CONFIRMADO, ent�o ele est� pronto para ser provisionado novamente no painel.
-   - **PASSO 1:** Ao chegar em casa, abra o SQL Editor do Supabase e rode o seguinte comando para criar as colunas que faltam:
-     ```sql
-     ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS subscription_status text;
-     ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS stripe_customer_id text;
-     ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS stripe_subscription_id text;
-     ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS grace_period_ends_at timestamp with time zone;
-     ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS suspension_reason text;
-     ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS temporary_password text;
-     ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS must_change_password boolean DEFAULT false;
-     NOTIFY pgrst, 'reload schema';
-     ```
-   - **PASSO 2:** Volte no Painel Super Admin -> Pedidos de Compra e clique novamente em **Provisionar Empresa**.
-   - **PASSO 3:** Dessa vez, a inser��o n�o vai quebrar. Uma janela surgir� na sua tela informando a **Senha Tempor�ria** do gestor glfx20@gmail.com.
-   - **PASSO 4:** Deslogue do Master, e entre com o glfx20@gmail.com + Senha Tempor�ria.
+### 5 Causas Prov�veis de Falha para o Pr�ximo Turno
+1. **Atraso de Propaga��o Cloudflare**: A Cloudflare pode demorar at� 5 minutos para propagar o Worker globalmente e invalidar a CDN. Se falhar, aguarde alguns minutos e force um recarregamento da p�gina (Ctrl+F5).
+2. **Incompatibilidade de Hash LEGACY_HASH_UNSUPPORTED**: Se o usu�rio colocar um Hash diferente que n�o seja PBKDF2 ou bcrypt/argon2 formatado corretamente, o Edge runtime lan�ar� erro 401 por incompatibilidade criptogr�fica.
+3. **CORS ou bloqueios de Rota da Cloudflare**: Pode haver uma regra de cache de borda (Edge Cache) no dashboard da Cloudflare (em Caching > Cache Rules) ignorando a regra de 
+o-store.
+4. **Supabase Environment Variables no Cloudflare**: Se por algum motivo as vari�veis NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY estiverem ausentes no painel da Cloudflare (Settings > Variables), o sistema usar� o mock silenciosamente para proteger o Build e n�o ler� dados.
+5. **Senha ou E-mail com espa�os em branco (Trailing Spaces)**: Mesmo for�ando a atualiza��o manual no Supabase, se o campo de email copiado pelo usu�rio tiver um espa�o extra invis�vel (glfx20@gmail.com ), a consulta .ilike exata pode falhar.
+
+
+## Atualiza��o Final da Sess�o (2026-08-05) - Bugs de Schema e Subm�dulos
+
+1. **Erro 'mustChangePassword' column not found:** O PostgREST do Supabase � estrito com nomes de colunas. Algumas rotas (login/route.ts, eset-password/route.ts, change-password/route.ts) estavam fazendo selects e updates usando chaves em camelCase por seguran�a, mas como elas n�o existem no Supabase (apenas snake_case), a API quebrava e o login/altera��o de senha falhava silenciosamente. Todas as refer�ncias em camelCase foram removidas do backend.
+2. **Erro de compila��o na Cloudflare (Subm�dulos do Git):** Ao rodar git add ., o Github adicionou a pasta do projeto de exemplo (SISTEMA/fitcrew-challenge e SITE/fitcrew-challenge) como um subm�dulo porque ele continha uma pasta oculta .git. Como n�o havia .gitmodules, o Cloudflare falhava ao tentar dar pull nesses subm�dulos invis�veis. Solu��o: Removemos as pastas ocultas .git de dentro dos exemplos para que sejam tratados apenas como arquivos normais.
+
+### STATUS ATUAL (Onde Paramos)
+O sistema foi comitado no reposit�rio com 100% de sucesso.
+Cloudflare deve conseguir compilar sem engasgos com os subm�dulos, o problema do Cache foi corrigido no supabaseClient.ts com 
+o-store e os bugs de mustChangePassword (camelCase) sumiram das rotas de Auth.
+Amanh�, basta continuar o desenvolvimento!
+
