@@ -712,7 +712,10 @@ function ContaAzulContent() {
         })
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({ 
+        success: false, 
+        error: `Erro de servidor (${res.status} ${res.statusText}). O serviço temporariamente respondeu uma página de erro.` 
+      }));
       setIsSyncing(false);
 
       if (res.ok && data.success) {

@@ -388,3 +388,7 @@ Amanh�, basta continuar o desenvolvimento!
 - **Desbloqueio de Permissao payables e payables_list**: Removidas as restricoes exclusivas de Super Admin das tabelas de contas a pagar/receber na rota /api/db. Agora os perfis Gestor conseguem acessar e sincronizar a DRE e contas financeiras da propria empresa sem erros 403 Forbidden.
 - **Isolamento de Dados Mantido**: Consultas filtram estritamente por company_id do gestor autenticado.
 - **Validacao de Build**: `npm run build` executado e aprovado com sucesso.
+## Sessao 2026-08-06 (Otimizacao Tempo de Execucao Auto-Sync & Tratamento JSON)
+- **Ajuste de Timeout Edge**: Reduzidas iteracoes de pagina de 5 para 3 e simplificada busca secundaria de clientes para evitar exceder o tempo limite de 30 segundos dos Workers da Cloudflare (evitando erro HTTP 504 / 500).
+- **Tratamento de Resposta HTML/JSON**: Adicionado tratamento seguro em `handleAutoSync` para converter respostas HTML de erro de servidor em mensagens legiveis na UI em vez de quebrar a aplicacao com `Unexpected token '<'`.
+- **Validacao de Build**: Build concluido com sucesso.
