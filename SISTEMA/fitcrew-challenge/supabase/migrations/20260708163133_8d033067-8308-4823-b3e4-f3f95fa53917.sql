@@ -1,1 +1,0 @@
-ALTER TABLE public.checkins ALTER COLUMN photo_url DROP NOT NULL;

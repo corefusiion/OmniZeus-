@@ -1,1 +1,0 @@
-ALTER TABLE public.ai_coach_messages ADD COLUMN IF NOT EXISTS image_path text;
