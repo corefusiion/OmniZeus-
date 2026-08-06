@@ -1,4 +1,4 @@
-﻿export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { encryptContaAzulFields } from "@/lib/crypto/atRest";
@@ -173,19 +173,41 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "update_contaazul_config" && contaazul_config) {
-      if (!isSuperAdmin) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+      // Gestores and Super Admins can manage their own company's Conta Azul config
+      const canManageContaAzul = isSuperAdmin || session.role === "gestor";
+      if (!canManageContaAzul) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
       
       const compId = contaazul_config.company_id || effectiveCompanyId;
       const encryptedConfig = await encryptContaAzulFields(contaazul_config);
-      
-      const { data, error } = await supabase
+      const payload = { ...encryptedConfig, company_id: compId, updated_at: new Date().toISOString() };
+
+      // Check if a row already exists (upsert with onConflict fails without unique constraint on company_id)
+      const { data: existing } = await supabase
         .from('contaazul_config')
-        .upsert({ ...encryptedConfig, company_id: compId, updated_at: new Date().toISOString() }, { onConflict: 'company_id' })
-        .select()
-        .single();
-        
+        .select('id')
+        .eq('company_id', compId)
+        .maybeSingle();
+
+      let data, error;
+      if (existing?.id) {
+        ({ data, error } = await supabase
+          .from('contaazul_config')
+          .update(payload)
+          .eq('company_id', compId)
+          .select()
+          .single());
+      } else {
+        ({ data, error } = await supabase
+          .from('contaazul_config')
+          .insert({ ...payload, id: crypto.randomUUID() })
+          .select()
+          .single());
+      }
+
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       return NextResponse.json({ success: true, contaazul_config: data });
     }
+
 
     if (action === "delete" && table && record?.id) {
       if (!isWritableTable(table)) return NextResponse.json({ error: "Tabela invÃ¡lida." }, { status: 400 });
