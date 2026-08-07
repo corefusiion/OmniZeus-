@@ -288,21 +288,18 @@ export async function fetchContaAzulCustomers(companyId?: string) { return fetch
 export async function insertContaAzulCustomer(customer: any, companyId?: string) { return insertServerTable('contaazul_customers', customer, companyId); }
 
 export async function fetchContaAzulClients(companyId?: string) { return fetchServerTable('contaazul_clients', companyId); }
-export async function saveContaAzulClients(clients: any[], companyId?: string) { return setServerTable('contaazul_clients', clients, companyId); }
+export async function saveContaAzulClients(clients: any[]) { return setServerTable('contaazul_clients', clients); }
 
 export async function fetchContaAzulSuppliers(companyId?: string) { return fetchServerTable('contaazul_suppliers', companyId); }
-export async function saveContaAzulSuppliers(suppliers: any[], companyId?: string) { return setServerTable('contaazul_suppliers', suppliers, companyId); }
+export async function saveContaAzulSuppliers(suppliers: any[]) { return setServerTable('contaazul_suppliers', suppliers); }
 
 export async function fetchContaAzulEntries(companyId?: string) { return fetchServerTable('contaazul_entries', companyId); }
-export async function saveContaAzulEntries(entries: any[], companyId?: string) { return setServerTable('contaazul_entries', entries, companyId); }
+export async function saveContaAzulEntries(entries: any[]) { return setServerTable('contaazul_entries', entries); }
 
 export async function fetchContaAzulCategories(companyId?: string) { return fetchServerTable('contaazul_categories', companyId); }
-export async function saveContaAzulCategories(categories: any[], companyId?: string) { return setServerTable('contaazul_categories', categories, companyId); }
-
-export async function fetchContaAzulCategories() { return fetchServerTable('contaazul_categories'); }
-export async function insertContaAzulCategory(cat: any) { return insertServerTable('contaazul_categories', cat); }
+export async function saveContaAzulCategories(categories: any[]) { return setServerTable('contaazul_categories', categories); }
+export async function insertContaAzulCategory(cat: any, companyId?: string) { return insertServerTable('contaazul_categories', cat, companyId); }
 export async function updateContaAzulCategory(cat: any) { return updateServerTableRecord('contaazul_categories', cat); }
-export async function saveContaAzulCategories(cats: any[]) { return setServerTable('contaazul_categories', cats); }
 
 export async function fetchCustomJobRoles(): Promise<string[]> {
   try {
