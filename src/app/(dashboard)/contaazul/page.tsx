@@ -323,10 +323,10 @@ function ContaAzulContent() {
     try {
       const [cfg, clients, suppliers, entries, categories] = await Promise.all([
         fetchContaAzulConfig(activeCompanyId),
-        fetchContaAzulClients(),
-        fetchContaAzulSuppliers(),
-        fetchContaAzulEntries(),
-        fetchContaAzulCategories()
+        fetchContaAzulClients(activeCompanyId),
+        fetchContaAzulSuppliers(activeCompanyId),
+        fetchContaAzulEntries(activeCompanyId),
+        fetchContaAzulCategories(activeCompanyId)
       ]);
 
       if (cfg && cfg.clientId) setClientId(cfg.clientId);
@@ -341,15 +341,15 @@ function ContaAzulContent() {
       if (cfg && cfg.refreshToken) setRefreshToken(cfg.refreshToken);
       if (cfg && cfg.isConnected) setIsConnected(true);
 
-      if (Array.isArray(clients) && clients.length > 0) {
+      if (Array.isArray(clients)) {
         setSyncedClients(clients);
       }
 
-      if (Array.isArray(suppliers) && suppliers.length > 0) {
+      if (Array.isArray(suppliers)) {
         setSyncedSuppliers(suppliers);
       }
 
-      if (Array.isArray(entries) && entries.length > 0) {
+      if (Array.isArray(entries)) {
         setSyncedEntries(entries);
       }
 

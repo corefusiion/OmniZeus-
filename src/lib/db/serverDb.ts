@@ -284,20 +284,20 @@ export async function updateContaAzulConfig(config: any) {
   }
 }
 
-export async function fetchContaAzulCustomers() { return fetchServerTable('contaazul_customers'); }
-export async function insertContaAzulCustomer(customer: any) { return insertServerTable('contaazul_customers', customer); }
+export async function fetchContaAzulCustomers(companyId?: string) { return fetchServerTable('contaazul_customers', companyId); }
+export async function insertContaAzulCustomer(customer: any, companyId?: string) { return insertServerTable('contaazul_customers', customer, companyId); }
 
-export async function fetchContaAzulClients() { return fetchServerTable('contaazul_clients'); }
-export async function saveContaAzulClients(clients: any[]) { return setServerTable('contaazul_clients', clients); }
+export async function fetchContaAzulClients(companyId?: string) { return fetchServerTable('contaazul_clients', companyId); }
+export async function saveContaAzulClients(clients: any[], companyId?: string) { return setServerTable('contaazul_clients', clients, companyId); }
 
-export async function fetchContaAzulSuppliers() { return fetchServerTable('contaazul_suppliers'); }
-export async function saveContaAzulSuppliers(suppliers: any[]) { return setServerTable('contaazul_suppliers', suppliers); }
+export async function fetchContaAzulSuppliers(companyId?: string) { return fetchServerTable('contaazul_suppliers', companyId); }
+export async function saveContaAzulSuppliers(suppliers: any[], companyId?: string) { return setServerTable('contaazul_suppliers', suppliers, companyId); }
 
-export async function fetchContaAzulEntries() { return fetchServerTable('contaazul_entries'); }
-export async function saveContaAzulEntries(entries: any[]) { return setServerTable('contaazul_entries', entries); }
+export async function fetchContaAzulEntries(companyId?: string) { return fetchServerTable('contaazul_entries', companyId); }
+export async function saveContaAzulEntries(entries: any[], companyId?: string) { return setServerTable('contaazul_entries', entries, companyId); }
 
-export async function fetchContaAzulPayables() { return fetchServerTable('contaazul_payables'); }
-export async function saveContaAzulPayables(payables: any[]) { return setServerTable('contaazul_payables', payables); }
+export async function fetchContaAzulCategories(companyId?: string) { return fetchServerTable('contaazul_categories', companyId); }
+export async function saveContaAzulCategories(categories: any[], companyId?: string) { return setServerTable('contaazul_categories', categories, companyId); }
 
 export async function fetchContaAzulCategories() { return fetchServerTable('contaazul_categories'); }
 export async function insertContaAzulCategory(cat: any) { return insertServerTable('contaazul_categories', cat); }

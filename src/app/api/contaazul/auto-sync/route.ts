@@ -186,23 +186,53 @@ export async function POST(req: NextRequest) {
         const scopedSuppliers: any[] = [];
 
         for (const item of rawPessoas) {
-          const itemScoped = { ...item, company_id: companyId, synced_at: new Date().toISOString() };
+          const nome = item.nome || item.name || item.fantasia || item.razao_social || "Sem nome";
+          const docRaw = item.cpf_cnpj || item.cpf || item.cnpj || item.document || item.documento || "";
+          const doc = String(docRaw).replace(/\D/g, "");
+          const email = item.email || item.email_principal || "";
+          const tel = item.telefone_celular || item.telefone || item.phone || item.celular || "";
+
           const perfisList = item.perfis || item.profiles || [];
           const isSupp = perfisList.some((p: any) =>
             p === "Fornecedor" || p === "FORNECEDOR" || p?.tipo_perfil === "Fornecedor"
           ) || item.roles?.includes("SUPPLIER") || item.is_supplier === true;
 
-          if (isSupp) scopedSuppliers.push(itemScoped);
-          else scopedCustomers.push(itemScoped);
+          const itemId = String(item.id || `${isSupp ? 'supp' : 'cli'}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`);
+
+          const itemSanitized = {
+            id: itemId,
+            company_id: companyId,
+            nome: nome,
+            name: nome,
+            fantasia: item.fantasia || nome,
+            email: email,
+            cpf_cnpj: doc,
+            document: doc,
+            telefone: tel,
+            phone: tel,
+            telefone_celular: tel,
+            tipo_pessoa: item.tipo_pessoa || item.person_type || (doc.length > 11 ? "Jurídica" : "Física"),
+            person_type: item.tipo_pessoa || item.person_type || (doc.length > 11 ? "LEGAL_PERSON" : "NATURAL_PERSON"),
+            codigo: item.codigo ? String(item.codigo) : null,
+            observacoes: item.observacoes ? String(item.observacoes) : null,
+            ativo: item.ativo ?? true,
+            status: "Ativo",
+            synced_at: new Date().toISOString()
+          };
+
+          if (isSupp) scopedSuppliers.push(itemSanitized);
+          else scopedCustomers.push(itemSanitized);
         }
 
         if (scopedCustomers.length > 0) {
-          const { data: upsertDataC } = await supabase.from('contaazul_clients').upsert(scopedCustomers, { onConflict: 'id,company_id' }).select();
+          const { data: upsertDataC, error: errC } = await supabase.from('contaazul_clients').upsert(scopedCustomers, { onConflict: 'id,company_id' }).select();
+          if (errC) console.error("[Auto-Sync] Error upserting contaazul_clients:", errC);
           newCount += upsertDataC?.length || scopedCustomers.length;
         }
         
         if (scopedSuppliers.length > 0) {
-          const { data: upsertDataS } = await supabase.from('contaazul_suppliers').upsert(scopedSuppliers, { onConflict: 'id,company_id' }).select();
+          const { data: upsertDataS, error: errS } = await supabase.from('contaazul_suppliers').upsert(scopedSuppliers, { onConflict: 'id,company_id' }).select();
+          if (errS) console.error("[Auto-Sync] Error upserting contaazul_suppliers:", errS);
           newCount += upsertDataS?.length || scopedSuppliers.length;
         }
 
