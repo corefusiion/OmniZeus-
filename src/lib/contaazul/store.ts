@@ -125,9 +125,6 @@ export async function fetchWithAutoRefresh(
   passedTokens?: { accessToken?: string; refreshToken?: string; clientId?: string; clientSecret?: string },
   companyId: string = 'comp_techcontabil_01'
 ): Promise<{ res: Response; newAccessToken?: string; newRefreshToken?: string }> {
-  let stored = await getContaAzulTokens(companyId);
-
-  // Filtrar tokens criptografados enviados por engano
   let cleanPassedAccess = passedTokens?.accessToken;
   let cleanPassedRefresh = passedTokens?.refreshToken;
   if (cleanPassedAccess && (cleanPassedAccess.startsWith("enc.v1:") || cleanPassedAccess.startsWith("cyjr"))) {
@@ -137,14 +134,9 @@ export async function fetchWithAutoRefresh(
     cleanPassedRefresh = undefined;
   }
 
-  // Se o frontend ou chamador enviou tokens válidos explicitamente, salva no BD
-  if (cleanPassedAccess) {
-    stored = await saveContaAzulTokens(companyId, {
-      accessToken: cleanPassedAccess,
-      refreshToken: cleanPassedRefresh || stored.refreshToken,
-      clientId: passedTokens?.clientId || stored.clientId,
-      clientSecret: passedTokens?.clientSecret || stored.clientSecret
-    });
+  let stored: Partial<ContaAzulTokenData> = {};
+  if (!cleanPassedAccess) {
+    stored = await getContaAzulTokens(companyId);
   }
 
   let activeAccessToken = cleanPassedAccess || stored.accessToken;
