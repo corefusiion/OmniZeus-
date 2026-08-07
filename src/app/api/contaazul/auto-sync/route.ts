@@ -238,15 +238,34 @@ export async function POST(req: NextRequest) {
         }
 
         if (scopedCustomers.length > 0) {
-          const { data: upsertDataC, error: errC } = await supabase.from('contaazul_clients').upsert(scopedCustomers, { onConflict: 'id,company_id' }).select();
-          if (errC) console.error("[Auto-Sync] Error upserting contaazul_clients:", errC);
-          newCount += upsertDataC?.length || scopedCustomers.length;
+          let { data: upsertDataC, error: errC } = await supabase.from('contaazul_clients').upsert(scopedCustomers, { onConflict: 'id' }).select();
+          if (errC) {
+            console.error("[Auto-Sync] Error on upsert (onConflict: id), retrying standard upsert:", errC);
+            const retry = await supabase.from('contaazul_clients').upsert(scopedCustomers).select();
+            upsertDataC = retry.data;
+            errC = retry.error;
+          }
+          if (errC) {
+            console.error("[Auto-Sync] Final Error upserting contaazul_clients:", errC);
+            errorsCount++;
+          } else {
+            newCount += upsertDataC?.length || scopedCustomers.length;
+          }
         }
         
         if (scopedSuppliers.length > 0) {
-          const { data: upsertDataS, error: errS } = await supabase.from('contaazul_suppliers').upsert(scopedSuppliers, { onConflict: 'id,company_id' }).select();
-          if (errS) console.error("[Auto-Sync] Error upserting contaazul_suppliers:", errS);
-          newCount += upsertDataS?.length || scopedSuppliers.length;
+          let { data: upsertDataS, error: errS } = await supabase.from('contaazul_suppliers').upsert(scopedSuppliers, { onConflict: 'id' }).select();
+          if (errS) {
+            const retry = await supabase.from('contaazul_suppliers').upsert(scopedSuppliers).select();
+            upsertDataS = retry.data;
+            errS = retry.error;
+          }
+          if (errS) {
+            console.error("[Auto-Sync] Final Error upserting contaazul_suppliers:", errS);
+            errorsCount++;
+          } else {
+            newCount += upsertDataS?.length || scopedSuppliers.length;
+          }
         }
 
         const { data: existingEntriesRows } = await supabase.from('contaazul_entries').select('id, id_evento, situacao, status').eq('company_id', companyId);
@@ -331,7 +350,10 @@ export async function POST(req: NextRequest) {
         }
         
         if (entriesToUpsert.length > 0) {
-          await supabase.from('contaazul_entries').upsert(entriesToUpsert, { onConflict: 'id,company_id' });
+          let { error: errE } = await supabase.from('contaazul_entries').upsert(entriesToUpsert, { onConflict: 'id' });
+          if (errE) {
+            await supabase.from('contaazul_entries').upsert(entriesToUpsert);
+          }
         }
         
         if (categoriesData.length > 0) {
