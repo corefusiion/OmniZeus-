@@ -20,14 +20,30 @@ async function safeJson(res: Response): Promise<any> {
   }
 }
 
-/** Extrai array de um payload que pode usar diferentes estruturas */
+/** Extrai array de um payload que pode usar diferentes estruturas.
+ * Suporta padrões: array direto, items, itens (PT-BR), content (Spring),
+ * data, results, e quaisquer chaves extras passadas. */
 function extractList(data: any, ...extraKeys: string[]): any[] {
   if (Array.isArray(data)) return data;
-  const keys = ["items", "content", "data", "results", ...extraKeys];
+  // "itens" = plural português usado pela Conta Azul API v2
+  const keys = ["items", "itens", "content", "data", "results", "registros", "lista", ...extraKeys];
   for (const k of keys) {
     if (Array.isArray(data?.[k])) return data[k];
   }
   return [];
+}
+
+/** Retorna preview seguro da estrutura de um payload para diagnóstico */
+function previewPayload(data: any): string {
+  if (data === null || data === undefined) return "null/undefined";
+  if (Array.isArray(data)) return `Array(${data.length}) [${JSON.stringify(data[0]).substring(0, 60)}...]`;
+  if (typeof data === "object") {
+    const keys = Object.keys(data);
+    const arrayKey = keys.find(k => Array.isArray(data[k]));
+    if (arrayKey) return `Object{keys:[${keys.join(",")}]} → ${arrayKey}: Array(${data[arrayKey].length})`;
+    return `Object{keys:[${keys.join(",")}]}`;
+  }
+  return String(data).substring(0, 80);
 }
 
 /** Upsert resiliente: tenta onConflict composto, depois simples, depois insert individual */
@@ -164,6 +180,8 @@ export async function POST(req: NextRequest) {
       let entriesCount = 0;
       let categoriesCount = 0;
       let errorsCount = 0;
+      // Rastreamento de cada chamada para diagnóstico em produção
+      const apiDebug: Record<string, string> = {};
 
       try {
         const passedTokens = {
@@ -192,9 +210,11 @@ export async function POST(req: NextRequest) {
         if (pessoasRes.ok) {
           const data = await safeJson(pessoasRes);
           rawPessoas.push(...extractList(data, "pessoas", "customers"));
+          apiDebug["pessoas_v2"] = `HTTP 200 → ${previewPayload(data)} → ${rawPessoas.length} extraídos`;
           console.log(`[Auto-Sync][${companyId}] /v1/pessoas → ${rawPessoas.length} registros`);
         } else {
           const errBody = await safeJson(pessoasRes);
+          apiDebug["pessoas_v2"] = `HTTP ${pessoasRes.status} → ${JSON.stringify(errBody).substring(0, 200)}`;
           console.warn(`[Auto-Sync][${companyId}] /v1/pessoas HTTP ${pessoasRes.status}:`, JSON.stringify(errBody).substring(0, 300));
         }
 
@@ -233,12 +253,14 @@ export async function POST(req: NextRequest) {
           if (suppRes.res.ok) {
             const data = await safeJson(suppRes.res);
             const list = extractList(data, "fornecedores", "suppliers");
+            apiDebug["fornecedores_v1"] = `HTTP 200 → ${previewPayload(data)} → ${list.length} extraídos`;
             console.log(`[Auto-Sync][${companyId}] /v1/compras/fornecedores → ${list.length} registros`);
             for (const suppItem of list) {
               rawPessoas.push({ ...suppItem, is_supplier: true, tipo_perfil: "FORNECEDOR" });
             }
           } else {
             const errBody = await safeJson(suppRes.res);
+            apiDebug["fornecedores_v1"] = `HTTP ${suppRes.res.status} → ${JSON.stringify(errBody).substring(0, 150)}`;
             console.warn(
               `[Auto-Sync][${companyId}] /v1/compras/fornecedores HTTP ${suppRes.res.status}:`,
               JSON.stringify(errBody).substring(0, 200)
@@ -257,10 +279,13 @@ export async function POST(req: NextRequest) {
             if (suppRes2.res.ok) {
               const data2 = await safeJson(suppRes2.res);
               const list2 = extractList(data2, "pessoas", "fornecedores");
+              apiDebug["fornecedores_v2_perfil"] = `HTTP 200 → ${previewPayload(data2)} → ${list2.length} extraídos`;
               console.log(`[Auto-Sync][${companyId}] /v1/pessoas?perfis=FORNECEDOR → ${list2.length} registros`);
               for (const item of list2) {
                 rawPessoas.push({ ...item, is_supplier: true });
               }
+            } else {
+              apiDebug["fornecedores_v2_perfil"] = `HTTP ${suppRes2.res.status}`;
             }
           }
         }
@@ -281,9 +306,11 @@ export async function POST(req: NextRequest) {
           if (entriesRes.res.ok) {
             const eData = await safeJson(entriesRes.res);
             entriesData = extractList(eData, "eventos", "lancamentos", "financeiro");
+            apiDebug["eventos_financeiros"] = `HTTP 200 → ${previewPayload(eData)} → ${entriesData.length} extraídos`;
             console.log(`[Auto-Sync][${companyId}] /v1/financeiro/eventos-financeiros → ${entriesData.length} registros`);
           } else {
             const errBody = await safeJson(entriesRes.res);
+            apiDebug["eventos_financeiros"] = `HTTP ${entriesRes.res.status} → ${JSON.stringify(errBody).substring(0, 200)}`;
             console.warn(
               `[Auto-Sync][${companyId}] /v1/financeiro/eventos-financeiros HTTP ${entriesRes.res.status}:`,
               JSON.stringify(errBody).substring(0, 300)
@@ -303,8 +330,10 @@ export async function POST(req: NextRequest) {
               if (lancRes.res.ok) {
                 const lData = await safeJson(lancRes.res);
                 entriesData = extractList(lData, "lancamentos", "eventos");
+                apiDebug["lancamentos_fallback"] = `HTTP 200 → ${previewPayload(lData)} → ${entriesData.length} extraídos`;
                 console.log(`[Auto-Sync][${companyId}] /v1/financeiro/lancamentos → ${entriesData.length} registros`);
               } else {
+                apiDebug["lancamentos_fallback"] = `HTTP ${lancRes.res.status}`;
                 console.warn(
                   `[Auto-Sync][${companyId}] /v1/financeiro/lancamentos HTTP ${lancRes.res.status} — ambos endpoints financeiros falharam.`,
                   "Verifique se o token tem scope 'financeiro:read'."
@@ -329,9 +358,11 @@ export async function POST(req: NextRequest) {
           if (catsRes.res.ok) {
             const cData = await safeJson(catsRes.res);
             categoriesData = extractList(cData, "categorias", "plano_contas", "planoContas");
+            apiDebug["categorias_v1"] = `HTTP 200 → ${previewPayload(cData)} → ${categoriesData.length} extraídas`;
             console.log(`[Auto-Sync][${companyId}] /v1/financeiro/categorias → ${categoriesData.length} registros`);
           } else {
             const errBody = await safeJson(catsRes.res);
+            apiDebug["categorias_v1"] = `HTTP ${catsRes.res.status} → ${JSON.stringify(errBody).substring(0, 150)}`;
             console.warn(
               `[Auto-Sync][${companyId}] /v1/financeiro/categorias HTTP ${catsRes.res.status}:`,
               JSON.stringify(errBody).substring(0, 200)
@@ -348,7 +379,10 @@ export async function POST(req: NextRequest) {
               if (cats2Res.res.ok) {
                 const c2Data = await safeJson(cats2Res.res);
                 categoriesData = extractList(c2Data, "categorias", "plano_contas");
+                apiDebug["categorias_v2"] = `HTTP 200 → ${previewPayload(c2Data)} → ${categoriesData.length} extraídas`;
                 console.log(`[Auto-Sync][${companyId}] /v2/financeiro/categorias → ${categoriesData.length} registros`);
+              } else {
+                apiDebug["categorias_v2"] = `HTTP ${cats2Res.res.status}`;
               }
             }
           }
@@ -582,7 +616,8 @@ export async function POST(req: NextRequest) {
           matched_count: 0,
           errors_count: errorsCount,
           status: errorsCount === 0 ? "success" : "partial",
-          message: `Sync: ${customersCount} clientes, ${suppliersCount} fornecedores, ${entriesCount} lançamentos, ${categoriesCount} categorias${errorsCount > 0 ? ` (${errorsCount} erros)` : ""}`
+          message: `Sync: ${customersCount} clientes, ${suppliersCount} fornecedores, ${entriesCount} lançamentos, ${categoriesCount} categorias${errorsCount > 0 ? ` (${errorsCount} erros)` : ""}`,
+          api_debug: apiDebug
         };
 
         await supabase.from("contaazul_sync_logs").insert(syncLog);
