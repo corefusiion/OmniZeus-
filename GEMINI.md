@@ -441,3 +441,41 @@ Amanh�, basta continuar o desenvolvimento!
 - **Status**: O erro de cota/sub-requisições da Cloudflare foi 100% corrigido e a tabela de Clientes sincroniza normalmente (5 cadastros confirmados).
 - **Pendência**: As demais abas (Fornecedores - com 3 cadastros ativos no painel Conta Azul -, Contas a Receber/Pagar e Plano de Contas) ainda não estão trazendo/populando os dados completos para a interface do OmniZeus.
 - **Plano de Ação para Amanhã**: Investigar o payload exato retornado pelos endpoints da Conta Azul (`/v1/compras/fornecedores`, `/v1/financeiro/eventos-financeiros` e `/v1/financeiro/categorias`), checar permissões do Token OAuth2 e ajustar o mapeamento/sanitização no `auto-sync` para popular todas as abas.
+
+---
+
+## 🧭 Sessão — 2026-08-07 (Parte 2 — Correção Auto-Sync: Fornecedores, Financeiro e Categorias)
+
+### 1. Git Pull & Análise
+- `git pull` trouxe 13 arquivos modificados da sessão anterior (crypto, store, auto-sync, callbacks).
+- Lido o GEMINI.md e identificada a pendência: abas Fornecedores, Contas a Receber/Pagar e Plano de Contas vazias após sync.
+
+### 2. Diagnóstico
+- Confirmado: `/api/db/route.ts` já usa Supabase para todas as tabelas — pipeline de leitura correto.
+- **Problema real**: o auto-sync não conseguia gravar/classificar fornecedores/entries/categorias.
+- **Causas raiz**:
+  - Endpoint `/v1/compras/fornecedores` pode retornar HTML (sem tratamento seguro).
+  - Eventos financeiros: falhas HTTP tratadas silenciosamente, sem log do status/body.
+  - Categorias: falta fallback `content` (padrão Spring usado pela Conta Azul em alguns endpoints).
+  - `onConflict: 'id'` vs PK composta `(id, company_id)` do novo SQL script — upsert falhava silenciosamente.
+  - Classificação de fornecedor não cobria `tipos_perfil`, `perfil` singular ou filtro por URL.
+
+### 3. Correções Implementadas em `src/app/api/contaazul/auto-sync/route.ts`
+- **`safeJson(res)`**: leitura segura que detecta HTML vs JSON e loga aviso com preview do body.
+- **`extractList(data, ...keys)`**: extrator universal de array com fallbacks (`items`, `content`, `data`, `results`, + extras por entidade).
+- **`resilientUpsert(table, records)`**: tenta `onConflict: 'id,company_id'` (PK composta) → `onConflict: 'id'` (PK simples) → upsert sem constraint — nunca falha silenciosamente; loga cada tentativa.
+- **Fornecedores**: busca principal `/v1/pessoas` + fallback `/v1/compras/fornecedores` com `safeJson` + segundo fallback `/v1/pessoas?perfis=FORNECEDOR`. Classificação expandida para `tipos_perfil`, `perfil` singular, `perfil=FORNECEDOR`.
+- **Eventos Financeiros**: loga HTTP status + 300 chars do body quando falhar; fallback `/v1/financeiro/lancamentos`; extrai `titulo`, `data_lancamento`, `contato.nome`, `plano_conta.nome`, `data_liquidacao`.
+- **Categorias**: fallback `/v2/financeiro/categorias`; extrai `descricao` e `natureza`.
+- **Logging por entidade**: `[Auto-Sync][companyId]` com contagem individual (clientes / fornecedores / lançamentos / categorias).
+- **Mensagem de sync**: `"X clientes, Y fornecedores, Z lançamentos, W categorias"` — rastreável no painel.
+
+### 4. Validação
+- `npx tsc --noEmit` → **exit 0** (sem erros de tipo).
+- `npm run build` → **Compiled successfully, 30/30 páginas estáticas, 49 APIs ƒ** — sem falhas.
+- Commit `5dbff06` enviado ao `origin/main` → Cloudflare auto-deploy acionado.
+
+### 5. ⚠️ Pendência para Próxima Sessão
+- **Validar em produção**: após deploy na Cloudflare, executar auto-sync e verificar nos logs se os endpoints de fornecedores/financeiro/categorias retornam dados ou erros HTTP (403/404).
+- **Se 403 nos endpoints financeiros**: o token OAuth pode não ter os scopes necessários (`financeiro:read`). Nesse caso, reconectar o OAuth na aba Credenciais & OAuth 2.0 e verificar quais scopes o app Conta Azul tem configurado.
+- **Verificar no Supabase**: tabelas `contaazul_suppliers`, `contaazul_entries`, `contaazul_categories` devem ter registros após sync.
