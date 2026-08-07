@@ -60,7 +60,7 @@ export async function POST(req: Request) {
       } : undefined
     };
 
-    const targetCompanyId = companyId || "comp_zenitus";
+    const targetCompanyId = companyId || "comp_techcontabil_01";
     
     // Tokens podem estar criptografados em repouso (enc:v1:) — descriptografa antes de usar
     const { data: configRows } = await supabase

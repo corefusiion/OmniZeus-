@@ -8,7 +8,7 @@ export const runtime = "edge";
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const companyId = searchParams.get("companyId") || req.headers.get("x-company-id") || "comp_zenitus";
+    const companyId = searchParams.get("companyId") || req.headers.get("x-company-id") || "comp_techcontabil_01";
 
     const tokens = await getContaAzulTokens(companyId);
 

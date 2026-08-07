@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     // Fallback 2: Buscar via getContaAzulTokens
     if (connectedConfigs.length === 0 && targetCompanyId) {
       const fileTokens = await getContaAzulTokens(targetCompanyId);
-      const fallbackTokens = fileTokens.accessToken ? fileTokens : await getContaAzulTokens('comp_zenitus');
+      const fallbackTokens = fileTokens.accessToken ? fileTokens : await getContaAzulTokens('comp_techcontabil_01');
       if (fallbackTokens.accessToken) {
         connectedConfigs.push({
           company_id: targetCompanyId,
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
     const syncResults: any[] = [];
 
     for (const cfg of connectedConfigs) {
-      const companyId = cfg.company_id || "comp_zenitus";
+      const companyId = (targetCompanyId && targetCompanyId !== "global") ? targetCompanyId : (cfg.company_id || "comp_techcontabil_01");
       const companyProfile = companies.find((c: any) => c.id === companyId);
       const companyName = companyProfile?.tradeName || companyProfile?.corporateName || companyId;
 
