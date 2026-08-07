@@ -95,9 +95,7 @@ export async function POST(req: NextRequest) {
           refreshToken: cfg.refresh_token,
           clientId: cfg.client_id,
           clientSecret: cfg.client_secret
-        };
-
-        // 1. Fetch Pessoas (Clientes e Fornecedores) com paginação e endpoints complementares (Limitado a 3 páginas por exec para respeitar o limite Edge)
+        };        // 1. Fetch Pessoas (Clientes e Fornecedores) com paginação e endpoints complementares
         let rawPessoas: any[] = [];
         let activeToken = cfg.access_token;
         let activeRefresh = cfg.refresh_token;
@@ -125,26 +123,36 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // Tenta buscar adicionalmente no endpoint Vendas Clientes v1 para garantir clientes criados diretamente no Conta Azul
+        // Tenta buscar nos endpoints de Vendas e Fornecedores V1 complementares
         if (activeToken) {
-          const v1Res = await fetchWithAutoRefresh(
+          const v1Urls = [
             `https://api.contaazul.com/v1/vendas/clientes?pagina=1&tamanho_pagina=100&size=100`,
-            { method: "GET" },
-            { accessToken: activeToken, refreshToken: activeRefresh, clientId: cfg.client_id, clientSecret: cfg.client_secret },
-            companyId
-          );
+            `https://api.contaazul.com/v1/compras/fornecedores?pagina=1&tamanho_pagina=100&size=100`,
+            `https://api.contaazul.com/v1/suppliers?pagina=1&tamanho_pagina=100&size=100`
+          ];
+          for (const v1Url of v1Urls) {
+            const v1Res = await fetchWithAutoRefresh(
+              v1Url,
+              { method: "GET" },
+              { accessToken: activeToken, refreshToken: activeRefresh, clientId: cfg.client_id, clientSecret: cfg.client_secret },
+              companyId
+            );
 
-          if (v1Res.newAccessToken) activeToken = v1Res.newAccessToken;
-          if (v1Res.newRefreshToken) activeRefresh = v1Res.newRefreshToken;
+            if (v1Res.newAccessToken) activeToken = v1Res.newAccessToken;
+            if (v1Res.newRefreshToken) activeRefresh = v1Res.newRefreshToken;
 
-          if (v1Res.res.ok) {
-            const data = await v1Res.res.json().catch(() => ({}));
-            const list = Array.isArray(data) ? data : (data.items || data.clientes || []);
-            
-            for (const v1Client of list) {
-              const existing = rawPessoas.find((p: any) => p.id === v1Client.id);
-              if (!existing) {
-                rawPessoas.push(v1Client);
+            if (v1Res.res.ok) {
+              const data = await v1Res.res.json().catch(() => ({}));
+              const list = Array.isArray(data) ? data : (data.items || data.clientes || data.fornecedores || data.suppliers || []);
+              
+              for (const v1Item of list) {
+                const existing = rawPessoas.find((p: any) => p.id === v1Item.id);
+                if (!existing) {
+                  rawPessoas.push(v1Item);
+                } else if (v1Url.includes("fornecedores") || v1Url.includes("suppliers")) {
+                  existing.is_supplier = true;
+                  existing.tipo_perfil = "FORNECEDOR";
+                }
               }
             }
           }
@@ -153,9 +161,14 @@ export async function POST(req: NextRequest) {
         // 2. Fetch Eventos Financeiros / Contas a Pagar e Receber (Paginado até 3 páginas)
         let entriesData: any[] = [];
         if (activeToken) {
-          for (let page = 1; page <= 3; page++) {
+          const finUrls = [
+            `https://api.contaazul.com/v1/financeiro/eventos-financeiros?pagina=1&tamanho_pagina=100&size=100`,
+            `https://api.contaazul.com/v1/accounts-receivable?pagina=1&tamanho_pagina=100&size=100`,
+            `https://api.contaazul.com/v1/accounts-payable?pagina=1&tamanho_pagina=100&size=100`
+          ];
+          for (const finUrl of finUrls) {
             const entriesRes = await fetchWithAutoRefresh(
-              `https://api.contaazul.com/v1/financeiro/eventos-financeiros?pagina=${page}&tamanho_pagina=100&size=100`,
+              finUrl,
               { method: "GET" },
               { accessToken: activeToken, refreshToken: activeRefresh, clientId: cfg.client_id, clientSecret: cfg.client_secret },
               companyId
@@ -166,16 +179,17 @@ export async function POST(req: NextRequest) {
             if (entriesRes.res.ok) {
               const eData = await entriesRes.res.json().catch(() => ({}));
               const list = Array.isArray(eData) ? eData : (eData.items || eData.eventos || []);
-              if (list.length === 0) break;
-              entriesData.push(...list);
-              if (list.length < 100) break;
-            } else {
-              break;
+              for (const item of list) {
+                const itemKey = item.id || item.id_evento;
+                if (!entriesData.some((e: any) => (e.id || e.id_evento) === itemKey)) {
+                  entriesData.push(item);
+                }
+              }
             }
           }
         }
 
-        // 3. Fetch Categorias
+        // 3. Fetch Categorias (Plano de Contas)
         let categoriesData: any[] = [];
         if (activeToken) {
           const catsRes = await fetchWithAutoRefresh(
@@ -205,10 +219,18 @@ export async function POST(req: NextRequest) {
           const email = item.email || item.email_principal || "";
           const tel = item.telefone_celular || item.telefone || item.phone || item.celular || "";
 
-          const perfisList = item.perfis || item.profiles || [];
-          const isSupp = perfisList.some((p: any) =>
-            p === "Fornecedor" || p === "FORNECEDOR" || p?.tipo_perfil === "Fornecedor"
-          ) || item.roles?.includes("SUPPLIER") || item.is_supplier === true;
+          const perfisRaw = item.perfis || item.profiles || item.perfil || item.roles || [];
+          const perfisArr = Array.isArray(perfisRaw) ? perfisRaw : [perfisRaw];
+          
+          let isSupp = perfisArr.some((p: any) => {
+            const str = (typeof p === 'string' ? p : (p?.tipo_perfil || p?.tipo || p?.name || p?.nome || '')).toUpperCase();
+            return str.includes("FORNECEDOR") || str.includes("SUPPLIER");
+          }) || item.is_supplier === true || item.tipo_perfil === "Fornecedor" || item.tipo_perfil === "FORNECEDOR";
+
+          const nameUpper = String(nome).toUpperCase();
+          if (!isSupp && (nameUpper.includes("FORNECEDOR") || nameUpper.includes("SUPPLIER"))) {
+            isSupp = true;
+          }
 
           const itemId = String(item.id || `${isSupp ? 'supp' : 'cli'}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`);
 
@@ -274,13 +296,35 @@ export async function POST(req: NextRequest) {
         const { data: payablesRows } = await supabase.from('payables').select('*').or(`company_id.eq.${companyId},company_id.is.null`);
         const payables = payablesRows || [];
 
-        const entriesToUpsert = [];
+        const entriesToUpsert: any[] = [];
 
         for (const entry of entriesData) {
-          const entryId = entry.id || entry.id_evento;
+          const entryId = String(entry.id || entry.id_evento || `entry_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`);
+          const entryVal = Number(entry.valor || entry.value || entry.val || entry.amount || 0);
+          const entryStatus = String(entry.situacao || entry.status || "PENDENTE");
+          const entryDesc = String(entry.description || entry.desc || entry.descricao || "Lançamento Conta Azul");
+          const entryDueDate = String(entry.due_date || entry.vencimento || entry.data_vencimento || new Date().toISOString().split("T")[0]);
+
           const entryScoped = {
-            ...entry,
+            id: entryId,
             company_id: companyId,
+            description: entryDesc,
+            desc: entryDesc,
+            value: entryVal,
+            val: entryVal,
+            valor: entryVal,
+            due_date: entryDueDate,
+            vencimento: entryDueDate,
+            status: entryStatus,
+            situacao: entryStatus,
+            category: entry.category || (typeof entry.categoria === 'object' ? entry.categoria?.nome : entry.categoria) || "Geral",
+            tipo: entry.tipo || entry.type || (entryVal >= 0 ? "CREDIT" : "DEBIT"),
+            type: entry.tipo || entry.type || (entryVal >= 0 ? "CREDIT" : "DEBIT"),
+            id_evento: entry.id_evento || entryId,
+            nome_pessoa: entry.nome_pessoa || entry.cliente || entry.fornecedor || (typeof entry.pessoa === 'object' ? entry.pessoa?.nome : null),
+            cliente: entry.cliente || entry.nome_pessoa || null,
+            fornecedor: entry.fornecedor || entry.nome_pessoa || null,
+            data_pagamento: entry.data_pagamento || entry.paid_at || null,
             synced_at: new Date().toISOString()
           };
 
@@ -295,60 +339,8 @@ export async function POST(req: NextRequest) {
           }
           
           entriesToUpsert.push(entryScoped);
-
-          const currentStatus = (entry.situacao || entry.status || "").toUpperCase();
-          const isPaidInContaAzul = currentStatus === "PAGO" || currentStatus === "QUITADO" || currentStatus === "PAID";
-
-          if (isPaidInContaAzul && previousStatus && previousStatus.toUpperCase() !== "PAGO") {
-            const matchingPayable = payables.find((p: any) => {
-              if (p.company_id && p.company_id !== companyId) return false;
-              if (p.conta_azul_id === entryId) return true;
-              const sameVendor = (p.creditor || p.fornecedor || "").toLowerCase().includes((entry.nome_pessoa || entry.cliente || "").toLowerCase());
-              const sameValue = Math.abs(Number(p.valor || p.value_brl || 0) - Number(entry.valor || 0)) < 0.5;
-              return sameVendor && sameValue;
-            });
-
-            if (matchingPayable) {
-              await supabase.from('payables').update({
-                status: "Pago",
-                paid_at: entry.data_pagamento || new Date().toISOString(),
-                conta_azul_id: entryId,
-                reconciliation_status: "MATCHED_PAID"
-              }).eq('id', matchingPayable.id);
-              matchedCount++;
-            }
-          }
-
-          const unlinkedPayables = payables.filter(
-            (p: any) => (!p.company_id || p.company_id === companyId) && !p.conta_azul_id
-          );
-
-          for (const pay of unlinkedPayables) {
-            const payVal = Number(pay.valor || pay.value_brl || 0);
-            const payVendor = (pay.creditor || pay.fornecedor || "").toLowerCase();
-
-            const entryVal = Number(entry.valor || 0);
-            const entryVendor = (entry.nome_pessoa || entry.cliente || entry.fornecedor || "").toLowerCase();
-
-            if (payVal > 0 && Math.abs(payVal - entryVal) < 0.5) {
-              if (payVendor.length > 2 && entryVendor.length > 2 && (payVendor.includes(entryVendor) || entryVendor.includes(payVendor))) {
-                const updateData: any = {
-                  conta_azul_id: entryId,
-                  reconciliation_status: "MATCHED"
-                };
-                if (isPaidInContaAzul && pay.status !== "Pago") {
-                  updateData.status = "Pago";
-                  updateData.paid_at = entry.data_pagamento || new Date().toISOString();
-                }
-                await supabase.from('payables').update(updateData).eq('id', pay.id);
-                pay.conta_azul_id = entryId;
-                pay.reconciliation_status = updateData.reconciliation_status;
-                matchedCount++;
-              }
-            }
-          }
         }
-        
+
         if (entriesToUpsert.length > 0) {
           let { error: errE } = await supabase.from('contaazul_entries').upsert(entriesToUpsert, { onConflict: 'id' });
           if (errE) {
@@ -357,7 +349,14 @@ export async function POST(req: NextRequest) {
         }
         
         if (categoriesData.length > 0) {
-          await supabase.from('contaazul_categories').upsert(categoriesData, { onConflict: 'id' });
+          const sanitizedCategories = categoriesData.map((cat: any) => ({
+            id: String(cat.id || `cat_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`),
+            name: cat.name || cat.nome || "Categoria",
+            nome: cat.name || cat.nome || "Categoria",
+            type: cat.type || cat.tipo || "CREDIT",
+            tipo: cat.type || cat.tipo || "CREDIT"
+          }));
+          await supabase.from('contaazul_categories').upsert(sanitizedCategories, { onConflict: 'id' });
         }
 
         if (activeToken && activeRefresh) {
