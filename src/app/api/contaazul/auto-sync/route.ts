@@ -28,28 +28,41 @@ export async function POST(req: NextRequest) {
     const { data: dbDataConfigs } = await supabase.from('contaazul_config').select('*');
     let configData = dbDataConfigs || [];
 
-    if (configData.length === 0 && targetCompanyId) {
+    let decryptedConfigs = await Promise.all(
+      configData.map(async (cfg: any) => await decryptContaAzulFields(cfg))
+    );
+
+    let connectedConfigs = decryptedConfigs.filter((cfg: any) => {
+      const hasToken = !!(cfg.access_token || cfg.accessToken);
+      if (!hasToken) return false;
+      if (targetCompanyId && targetCompanyId !== "global") {
+        if (cfg.company_id && cfg.company_id !== targetCompanyId && cfg.company_id !== "global") {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    // Fallback 1: Se não houver config exata para este company_id, mas existir qualquer config conectada no banco, aproveita-a
+    if (connectedConfigs.length === 0 && decryptedConfigs.length > 0) {
+      connectedConfigs = decryptedConfigs.filter((cfg: any) => !!(cfg.access_token || cfg.accessToken));
+    }
+
+    // Fallback 2: Buscar via getContaAzulTokens
+    if (connectedConfigs.length === 0 && targetCompanyId) {
       const fileTokens = await getContaAzulTokens(targetCompanyId);
-      if (fileTokens.accessToken) {
-        configData.push({
+      const fallbackTokens = fileTokens.accessToken ? fileTokens : await getContaAzulTokens('comp_zenitus');
+      if (fallbackTokens.accessToken) {
+        connectedConfigs.push({
           company_id: targetCompanyId,
-          client_id: fileTokens.clientId,
-          client_secret: fileTokens.clientSecret,
-          access_token: fileTokens.accessToken,
-          refresh_token: fileTokens.refreshToken,
+          client_id: fallbackTokens.clientId,
+          client_secret: fallbackTokens.clientSecret,
+          access_token: fallbackTokens.accessToken,
+          refresh_token: fallbackTokens.refreshToken,
           is_connected: true
         });
       }
     }
-
-    const connectedConfigs = (await Promise.all(
-      configData.map(async (cfg: any) => await decryptContaAzulFields(cfg))
-    ))
-      .filter((cfg: any) => {
-        if (!cfg.is_connected || !cfg.access_token) return false;
-        if (targetCompanyId && targetCompanyId !== "global" && cfg.company_id !== targetCompanyId) return false;
-        return true;
-      });
 
     if (connectedConfigs.length === 0) {
       return NextResponse.json({
