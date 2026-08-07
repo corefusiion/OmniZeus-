@@ -20,12 +20,13 @@ const DEFAULT_TOKENS: ContaAzulTokenData = {
 
 // ─── Read tokens for a specific company ──────────────────────────────────────
 
-export async function getContaAzulTokens(companyId: string = 'comp_zenitus'): Promise<ContaAzulTokenData> {
+export async function getContaAzulTokens(companyId: string = 'comp_techcontabil_01'): Promise<ContaAzulTokenData> {
   try {
+    const targetId = companyId || 'comp_techcontabil_01';
     const { data: cfg } = await supabase
       .from('contaazul_config')
       .select('*')
-      .eq('company_id', companyId)
+      .eq('company_id', targetId)
       .single();
 
     if (cfg) {
@@ -58,7 +59,7 @@ export async function saveContaAzulTokens(
     companyId = tokensOrCompanyId;
     tokens = { ...(tokensArg || {}) };
   } else {
-    companyId = 'comp_zenitus';
+    companyId = 'comp_techcontabil_01';
     tokens = { ...(tokensOrCompanyId || {}) };
   }
 
