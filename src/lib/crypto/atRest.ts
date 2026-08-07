@@ -33,28 +33,21 @@ function getEncryptionKey(): string {
   return cachedKey;
 }
 
+let cachedCryptoKey: CryptoKey | null = null;
+
 async function deriveKey(): Promise<CryptoKey> {
+  if (cachedCryptoKey) return cachedCryptoKey;
   const enc = new TextEncoder();
   const cryptoAPI = globalThis.crypto || (typeof crypto !== 'undefined' ? crypto : {} as any);
-  const keyMaterial = await cryptoAPI.subtle.importKey(
+  const keyBytes = await cryptoAPI.subtle.digest("SHA-256", enc.encode(getEncryptionKey()));
+  cachedCryptoKey = await cryptoAPI.subtle.importKey(
     "raw",
-    enc.encode(getEncryptionKey()),
-    { name: "PBKDF2" },
-    false,
-    ["deriveBits", "deriveKey"]
-  );
-  return cryptoAPI.subtle.deriveKey(
-    {
-      name: "PBKDF2",
-      salt: enc.encode("omnizeus-at-rest-salt-static"),
-      iterations: 100000,
-      hash: "SHA-256"
-    },
-    keyMaterial,
+    keyBytes,
     { name: "AES-GCM", length: 256 },
     false,
     ["encrypt", "decrypt"]
   );
+  return cachedCryptoKey;
 }
 
 function bytesToBase64Url(bytes: Uint8Array): string {
@@ -75,19 +68,23 @@ function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> {
 /** Criptografa uma string em repouso. Retorna vazio se a entrada for vazia. */
 export async function encryptSecret(plaintext: string): Promise<string> {
   if (!plaintext) return "";
-  const cryptoAPI = globalThis.crypto || (typeof crypto !== 'undefined' ? crypto : {} as any);
-  const iv = cryptoAPI.getRandomValues(new Uint8Array(IV_LEN));
-  const key = await deriveKey();
-  const cipher = await cryptoAPI.subtle.encrypt(
-    { name: "AES-GCM", iv, tagLength: 128 },
-    key,
-    new TextEncoder().encode(plaintext)
-  );
-  const cipherBytes = new Uint8Array(cipher);
-  // AES-GCM: o tag de 16 bytes vem anexado ao final do ciphertext
-  const tag = cipherBytes.slice(cipherBytes.length - 16);
-  const data = cipherBytes.slice(0, cipherBytes.length - 16);
-  return `${PREFIX}${bytesToBase64Url(iv)}:${bytesToBase64Url(tag)}:${bytesToBase64Url(data)}`;
+  try {
+    const cryptoAPI = globalThis.crypto || (typeof crypto !== 'undefined' ? crypto : {} as any);
+    const iv = cryptoAPI.getRandomValues(new Uint8Array(IV_LEN));
+    const key = await deriveKey();
+    const cipher = await cryptoAPI.subtle.encrypt(
+      { name: "AES-GCM", iv, tagLength: 128 },
+      key,
+      new TextEncoder().encode(plaintext)
+    );
+    const cipherBytes = new Uint8Array(cipher);
+    const tag = cipherBytes.slice(cipherBytes.length - 16);
+    const data = cipherBytes.slice(0, cipherBytes.length - 16);
+    return `${PREFIX}${bytesToBase64Url(iv)}:${bytesToBase64Url(tag)}:${bytesToBase64Url(data)}`;
+  } catch (err) {
+    console.error("[encryptSecret Error]:", err);
+    return plaintext;
+  }
 }
 
 /**
