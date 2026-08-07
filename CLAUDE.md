@@ -435,4 +435,9 @@ Amanh�, basta continuar o desenvolvimento!
 - **Resultado de Desempenho**: Tempo de resposta do auto-sync reduzido de 24s para **6.4s**, 100% de sucesso sem estourar limites.
 
 ### 6. Commits & Deploy
-- Commits `b95c819`, `4318cb7`, `743b743` e `90918ff` comitados e enviados na branch `main` com deploy de produção aprovado na Cloudflare.
+- Commits `b95c819`, `4318cb7`, `743b743`, `90918ff` e `20653c6` comitados e enviados na branch `main` com deploy de produção aprovado na Cloudflare.
+
+### 7. ⚠️ Pendência para Próxima Sessão (Amanhã)
+- **Status**: O erro de cota/sub-requisições da Cloudflare foi 100% corrigido e a tabela de Clientes sincroniza normalmente (5 cadastros confirmados).
+- **Pendência**: As demais abas (Fornecedores - com 3 cadastros ativos no painel Conta Azul -, Contas a Receber/Pagar e Plano de Contas) ainda não estão trazendo/populando os dados completos para a interface do OmniZeus.
+- **Plano de Ação para Amanhã**: Investigar o payload exato retornado pelos endpoints da Conta Azul (`/v1/compras/fornecedores`, `/v1/financeiro/eventos-financeiros` e `/v1/financeiro/categorias`), checar permissões do Token OAuth2 e ajustar o mapeamento/sanitização no `auto-sync` para popular todas as abas.
