@@ -184,207 +184,135 @@ export async function POST(req: NextRequest) {
       const apiDebug: Record<string, string> = {};
 
       try {
-        const passedTokens = {
-          accessToken: cfg.access_token,
-          refreshToken: cfg.refresh_token,
-          clientId: cfg.client_id,
-          clientSecret: cfg.client_secret
-        };
-
         let activeToken = cfg.access_token as string;
         let activeRefresh = cfg.refresh_token as string;
 
-        // ─── 1. Fetch Pessoas (Clientes + Fornecedores) ────────────────────────
-        // Busca 1a: lista geral de pessoas (clientes e fornecedores misturados)
+        // ─── 1. Fetch Pessoas via API v2 ───────────────────────────────────────
+        // Na API v2 da Conta Azul, CLIENTES e FORNECEDORES são ambos "Pessoas"
+        // O mesmo endpoint /v1/pessoas retorna todos — diferenciados pelo campo "perfis"
+        // Base URL CORRETA: https://api-v2.contaazul.com (api.contaazul.com = v1 descontinuada)
         let rawPessoas: any[] = [];
 
-        const { res: pessoasRes, newAccessToken, newRefreshToken } = await fetchWithAutoRefresh(
-          `https://api-v2.contaazul.com/v1/pessoas?pagina=1&tamanho_pagina=100&size=100`,
-          { method: "GET" },
-          passedTokens,
-          companyId
-        );
-        if (newAccessToken) activeToken = newAccessToken;
-        if (newRefreshToken) activeRefresh = newRefreshToken;
-
-        if (pessoasRes.ok) {
-          const data = await safeJson(pessoasRes);
-          rawPessoas.push(...extractList(data, "pessoas", "customers"));
-          apiDebug["pessoas_v2"] = `HTTP 200 → ${previewPayload(data)} → ${rawPessoas.length} extraídos`;
-          console.log(`[Auto-Sync][${companyId}] /v1/pessoas → ${rawPessoas.length} registros`);
-        } else {
-          const errBody = await safeJson(pessoasRes);
-          apiDebug["pessoas_v2"] = `HTTP ${pessoasRes.status} → ${JSON.stringify(errBody).substring(0, 200)}`;
-          console.warn(`[Auto-Sync][${companyId}] /v1/pessoas HTTP ${pessoasRes.status}:`, JSON.stringify(errBody).substring(0, 300));
-        }
-
-        // Busca 1b: tentativa de buscar especificamente fornecedores via /v1/pessoas?perfis=FORNECEDOR
-        // Apenas se a lista principal não trouxe fornecedores identificados
-        const hasSuppliersInMain = rawPessoas.some((item: any) => {
-          const perfisRaw = item.perfis || item.profiles || item.perfil || item.roles || item.tipos_perfil || [];
-          const perfisArr = Array.isArray(perfisRaw) ? perfisRaw : [perfisRaw];
-          return (
-            perfisArr.some((p: any) => {
-              const str = (
-                typeof p === "string"
-                  ? p
-                  : p?.tipo_perfil || p?.tipo || p?.name || p?.nome || p?.type || ""
-              ).toUpperCase();
-              return str.includes("FORNECEDOR") || str.includes("SUPPLIER");
-            }) ||
-            item.is_supplier === true ||
-            item.tipo_perfil === "Fornecedor" ||
-            item.tipo_perfil === "FORNECEDOR" ||
-            item.perfil === "FORNECEDOR"
-          );
+        const makeTokens = () => ({
+          accessToken: activeToken,
+          refreshToken: activeRefresh,
+          clientId: cfg.client_id,
+          clientSecret: cfg.client_secret
         });
 
-        if (!hasSuppliersInMain && activeToken) {
-          // Tentativa via endpoint /v1/compras/fornecedores
-          const suppRes = await fetchWithAutoRefresh(
-            `https://api.contaazul.com/v1/compras/fornecedores?pagina=1&tamanho_pagina=100&size=100`,
+        // 1a. Busca GERAL (sem filtro de perfil) — retorna clientes e fornecedores misturados
+        {
+          const { res, newAccessToken: nat, newRefreshToken: nrt } = await fetchWithAutoRefresh(
+            `https://api-v2.contaazul.com/v1/pessoas?pagina=1&tamanho_pagina=100`,
             { method: "GET" },
-            { accessToken: activeToken, refreshToken: activeRefresh, clientId: cfg.client_id, clientSecret: cfg.client_secret },
+            makeTokens(),
             companyId
           );
-          if (suppRes.newAccessToken) activeToken = suppRes.newAccessToken;
-          if (suppRes.newRefreshToken) activeRefresh = suppRes.newRefreshToken;
+          if (nat) activeToken = nat;
+          if (nrt) activeRefresh = nrt;
 
-          if (suppRes.res.ok) {
-            const data = await safeJson(suppRes.res);
-            const list = extractList(data, "fornecedores", "suppliers");
-            apiDebug["fornecedores_v1"] = `HTTP 200 → ${previewPayload(data)} → ${list.length} extraídos`;
-            console.log(`[Auto-Sync][${companyId}] /v1/compras/fornecedores → ${list.length} registros`);
-            for (const suppItem of list) {
-              rawPessoas.push({ ...suppItem, is_supplier: true, tipo_perfil: "FORNECEDOR" });
-            }
+          if (res.ok) {
+            const data = await safeJson(res);
+            const list = extractList(data, "pessoas", "clientes", "customers");
+            rawPessoas.push(...list);
+            apiDebug["pessoas_geral"] = `HTTP 200 → ${previewPayload(data)} → ${list.length} extraídos`;
           } else {
-            const errBody = await safeJson(suppRes.res);
-            apiDebug["fornecedores_v1"] = `HTTP ${suppRes.res.status} → ${JSON.stringify(errBody).substring(0, 150)}`;
-            console.warn(
-              `[Auto-Sync][${companyId}] /v1/compras/fornecedores HTTP ${suppRes.res.status}:`,
-              JSON.stringify(errBody).substring(0, 200)
-            );
+            const body = await safeJson(res);
+            apiDebug["pessoas_geral"] = `HTTP ${res.status} → ${JSON.stringify(body).substring(0, 200)}`;
+          }
+        }
 
-            // Fallback: tentar endpoint v2 com filtro de perfil
-            const suppRes2 = await fetchWithAutoRefresh(
-              `https://api-v2.contaazul.com/v1/pessoas?pagina=1&tamanho_pagina=100&perfis=FORNECEDOR`,
+        // 1b. Busca ESPECÍFICA de Fornecedores com filtro perfis=FORNECEDOR
+        // (garante que fornecedores sejam capturados mesmo se não vieram na busca geral)
+        {
+          const { res, newAccessToken: nat, newRefreshToken: nrt } = await fetchWithAutoRefresh(
+            `https://api-v2.contaazul.com/v1/pessoas?pagina=1&tamanho_pagina=100&perfis=FORNECEDOR`,
+            { method: "GET" },
+            makeTokens(),
+            companyId
+          );
+          if (nat) activeToken = nat;
+          if (nrt) activeRefresh = nrt;
+
+          if (res.ok) {
+            const data = await safeJson(res);
+            const list = extractList(data, "pessoas", "fornecedores");
+            // Adiciona apenas os que ainda não estão em rawPessoas (deduplicação por id)
+            const existingIds = new Set(rawPessoas.map((p: any) => String(p.id)));
+            const novos = list.filter((p: any) => !existingIds.has(String(p.id)));
+            // Marca explicitamente como fornecedor
+            novos.forEach((p: any) => { p._force_supplier = true; });
+            rawPessoas.push(...novos);
+            apiDebug["pessoas_fornecedores"] = `HTTP 200 → ${previewPayload(data)} → ${list.length} total, ${novos.length} novos`;
+          } else {
+            const body = await safeJson(res);
+            apiDebug["pessoas_fornecedores"] = `HTTP ${res.status} → ${JSON.stringify(body).substring(0, 200)}`;
+          }
+        }
+
+        console.log(`[Auto-Sync][${companyId}] Total rawPessoas: ${rawPessoas.length}`);
+
+        // ─── 2. Fetch Financeiro via API v2 ────────────────────────────────────
+        // Endpoint correto na v2: /v1/financeiro/eventos-financeiros
+        let entriesData: any[] = [];
+        {
+          const { res, newAccessToken: nat, newRefreshToken: nrt } = await fetchWithAutoRefresh(
+            `https://api-v2.contaazul.com/v1/financeiro/eventos-financeiros?pagina=1&tamanho_pagina=100`,
+            { method: "GET" },
+            makeTokens(),
+            companyId
+          );
+          if (nat) activeToken = nat;
+          if (nrt) activeRefresh = nrt;
+
+          if (res.ok) {
+            const data = await safeJson(res);
+            entriesData = extractList(data, "eventos", "lancamentos", "parcelas", "financeiro");
+            apiDebug["eventos_financeiros_v2"] = `HTTP 200 → ${previewPayload(data)} → ${entriesData.length} extraídos`;
+          } else {
+            const body = await safeJson(res);
+            apiDebug["eventos_financeiros_v2"] = `HTTP ${res.status} → ${JSON.stringify(body).substring(0, 200)}`;
+
+            // Fallback: parcelas a receber
+            const { res: r2, newAccessToken: nat2, newRefreshToken: nrt2 } = await fetchWithAutoRefresh(
+              `https://api-v2.contaazul.com/v1/financeiro/eventos-financeiros/parcelas?pagina=1&tamanho_pagina=100`,
               { method: "GET" },
-              { accessToken: activeToken, refreshToken: activeRefresh, clientId: cfg.client_id, clientSecret: cfg.client_secret },
+              makeTokens(),
               companyId
             );
-            if (suppRes2.newAccessToken) activeToken = suppRes2.newAccessToken;
-            if (suppRes2.newRefreshToken) activeRefresh = suppRes2.newRefreshToken;
+            if (nat2) activeToken = nat2;
+            if (nrt2) activeRefresh = nrt2;
 
-            if (suppRes2.res.ok) {
-              const data2 = await safeJson(suppRes2.res);
-              const list2 = extractList(data2, "pessoas", "fornecedores");
-              apiDebug["fornecedores_v2_perfil"] = `HTTP 200 → ${previewPayload(data2)} → ${list2.length} extraídos`;
-              console.log(`[Auto-Sync][${companyId}] /v1/pessoas?perfis=FORNECEDOR → ${list2.length} registros`);
-              for (const item of list2) {
-                rawPessoas.push({ ...item, is_supplier: true });
-              }
+            if (r2.ok) {
+              const data2 = await safeJson(r2);
+              entriesData = extractList(data2, "parcelas", "eventos", "lancamentos");
+              apiDebug["parcelas_v2"] = `HTTP 200 → ${previewPayload(data2)} → ${entriesData.length} extraídos`;
             } else {
-              apiDebug["fornecedores_v2_perfil"] = `HTTP ${suppRes2.res.status}`;
+              const body2 = await safeJson(r2);
+              apiDebug["parcelas_v2"] = `HTTP ${r2.status} → ${JSON.stringify(body2).substring(0, 150)}`;
             }
           }
         }
 
-        // ─── 2. Fetch Eventos Financeiros ──────────────────────────────────────
-        let entriesData: any[] = [];
-        if (activeToken) {
-          // Tentativa principal: /v1/financeiro/eventos-financeiros
-          const entriesRes = await fetchWithAutoRefresh(
-            `https://api.contaazul.com/v1/financeiro/eventos-financeiros?pagina=1&tamanho_pagina=100&size=100`,
-            { method: "GET" },
-            { accessToken: activeToken, refreshToken: activeRefresh, clientId: cfg.client_id, clientSecret: cfg.client_secret },
-            companyId
-          );
-          if (entriesRes.newAccessToken) activeToken = entriesRes.newAccessToken;
-          if (entriesRes.newRefreshToken) activeRefresh = entriesRes.newRefreshToken;
-
-          if (entriesRes.res.ok) {
-            const eData = await safeJson(entriesRes.res);
-            entriesData = extractList(eData, "eventos", "lancamentos", "financeiro");
-            apiDebug["eventos_financeiros"] = `HTTP 200 → ${previewPayload(eData)} → ${entriesData.length} extraídos`;
-            console.log(`[Auto-Sync][${companyId}] /v1/financeiro/eventos-financeiros → ${entriesData.length} registros`);
-          } else {
-            const errBody = await safeJson(entriesRes.res);
-            apiDebug["eventos_financeiros"] = `HTTP ${entriesRes.res.status} → ${JSON.stringify(errBody).substring(0, 200)}`;
-            console.warn(
-              `[Auto-Sync][${companyId}] /v1/financeiro/eventos-financeiros HTTP ${entriesRes.res.status}:`,
-              JSON.stringify(errBody).substring(0, 300)
-            );
-
-            // Fallback A: /v1/financeiro/lancamentos
-            if (activeToken) {
-              const lancRes = await fetchWithAutoRefresh(
-                `https://api.contaazul.com/v1/financeiro/lancamentos?pagina=1&tamanho_pagina=100`,
-                { method: "GET" },
-                { accessToken: activeToken, refreshToken: activeRefresh, clientId: cfg.client_id, clientSecret: cfg.client_secret },
-                companyId
-              );
-              if (lancRes.newAccessToken) activeToken = lancRes.newAccessToken;
-              if (lancRes.newRefreshToken) activeRefresh = lancRes.newRefreshToken;
-
-              if (lancRes.res.ok) {
-                const lData = await safeJson(lancRes.res);
-                entriesData = extractList(lData, "lancamentos", "eventos");
-                apiDebug["lancamentos_fallback"] = `HTTP 200 → ${previewPayload(lData)} → ${entriesData.length} extraídos`;
-                console.log(`[Auto-Sync][${companyId}] /v1/financeiro/lancamentos → ${entriesData.length} registros`);
-              } else {
-                apiDebug["lancamentos_fallback"] = `HTTP ${lancRes.res.status}`;
-                console.warn(
-                  `[Auto-Sync][${companyId}] /v1/financeiro/lancamentos HTTP ${lancRes.res.status} — ambos endpoints financeiros falharam.`,
-                  "Verifique se o token tem scope 'financeiro:read'."
-                );
-              }
-            }
-          }
-        }
-
-        // ─── 3. Fetch Categorias (Plano de Contas) ────────────────────────────
+        // ─── 3. Fetch Categorias (Plano de Contas) via API v2 ─────────────────
         let categoriesData: any[] = [];
-        if (activeToken) {
-          const catsRes = await fetchWithAutoRefresh(
-            "https://api.contaazul.com/v1/financeiro/categorias",
+        {
+          const { res, newAccessToken: nat, newRefreshToken: nrt } = await fetchWithAutoRefresh(
+            `https://api-v2.contaazul.com/v1/financeiro/categorias?pagina=1&tamanho_pagina=200`,
             { method: "GET" },
-            { accessToken: activeToken, refreshToken: activeRefresh, clientId: cfg.client_id, clientSecret: cfg.client_secret },
+            makeTokens(),
             companyId
           );
-          if (catsRes.newAccessToken) activeToken = catsRes.newAccessToken;
-          if (catsRes.newRefreshToken) activeRefresh = catsRes.newRefreshToken;
+          if (nat) activeToken = nat;
+          if (nrt) activeRefresh = nrt;
 
-          if (catsRes.res.ok) {
-            const cData = await safeJson(catsRes.res);
-            categoriesData = extractList(cData, "categorias", "plano_contas", "planoContas");
-            apiDebug["categorias_v1"] = `HTTP 200 → ${previewPayload(cData)} → ${categoriesData.length} extraídas`;
-            console.log(`[Auto-Sync][${companyId}] /v1/financeiro/categorias → ${categoriesData.length} registros`);
+          if (res.ok) {
+            const data = await safeJson(res);
+            categoriesData = extractList(data, "categorias", "plano_contas", "planoContas");
+            apiDebug["categorias_v2"] = `HTTP 200 → ${previewPayload(data)} → ${categoriesData.length} extraídas`;
           } else {
-            const errBody = await safeJson(catsRes.res);
-            apiDebug["categorias_v1"] = `HTTP ${catsRes.res.status} → ${JSON.stringify(errBody).substring(0, 150)}`;
-            console.warn(
-              `[Auto-Sync][${companyId}] /v1/financeiro/categorias HTTP ${catsRes.res.status}:`,
-              JSON.stringify(errBody).substring(0, 200)
-            );
-
-            // Fallback: /v2/financeiro/categorias
-            if (activeToken) {
-              const cats2Res = await fetchWithAutoRefresh(
-                "https://api-v2.contaazul.com/v1/financeiro/categorias",
-                { method: "GET" },
-                { accessToken: activeToken, refreshToken: activeRefresh, clientId: cfg.client_id, clientSecret: cfg.client_secret },
-                companyId
-              );
-              if (cats2Res.res.ok) {
-                const c2Data = await safeJson(cats2Res.res);
-                categoriesData = extractList(c2Data, "categorias", "plano_contas");
-                apiDebug["categorias_v2"] = `HTTP 200 → ${previewPayload(c2Data)} → ${categoriesData.length} extraídas`;
-                console.log(`[Auto-Sync][${companyId}] /v2/financeiro/categorias → ${categoriesData.length} registros`);
-              } else {
-                apiDebug["categorias_v2"] = `HTTP ${cats2Res.res.status}`;
-              }
-            }
+            const body = await safeJson(res);
+            apiDebug["categorias_v2"] = `HTTP ${res.status} → ${JSON.stringify(body).substring(0, 200)}`;
           }
         }
 
@@ -400,11 +328,13 @@ export async function POST(req: NextRequest) {
           const tel = item.telefone_celular || item.telefone || item.phone || item.celular || "";
 
           // Classificação de fornecedor — múltiplas formas da API Conta Azul
+          // _force_supplier = marcado na busca com filtro perfis=FORNECEDOR
           const perfisRaw =
             item.perfis || item.profiles || item.perfil || item.roles || item.tipos_perfil || [];
           const perfisArr = Array.isArray(perfisRaw) ? perfisRaw : [perfisRaw];
 
           let isSupp =
+            item._force_supplier === true ||   // veio da busca ?perfis=FORNECEDOR
             item.is_supplier === true ||
             item.tipo_perfil === "Fornecedor" ||
             item.tipo_perfil === "FORNECEDOR" ||
@@ -417,6 +347,7 @@ export async function POST(req: NextRequest) {
               ).toUpperCase();
               return str.includes("FORNECEDOR") || str.includes("SUPPLIER");
             });
+
 
           // Fallback por nome (heurística)
           if (!isSupp) {
