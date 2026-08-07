@@ -722,9 +722,10 @@ function ContaAzulContent() {
         await loadContaAzulData();
         const firstRes = Array.isArray(data.results) ? data.results[0] : null;
         const msg = firstRes?.message || `Sincronização 24/7 concluída com sucesso!`;
+        const isErrOrWarn = firstRes?.status === "error" || msg.includes("Atenção") || msg.includes("expirado") || msg.includes("HTTP 401");
 
         setNoticeMessage({ 
-          type: 'success', 
+          type: isErrOrWarn ? 'warning' : 'success', 
           text: msg
         });
       } else {
