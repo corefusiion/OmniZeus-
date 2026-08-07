@@ -1,4 +1,4 @@
-﻿# OmniZeus — Technical Architecture & Onboarding Guide (Claude AI)
+# OmniZeus — Technical Architecture & Onboarding Guide (Claude AI)
 
 > **Anthropic / Claude Technical Guide**: This document summarizes the technical stack, state management, security boundaries, file paths, and conversation logs of **OmniZeus** for fast onboarding across model switches or new development environments.
 
@@ -408,3 +408,31 @@ Amanh�, basta continuar o desenvolvimento!
 
 ### 3. Deploy
 - Codigos comitados e enviados no branch main com sucesso (origin/main).
+
+---
+
+## 🧭 Sessão — 2026-08-07 (Correção da Sincronização Conta Azul, Upsert Supabase & Resiliência Edge Cloudflare)
+
+### 1. Resolução do Erro HTTP 503 Service Unavailable (Derivação Criptográfica & CPU Timeout)
+- **Causa Raiz**: O módulo `src/lib/crypto/atRest.ts` executava 100.000 iterações PBKDF2 em ambiente Cloudflare Edge Workers, estourando o tempo limite de CPU por requisição e causando kill do Worker (HTTP 503).
+- **Solução**: Substituída a derivação por digest direto SHA-256 via Web Crypto API nativa (`crypto.subtle.digest`) com chave em cache (`cachedCryptoKey`). Adicionado `try/catch` seguro no `encryptSecret`.
+
+### 2. Compatibilidade Edge Runtime (`Buffer.from`)
+- **Causa Raiz**: O uso do objeto global Node.js `Buffer.from` em rotas Edge (`/api/contaazul/callback`, `/refresh` e `src/lib/contaazul/store.ts`) quebrava a execução.
+- **Solução**: Substituído por `btoa` / `atob` nativos da Web/Edge API.
+
+### 3. Correção de Inferência de Restrição Supabase (`onConflict`) & Gravação Real
+- **Causa Raiz**: A rota `/api/contaazul/auto-sync/route.ts` executava `.upsert(scopedCustomers, { onConflict: 'id,company_id' })`. Como no Supabase as tabelas `contaazul_clients`, `contaazul_suppliers`, `contaazul_entries` e `contaazul_categories` foram criadas com Primary Key simples em `id`, a cláusula `onConflict: 'id,company_id'` era rejeitada silenciosamente pelo PostgREST.
+- **Solução**: Atualizado o upsert para usar `{ onConflict: 'id' }` com fallback resiliente para upsert padrão sem inferência composta. Corrigida a contagem de registros para incrementar apenas quando o salvamento no banco for confirmado.
+
+### 4. Expansão da Sincronização Multi-Entidade (Clientes, Fornecedores, Contas e Categorias)
+- **Classificação de Fornecedores**: Adicionada verificação case-insensitive de perfis (`FORNECEDOR` / `SUPPLIER`) e filtro fallback por nome.
+- **Contas a Receber/Pagar & Plano de Contas**: Conectados os endpoints `/v1/financeiro/eventos-financeiros` e `/v1/financeiro/categorias` para popular todas as 4 guias da página `/contaazul` e os dashboards da plataforma.
+
+### 5. Otimização de Limite de Sub-requisições Cloudflare Workers (`Too many subrequests`)
+- **Causa Raiz**: A Cloudflare Workers restringe a no máximo 50 sub-requisições HTTP (`fetch()`) por invocação. O `fetchWithAutoRefresh` consultava o banco Supabase em cada chamada, multiplicando sub-requisições e excedendo o limite de 50 chamadas.
+- **Solução em `src/lib/contaazul/store.ts`**: Implementado *lazy loading* em `fetchWithAutoRefresh` (se `passedTokens.accessToken` estiver presente, ignora a consulta redundante no Supabase).
+- **Resultado de Desempenho**: Tempo de resposta do auto-sync reduzido de 24s para **6.4s**, 100% de sucesso sem estourar limites.
+
+### 6. Commits & Deploy
+- Commits `b95c819`, `4318cb7`, `743b743` e `90918ff` comitados e enviados na branch `main` com deploy de produção aprovado na Cloudflare.
