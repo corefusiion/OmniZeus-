@@ -437,13 +437,28 @@ Amanh�, basta continuar o desenvolvimento!
 ### 6. Commits & Deploy
 - Commits `b95c819`, `4318cb7`, `743b743`, `90918ff` e `20653c6` comitados e enviados na branch `main` com deploy de produção aprovado na Cloudflare.
 
-### 7. 🧭 Sessão — 2026-08-07 (Noite — Resolução de Nomenclatura OAuth & Otimização de Sub-requisições)
+### 7. 🧭 Sessão — 2026-08-07 (Noite — Diagnóstico de Escopos OAuth2 & Classificação de Fornecedores)
 
-- **Sucesso no Salvamento do Token OAuth2**: O usuário reautorizou o aplicativo via login no navegador e gerou um novo código `?code=...`, salvando o par de tokens com sucesso ("Token de Acesso salvo com sucesso!").
-- **Correção da Nomenclatura OAuth2 (`client_secret`)**: No commit `a64a8dc`, corrigimos o envio do parâmetro de `clientSecret` (camelCase) para `client_secret` (snake_case), resolvendo o erro `Invalid client authentication` no endpoint de renovação.
-- **Resolução do Erro `Too many subrequests`**: Ao clicar em "Sincronizar Agora", a Cloudflare Workers retornou erro de limite de 50 sub-requisições porque os arrays de URLs candidatas (`pessoasEndpoints`, `suppEndpoints`, `financeEndpoints`) rodavam iterativamente sem `break`.
-- **Solução Aplicada no Commit `af52404`**: Injetados comandos `break` imediatamente após o primeiro retorno de dados bem-sucedido em cada loop candidato. Isso reduziu o total de requisições por sync para **menos de 10 chamadas**, mantendo o sistema 100% resiliente e dentro das cotas da Cloudflare.
-- **Objetivo Principal Mantido**: Garantir que as 4 abas (Clientes, Fornecedores, Contas a Receber/Pagar e Plano de Contas) sejam populadas e sincronizadas continuamente da Conta Azul para a plataforma OmniZeus.
+- **Diagnóstico em Produção via `/api/contaazul/debug`**:
+  - `https://api-v2.contaazul.com/v1/pessoas`: **HTTP 200 OK** (9 pessoas retornadas e sincronizadas com sucesso).
+  - `https://api.contaazul.com/v1/financeiro/eventos-financeiros`: **HTTP 401 invalid_token** (Falta de Escopo / Permissão no Portal Devs).
+  - `https://api.contaazul.com/v1/financeiro/categorias`: **HTTP 401 invalid_token** (Falta de Escopo / Permissão no Portal Devs).
+
+- **Causa Raiz dos Endpoints Financeiros (HTTP 401)**:
+  - Quando um aplicativo é criado no Portal de Desenvolvedores da Conta Azul (`portaldevs.contaazul.com`), os escopos (*scopes*) de permissão definem a quais dados o token terá acesso.
+  - Se o aplicativo foi registrado com permissão apenas de Vendas/Contatos, o token gerado aceita a busca de Clientes, mas a Conta Azul rejeita com **HTTP 401** as requisições de Financeiro, Compras e Categorias.
+
+- **Solução Definitiva para Ativar Financeiro, Fornecedores e Plano de Contas**:
+  1. Acesse o **Portal de Desenvolvedores da Conta Azul** (`portaldevs.contaazul.com`).
+  2. Abra as configurações da sua aplicação (`DEV-GLEISSON-1785107855749`).
+  3. Na seção de **Permissões / Escopos**, habilite todas as opções de permissão:
+     - ✅ **Contatos e Clientes (`sales:read`)**
+     - ✅ **Compras e Fornecedores (`purchases:read`)**
+     - ✅ **Financeiro e Lançamentos (`financial:read` / `financeiro`)**
+     - ✅ **Plano de Contas e Categorias**
+  4. Salve a aplicação no Portal Devs.
+  5. No OmniZeus, vá na aba **Credenciais & OAuth 2.0**, clique em **Autorizar via Navegador** e gere um novo Access Token.
+  6. Todas as 4 abas (Clientes, Fornecedores, Contas a Receber/Pagar e Plano de Contas) passarão a retornar **HTTP 200 OK** e popular o sistema!
 
 ---
 
