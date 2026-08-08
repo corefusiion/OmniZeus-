@@ -168,6 +168,30 @@ export async function GET(req: NextRequest) {
     probe(
       "despesas_v1",
       `https://api.contaazul.com/v1/despesas?pagina=1&tamanho_pagina=50`
+    ),
+    probe(
+      "v1_sales",
+      `https://api.contaazul.com/v1/sales`
+    ),
+    probe(
+      "v1_purchases",
+      `https://api.contaazul.com/v1/purchases`
+    ),
+    probe(
+      "v1_services",
+      `https://api.contaazul.com/v1/services`
+    ),
+    probe(
+      "v1_contracts",
+      `https://api.contaazul.com/v1/contracts`
+    ),
+    probe(
+      "v2_vendas",
+      `https://api-v2.contaazul.com/v1/vendas`
+    ),
+    probe(
+      "v2_compras",
+      `https://api-v2.contaazul.com/v1/compras`
     )
   ]);
 
