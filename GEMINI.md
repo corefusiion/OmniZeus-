@@ -447,11 +447,15 @@ Amanh�, basta continuar o desenvolvimento!
   - **`https://api-v2.contaazul.com/v1/pessoas`**: **HTTP 200 OK** (9 cadastros retornados com sucesso contendo nome, documento, email, telefone e array `perfis`).
   - **Endpoints V1 (`api.contaazul.com/v1/sales`, `/purchases`, `/financeiro`)**: Retornam **HTTP 401 `invalid_token`** para apps de teste não homologados como integrador oficial pela Conta Azul.
 
-- **Aprimoramento da Classificação no Commit `560eb7c`**:
-  - Ajustamos o sanitizador em `auto-sync` para classificar dinamicamente cada registro retornado pela API v2:
-    - Registros com `perfis` contendo "Fornecedor" ou com a palavra "FORNECEDOR" no nome são salvos na tabela `contaazul_suppliers`.
-    - Registros com `perfis` contendo "Cliente" (ou sem tag de fornecedor) são salvos na tabela `contaazul_clients`.
-  - Isso garante que a sincronização popule tanto a aba de **Clientes** quanto a aba de **Fornecedores** automaticamente a partir do endpoint ativo da API v2!
+- **Criação da Aplicação de Produção no Portal Devs**:
+  - O usuário criou uma nova aplicação do tipo **"Produção"** ("Parabéns! Você tem acesso agora aos dados para criar o seu app de produção").
+  - Novas credenciais de produção registradas:
+    - **Client ID**: `5at28lp8eqg6ibem4a3bd231h5`
+    - **Client Secret**: `jiheok27q01286obhqsfl344tvhphkkn6068f6n1a2fjoeqafmj`
+    - **URL de Autorização Oficial com Escopo Cognito**: `https://auth.contaazul.com/login?response_type=code&client_id=5at28lp8eqg6ibem4a3bd231h5&redirect_uri=https://contaazul.com&state=omnizeus_oauth&scope=openid+profile+aws.cognito.signin.user.admin`
+
+- **Atualização no Gerador de Auth URL (Commit `633ccc2`)**:
+  - Atualizamos a rota `auth/route.ts` para incluir automaticamente o parâmetro oficial `scope=openid+profile+aws.cognito.signin.user.admin`, garantindo que o token gerado pela aplicação de Produção tenha acesso total e irrestrito ao ERP real da Conta Azul!
 
 ---
 
