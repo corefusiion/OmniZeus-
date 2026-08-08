@@ -16,10 +16,10 @@ export async function POST(req: Request) {
 
     const cleanRedirectUri = redirectUri || "https://contaazul.com";
 
-    // Standard ContaAzul OAuth 2.0 Login Consent Screen URL (without invalid scope param)
+    // Standard ContaAzul OAuth 2.0 Login Consent Screen URL (with official Cognito scope)
     const authUrl = `https://auth.contaazul.com/login?response_type=code&client_id=${encodeURIComponent(
       clientId
-    )}&redirect_uri=${encodeURIComponent(cleanRedirectUri)}&state=omnizeus_oauth`;
+    )}&redirect_uri=${encodeURIComponent(cleanRedirectUri)}&state=omnizeus_oauth&scope=openid+profile+aws.cognito.signin.user.admin`;
 
     return NextResponse.json({
       success: true,
