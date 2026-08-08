@@ -166,16 +166,20 @@ export async function fetchWithAutoRefresh(
     
     const credentials = btoa(`${activeClientId.trim()}:${activeClientSecret.trim()}`);
     
+    const refreshParams = new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: activeRefreshToken.trim(),
+      client_id: activeClientId.trim(),
+      client_secret: activeClientSecret.trim()
+    });
+
     let refreshRes = await fetch("https://auth.contaazul.com/oauth2/token", {
       method: "POST",
       headers: {
         "Authorization": `Basic ${credentials}`,
         "Content-Type": "application/x-www-form-urlencoded"
       },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: activeRefreshToken.trim()
-      })
+      body: refreshParams
     });
 
     let refreshData = await refreshRes.json().catch(() => ({}));
@@ -187,12 +191,7 @@ export async function fetchWithAutoRefresh(
           "Authorization": `Basic ${credentials}`,
           "Content-Type": "application/x-www-form-urlencoded"
         },
-        body: new URLSearchParams({
-          grant_type: "refresh_token",
-          refresh_token: activeRefreshToken.trim(),
-          client_id: activeClientId.trim(),
-          client_secret: activeClientSecret.trim()
-        })
+        body: refreshParams
       });
       refreshData = await refreshRes.json().catch(() => ({}));
     }

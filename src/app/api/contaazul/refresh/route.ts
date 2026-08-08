@@ -30,6 +30,13 @@ export async function POST(req: Request) {
 
     const credentials = btoa(`${activeClientId.trim()}:${activeClientSecret.trim()}`);
 
+    const refreshParams = new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: activeRefreshToken.trim(),
+      client_id: activeClientId.trim(),
+      client_secret: activeClientSecret.trim()
+    });
+
     // Automatic silent OAuth token refresh via ContaAzul API
     let tokenRes = await fetch("https://auth.contaazul.com/oauth2/token", {
       method: "POST",
@@ -37,10 +44,7 @@ export async function POST(req: Request) {
         "Authorization": `Basic ${credentials}`,
         "Content-Type": "application/x-www-form-urlencoded"
       },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: activeRefreshToken.trim()
-      })
+      body: refreshParams
     });
 
     let tokenData = await tokenRes.json().catch(() => ({}));
@@ -52,10 +56,7 @@ export async function POST(req: Request) {
           "Authorization": `Basic ${credentials}`,
           "Content-Type": "application/x-www-form-urlencoded"
         },
-        body: new URLSearchParams({
-          grant_type: "refresh_token",
-          refresh_token: activeRefreshToken.trim()
-        })
+        body: refreshParams
       });
       tokenData = await tokenRes.json().catch(() => ({}));
     }

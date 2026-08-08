@@ -55,37 +55,35 @@ export async function POST(req: Request) {
 
     const credentials = btoa(`${clientId}:${clientSecret}`);
 
-    // Tentativa 1: https://api.contaazul.com/oauth2/token
-    let tokenRes = await fetch("https://api.contaazul.com/oauth2/token", {
+    const params = new URLSearchParams({
+      grant_type: "authorization_code",
+      redirect_uri: redirectUri,
+      code: code.trim(),
+      client_id: clientId,
+      client_secret: clientSecret
+    });
+
+    // Tentativa 1: https://auth.contaazul.com/oauth2/token
+    let tokenRes = await fetch("https://auth.contaazul.com/oauth2/token", {
       method: "POST",
       headers: {
         "Authorization": `Basic ${credentials}`,
         "Content-Type": "application/x-www-form-urlencoded"
       },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        redirect_uri: redirectUri,
-        code: code.trim()
-      })
+      body: params
     });
 
     let tokenData = await tokenRes.json().catch(() => ({}));
 
-    // Tentativa 2: https://auth.contaazul.com/oauth2/token
+    // Tentativa 2: https://api.contaazul.com/oauth2/token
     if (!tokenRes.ok || !tokenData.access_token) {
-      tokenRes = await fetch("https://auth.contaazul.com/oauth2/token", {
+      tokenRes = await fetch("https://api.contaazul.com/oauth2/token", {
         method: "POST",
         headers: {
           "Authorization": `Basic ${credentials}`,
           "Content-Type": "application/x-www-form-urlencoded"
         },
-        body: new URLSearchParams({
-          grant_type: "authorization_code",
-          redirect_uri: redirectUri,
-          code: code.trim(),
-          client_id: clientId,
-          client_secret: clientSecret
-        })
+        body: params
       });
       tokenData = await tokenRes.json().catch(() => ({}));
     }
