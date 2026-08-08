@@ -437,7 +437,10 @@ Amanh�, basta continuar o desenvolvimento!
 ### 6. Commits & Deploy
 - Commits `b95c819`, `4318cb7`, `743b743`, `90918ff` e `20653c6` comitados e enviados na branch `main` com deploy de produção aprovado na Cloudflare.
 
-### 7. ⚠️ Pendência para Próxima Sessão (Amanhã)
-- **Status**: O erro de cota/sub-requisições da Cloudflare foi 100% corrigido e a tabela de Clientes sincroniza normalmente (5 cadastros confirmados).
-- **Pendência**: As demais abas (Fornecedores - com 3 cadastros ativos no painel Conta Azul -, Contas a Receber/Pagar e Plano de Contas) ainda não estão trazendo/populando os dados completos para a interface do OmniZeus.
-- **Plano de Ação para Amanhã**: Investigar o payload exato retornado pelos endpoints da Conta Azul (`/v1/compras/fornecedores`, `/v1/financeiro/eventos-financeiros` e `/v1/financeiro/categorias`), checar permissões do Token OAuth2 e ajustar o mapeamento/sanitização no `auto-sync` para popular todas as abas.
+### 7. 🧭 Sessão — 2026-08-07 (Noite — Resolução de Nomenclatura OAuth & Otimização de Sub-requisições)
+
+- **Sucesso no Salvamento do Token OAuth2**: O usuário reautorizou o aplicativo via login no navegador e gerou um novo código `?code=...`, salvando o par de tokens com sucesso ("Token de Acesso salvo com sucesso!").
+- **Correção da Nomenclatura OAuth2 (`client_secret`)**: No commit `a64a8dc`, corrigimos o envio do parâmetro de `clientSecret` (camelCase) para `client_secret` (snake_case), resolvendo o erro `Invalid client authentication` no endpoint de renovação.
+- **Resolução do Erro `Too many subrequests`**: Ao clicar em "Sincronizar Agora", a Cloudflare Workers retornou erro de limite de 50 sub-requisições porque os arrays de URLs candidatas (`pessoasEndpoints`, `suppEndpoints`, `financeEndpoints`) rodavam iterativamente sem `break`.
+- **Solução Aplicada no Commit `af52404`**: Injetados comandos `break` imediatamente após o primeiro retorno de dados bem-sucedido em cada loop candidato. Isso reduziu o total de requisições por sync para **menos de 10 chamadas**, mantendo o sistema 100% resiliente e dentro das cotas da Cloudflare.
+- **Objetivo Principal Mantido**: Garantir que as 4 abas (Clientes, Fornecedores, Contas a Receber/Pagar e Plano de Contas) sejam populadas e sincronizadas continuamente da Conta Azul para a plataforma OmniZeus.
