@@ -253,11 +253,16 @@ export async function POST(req: NextRequest) {
             const data = await safeJson(res);
             const list = extractList(data, "pessoas", "fornecedores", "suppliers");
             if (list.length > 0) {
-              const existingIds = new Set(rawPessoas.map((p: any) => String(p.id)));
-              const novos = list.filter((p: any) => !existingIds.has(String(p.id)));
-              novos.forEach((p: any) => { p._force_supplier = true; });
-              rawPessoas.push(...novos);
-              apiDebug[ep.name] = `HTTP 200 → ${list.length} obtidos (${novos.length} novos fornecedores)`;
+              list.forEach((supp: any) => {
+                const match = rawPessoas.find((p: any) => String(p.id) === String(supp.id));
+                if (match) {
+                  match._force_supplier = true;
+                } else {
+                  supp._force_supplier = true;
+                  rawPessoas.push(supp);
+                }
+              });
+              apiDebug[ep.name] = `HTTP 200 → ${list.length} fornecedores marcados`;
               break;
             }
           } else {
@@ -272,7 +277,8 @@ export async function POST(req: NextRequest) {
         const financeEndpoints = [
           { name: "v2_eventos_financeiros", url: `https://api-v2.contaazul.com/v1/financeiro/eventos-financeiros` },
           { name: "v2_eventos_pag", url: `https://api-v2.contaazul.com/v1/financeiro/eventos-financeiros?pagina=1&tamanho_pagina=100` },
-          { name: "v2_parcelas", url: `https://api-v2.contaazul.com/v1/financeiro/eventos-financeiros/parcelas` },
+          { name: "v1_vendas", url: `https://api.contaazul.com/v1/sales` },
+          { name: "v1_compras", url: `https://api.contaazul.com/v1/purchases` },
           { name: "v1_eventos_financeiros", url: `https://api.contaazul.com/v1/financeiro/eventos-financeiros` },
           { name: "v1_lancamentos", url: `https://api.contaazul.com/v1/financeiro/lancamentos` }
         ];
@@ -289,7 +295,7 @@ export async function POST(req: NextRequest) {
 
           if (res.ok) {
             const data = await safeJson(res);
-            const list = extractList(data, "eventos", "lancamentos", "parcelas", "financeiro");
+            const list = extractList(data, "eventos", "lancamentos", "parcelas", "financeiro", "vendas", "compras", "sales", "purchases");
             if (list.length > 0) {
               entriesData = list;
               apiDebug[ep.name] = `HTTP 200 → ${list.length} lançamentos extraídos`;
@@ -305,8 +311,9 @@ export async function POST(req: NextRequest) {
         // ─── 3. Fetch Categorias (Plano de Contas) ────────────────────────────
         let categoriesData: any[] = [];
         const categoryEndpoints = [
+          { name: "v1_categorias", url: `https://api.contaazul.com/v1/financeiro/categorias` },
           { name: "v2_categorias", url: `https://api-v2.contaazul.com/v1/financeiro/categorias` },
-          { name: "v1_categorias", url: `https://api.contaazul.com/v1/financeiro/categorias` }
+          { name: "v1_categories", url: `https://api.contaazul.com/v1/categories` }
         ];
 
         for (const ep of categoryEndpoints) {
@@ -321,7 +328,7 @@ export async function POST(req: NextRequest) {
 
           if (res.ok) {
             const data = await safeJson(res);
-            const list = extractList(data, "categorias", "plano_contas", "planoContas");
+            const list = extractList(data, "categorias", "content", "items", "categories");
             if (list.length > 0) {
               categoriesData = list;
               apiDebug[ep.name] = `HTTP 200 → ${list.length} categorias extraídas`;
