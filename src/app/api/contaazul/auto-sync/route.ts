@@ -352,7 +352,7 @@ export async function POST(req: NextRequest) {
           const perfisArr = Array.isArray(perfisRaw) ? perfisRaw : [perfisRaw];
 
           let isSupp =
-            item._force_supplier === true ||   // veio da busca ?perfis=FORNECEDOR
+            item._force_supplier === true ||
             item.is_supplier === true ||
             item.tipo_perfil === "Fornecedor" ||
             item.tipo_perfil === "FORNECEDOR" ||
@@ -366,17 +366,28 @@ export async function POST(req: NextRequest) {
               return str.includes("FORNECEDOR") || str.includes("SUPPLIER");
             });
 
+          let isCli =
+            item.is_customer === true ||
+            item.tipo_perfil === "Cliente" ||
+            item.tipo_perfil === "CLIENTE" ||
+            item.perfil === "CLIENTE" ||
+            perfisArr.some((p: any) => {
+              const str = (
+                typeof p === "string"
+                  ? p
+                  : p?.tipo_perfil || p?.tipo || p?.name || p?.nome || p?.type || ""
+              ).toUpperCase();
+              return str.includes("CLIENTE") || str.includes("CUSTOMER");
+            });
 
           // Fallback por nome (heurística)
-          if (!isSupp) {
-            const nameUpper = String(nome).toUpperCase();
-            if (nameUpper.includes("FORNECEDOR") || nameUpper.includes("SUPPLIER")) {
-              isSupp = true;
-            }
+          const nameUpper = String(nome).toUpperCase();
+          if (nameUpper.includes("FORNECEDOR") || nameUpper.includes("SUPPLIER")) {
+            isSupp = true;
           }
 
           const itemId = String(
-            item.id || `${isSupp ? "supp" : "cli"}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
+            item.id || `pessoa_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
           );
 
           const itemSanitized = {
@@ -402,8 +413,12 @@ export async function POST(req: NextRequest) {
             synced_at: new Date().toISOString()
           };
 
-          if (isSupp) scopedSuppliers.push(itemSanitized);
-          else scopedCustomers.push(itemSanitized);
+          if (isSupp) {
+            scopedSuppliers.push(itemSanitized);
+          }
+          if (isCli || !isSupp) {
+            scopedCustomers.push(itemSanitized);
+          }
         }
 
         console.log(

@@ -195,6 +195,8 @@ export async function GET(req: NextRequest) {
     )
   ]);
 
+  const debugPessoas = results[0]?.ok ? (results[0] as any).arrayPreview || [] : [];
+
   return NextResponse.json({
     diagnostics: {
       companyId,
@@ -204,6 +206,7 @@ export async function GET(req: NextRequest) {
       clientId: clientId ? `${clientId.substring(0, 8)}...` : "VAZIO",
       testedAt: new Date().toISOString()
     },
+    pessoasCount: results[0]?.arrayLen || 0,
     results
   });
 }
