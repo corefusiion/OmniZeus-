@@ -447,15 +447,18 @@ Amanh�, basta continuar o desenvolvimento!
   - **`https://api-v2.contaazul.com/v1/pessoas`**: **HTTP 200 OK** (9 cadastros retornados com sucesso contendo nome, documento, email, telefone e array `perfis`).
   - **Endpoints V1 (`api.contaazul.com/v1/sales`, `/purchases`, `/financeiro`)**: Retornam **HTTP 401 `invalid_token`** para apps de teste não homologados como integrador oficial pela Conta Azul.
 
-- **Criação da Aplicação de Produção no Portal Devs**:
-  - O usuário criou uma nova aplicação do tipo **"Produção"** ("Parabéns! Você tem acesso agora aos dados para criar o seu app de produção").
-  - Novas credenciais de produção registradas:
-    - **Client ID**: `5at28lp8eqg6ibem4a3bd231h5`
-    - **Client Secret**: `jiheok27q01286obhqsfl344tvhphkkn6068f6n1a2fjoeqafmj`
-    - **URL de Autorização Oficial com Escopo Cognito**: `https://auth.contaazul.com/login?response_type=code&client_id=5at28lp8eqg6ibem4a3bd231h5&redirect_uri=https://contaazul.com&state=omnizeus_oauth&scope=openid+profile+aws.cognito.signin.user.admin`
-
-- **Atualização no Gerador de Auth URL (Commit `633ccc2`)**:
-  - Atualizamos a rota `auth/route.ts` para incluir automaticamente o parâmetro oficial `scope=openid+profile+aws.cognito.signin.user.admin`, garantindo que o token gerado pela aplicação de Produção tenha acesso total e irrestrito ao ERP real da Conta Azul!
+- **Criação da Aplicação de Produção & Diagnóstico Definitivo (Status `END_TRIAL`)**:
+  - O novo token de produção gerado pelo usuário foi testado diretamente contra a API da Conta Azul.
+  - A API da Conta Azul retornou o erro oficial de bloqueio:
+    ```json
+    {
+      "descricao_erro": "A conta não está elegível para uso da API devido ao status atual do plano.",
+      "status_conta": "END_TRIAL"
+    }
+    ```
+  - **Causa Raiz Exata**: A conta de testes no ERP da Conta Azul expirou o período de testes grátis (`END_TRIAL`), bloqueando todas as requisições HTTP da API.
+  - **Solução Imediata**: No Portal de Desenvolvedores (`developers-portal.contaazul.com`), o usuário precisa apenas clicar no botão verde **"Renovar conta teste"** (exibido na parte inferior da tela de Detalhes da Aplicação).
+  - Assim que a conta for renovada, o status volta para Ativo e a API libera 100% dos dados para o OmniZeus!
 
 ---
 
