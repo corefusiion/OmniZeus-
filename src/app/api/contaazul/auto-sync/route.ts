@@ -232,9 +232,8 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // 1b. Busca específica de Fornecedores (v2 perfis=FORNECEDOR + v1 suppliers)
+        // 1b. Busca específica de Fornecedores via endpoints dedicados
         const suppEndpoints = [
-          { name: "v2_perfis_fornecedor", url: `https://api-v2.contaazul.com/v1/pessoas?perfis=FORNECEDOR` },
           { name: "v1_suppliers", url: `https://api.contaazul.com/v1/suppliers` },
           { name: "v1_compras_fornecedores", url: `https://api.contaazul.com/v1/compras/fornecedores` }
         ];
@@ -253,16 +252,11 @@ export async function POST(req: NextRequest) {
             const data = await safeJson(res);
             const list = extractList(data, "pessoas", "fornecedores", "suppliers");
             if (list.length > 0) {
-              list.forEach((supp: any) => {
-                const match = rawPessoas.find((p: any) => String(p.id) === String(supp.id));
-                if (match) {
-                  match._force_supplier = true;
-                } else {
-                  supp._force_supplier = true;
-                  rawPessoas.push(supp);
-                }
-              });
-              apiDebug[ep.name] = `HTTP 200 → ${list.length} fornecedores marcados`;
+              const existingIds = new Set(rawPessoas.map((p: any) => String(p.id)));
+              const novos = list.filter((p: any) => !existingIds.has(String(p.id)));
+              novos.forEach((p: any) => { p._force_supplier = true; });
+              rawPessoas.push(...novos);
+              apiDebug[ep.name] = `HTTP 200 → ${list.length} obtidos (${novos.length} novos fornecedores)`;
               break;
             }
           } else {
