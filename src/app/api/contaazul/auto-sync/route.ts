@@ -205,8 +205,6 @@ export async function POST(req: NextRequest) {
           { name: "v1_sales_customers", url: `https://api.contaazul.com/v1/sales/customers` }
         ];
 
-        let fetchedPessoasOk = false;
-
         for (const ep of pessoasEndpoints) {
           const { res, newAccessToken: nat, newRefreshToken: nrt } = await fetchWithAutoRefresh(
             ep.url,
@@ -221,18 +219,16 @@ export async function POST(req: NextRequest) {
             const data = await safeJson(res);
             const list = extractList(data, "pessoas", "clientes", "customers");
             if (list.length > 0) {
-              // Deduplicação por id / doc
               const existingIds = new Set(rawPessoas.map((p: any) => String(p.id)));
               const novos = list.filter((p: any) => !existingIds.has(String(p.id)));
               rawPessoas.push(...novos);
-              fetchedPessoasOk = true;
               apiDebug[ep.name] = `HTTP 200 → ${list.length} obtidos (${novos.length} novos)`;
+              break;
             } else {
               apiDebug[ep.name] = `HTTP 200 → 0 registros (payload: ${previewPayload(data)})`;
             }
           } else {
-            const body = await safeJson(res);
-            apiDebug[ep.name] = `HTTP ${res.status} → ${JSON.stringify(body).substring(0, 120)}`;
+            apiDebug[ep.name] = `HTTP ${res.status}`;
           }
         }
 
@@ -262,6 +258,7 @@ export async function POST(req: NextRequest) {
               novos.forEach((p: any) => { p._force_supplier = true; });
               rawPessoas.push(...novos);
               apiDebug[ep.name] = `HTTP 200 → ${list.length} obtidos (${novos.length} novos fornecedores)`;
+              break;
             }
           } else {
             apiDebug[ep.name] = `HTTP ${res.status}`;
