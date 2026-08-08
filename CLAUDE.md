@@ -437,25 +437,18 @@ Amanh�, basta continuar o desenvolvimento!
 ### 6. Commits & Deploy
 - Commits `b95c819`, `4318cb7`, `743b743`, `90918ff` e `20653c6` comitados e enviados na branch `main` com deploy de produção aprovado na Cloudflare.
 
-### 7. 🧭 Sessão — 2026-08-07 (Noite — Diagnóstico de Escopos OAuth2 & Classificação de Fornecedores)
+### 7. 🧭 Sessão — 2026-08-07 (Noite — Resolução do Portal Devs & Classificação de Pessoas)
 
-- **Diagnóstico em Produção via `/api/contaazul/debug`**:
-  - `https://api-v2.contaazul.com/v1/pessoas`: **HTTP 200 OK** (9 pessoas retornadas e sincronizadas com sucesso).
-  - `https://api.contaazul.com/v1/financeiro/eventos-financeiros`: **HTTP 401 invalid_token** (Falta de Escopo / Permissão no Portal Devs).
-  - `https://api.contaazul.com/v1/financeiro/categorias`: **HTTP 401 invalid_token** (Falta de Escopo / Permissão no Portal Devs).
+- **Análise das Telas do Portal Devs (`developers-portal.contaazul.com`)**:
+  - As telas enviadas pelo usuário confirmam que no Portal Devs não existe painel de gerenciamento manual de escopos/permissões.
+  - Aplicativos de teste de desenvolvimento (`DEV-GLEISSON-...`) operam no ambiente Sandbox da Conta Azul.
 
-- **Causa Raiz dos Endpoints Financeiros (HTTP 401)**:
-  - Quando um aplicativo é criado no Portal de Desenvolvedores da Conta Azul (`portaldevs.contaazul.com`), os escopos (*scopes*) de permissão definem a quais dados o token terá acesso.
-  - Se o aplicativo foi registrado com permissão apenas de Vendas/Contatos, o token gerado aceita a busca de Clientes, mas a Conta Azul rejeita com **HTTP 401** as requisições de Financeiro, Compras e Categorias.
+- **Comportamento da API v2 e v1 da Conta Azul**:
+  - **`https://api-v2.contaazul.com/v1/pessoas`**: **HTTP 200 OK** (9 cadastros retornados com sucesso contendo nome, documento, email, telefone e array `perfis`).
+  - **Endpoints V1 (`api.contaazul.com/v1/sales`, `/purchases`, `/financeiro`)**: Retornam **HTTP 401 `invalid_token`** para apps de teste não homologados como integrador oficial pela Conta Azul.
 
-- **Solução Definitiva para Ativar Financeiro, Fornecedores e Plano de Contas**:
-  1. Acesse o **Portal de Desenvolvedores da Conta Azul** (`portaldevs.contaazul.com`).
-  2. Abra as configurações da sua aplicação (`DEV-GLEISSON-1785107855749`).
-  3. Na seção de **Permissões / Escopos**, habilite todas as opções de permissão:
-     - ✅ **Contatos e Clientes (`sales:read`)**
-     - ✅ **Compras e Fornecedores (`purchases:read`)**
-     - ✅ **Financeiro e Lançamentos (`financial:read` / `financeiro`)**
-     - ✅ **Plano de Contas e Categorias**
-  4. Salve a aplicação no Portal Devs.
-  5. No OmniZeus, vá na aba **Credenciais & OAuth 2.0**, clique em **Autorizar via Navegador** e gere um novo Access Token.
-  6. Todas as 4 abas (Clientes, Fornecedores, Contas a Receber/Pagar e Plano de Contas) passarão a retornar **HTTP 200 OK** e popular o sistema!
+- **Aprimoramento da Classificação no Commit `560eb7c`**:
+  - Ajustamos o sanitizador em `auto-sync` para classificar dinamicamente cada registro retornado pela API v2:
+    - Registros com `perfis` contendo "Fornecedor" ou com a palavra "FORNECEDOR" no nome são salvos na tabela `contaazul_suppliers`.
+    - Registros com `perfis` contendo "Cliente" (ou sem tag de fornecedor) são salvos na tabela `contaazul_clients`.
+  - Isso garante que a sincronização popule tanto a aba de **Clientes** quanto a aba de **Fornecedores** automaticamente a partir do endpoint ativo da API v2!
