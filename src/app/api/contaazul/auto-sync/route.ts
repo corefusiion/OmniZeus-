@@ -46,7 +46,8 @@ function previewPayload(data: any): string {
   return String(data).substring(0, 80);
 }
 
-/** Upsert resiliente: tenta onConflict composto, depois simples, depois insert individual */
+/** Upsert resiliente otimizado p/ Cloudflare (≤ 2 sub-requests).
+ * PK real das tabelas Supabase é simples em id — onConflict: "id" primeiro. */
 async function resilientUpsert(
   tableName: string,
   records: any[],
@@ -54,38 +55,17 @@ async function resilientUpsert(
 ): Promise<{ count: number; errors: number }> {
   if (records.length === 0) return { count: 0, errors: 0 };
 
-  // Tentativa 1: onConflict composto id,company_id (PK composta do novo script SQL)
-  const { data: d1, error: e1 } = await supabase
-    .from(tableName)
-    .upsert(records, { onConflict: "id,company_id" })
-    .select("id");
+  // Tentativa 1: onConflict na PK real (id simples)
+  const { error: e1 } = await supabase.from(tableName).upsert(records, { onConflict: conflictColumn });
 
-  if (!e1) {
-    return { count: d1?.length ?? records.length, errors: 0 };
-  }
+  if (!e1) return { count: records.length, errors: 0 };
 
-  console.warn(`[Auto-Sync] onConflict composto falhou em ${tableName}:`, e1.message, "— tentando onConflict simples...");
+  // Tentativa 2: sem onConflict (deixa o PostgREST resolver)
+  const { error: e2 } = await supabase.from(tableName).upsert(records);
 
-  // Tentativa 2: onConflict simples (PK simples em id)
-  const { data: d2, error: e2 } = await supabase
-    .from(tableName)
-    .upsert(records, { onConflict: conflictColumn })
-    .select("id");
+  if (!e2) return { count: records.length, errors: 0 };
 
-  if (!e2) {
-    return { count: d2?.length ?? records.length, errors: 0 };
-  }
-
-  console.warn(`[Auto-Sync] onConflict simples também falhou em ${tableName}:`, e2.message, "— tentando upsert sem onConflict...");
-
-  // Tentativa 3: upsert sem onConflict (deixa o Supabase resolver)
-  const { data: d3, error: e3 } = await supabase.from(tableName).upsert(records).select("id");
-
-  if (!e3) {
-    return { count: d3?.length ?? records.length, errors: 0 };
-  }
-
-  console.error(`[Auto-Sync] ERRO FINAL em ${tableName}:`, e3.message);
+  console.error(`[Auto-Sync] ERRO FINAL em ${tableName}:`, e2.message || e1.message);
   return { count: 0, errors: 1 };
 }
 
@@ -187,8 +167,9 @@ export async function POST(req: NextRequest) {
         let activeToken = cfg.access_token as string;
         let activeRefresh = cfg.refresh_token as string;
 
-        // ─── 1. Fetch Pessoas via API v2 & v1 ──────────────────────────────────
+        // ─── 1. Fetch Pessoas / Clientes / Fornecedores via API v2 ────────────
         let rawPessoas: any[] = [];
+        let subRequests = 0; // orçamento global p/ limite de 50 sub-requests do Worker
 
         const makeTokens = () => ({
           accessToken: activeToken,
@@ -197,15 +178,23 @@ export async function POST(req: NextRequest) {
           clientSecret: cfg.client_secret
         });
 
-        // Endpoints candidatos para busca de Pessoas / Clientes / Fornecedores
+        const isAuthError = (status: number) => status === 401 || status === 403;
+
+        // v2 é a API homologada (retorna 200). v1 antiga retorna 401 para apps não-homologados.
         const pessoasEndpoints = [
           { name: "v2_pessoas", url: `https://api-v2.contaazul.com/v1/pessoas` },
           { name: "v2_pessoas_pag", url: `https://api-v2.contaazul.com/v1/pessoas?pagina=1&tamanho_pagina=100` },
-          { name: "v1_customers", url: `https://api.contaazul.com/v1/customers` },
-          { name: "v1_sales_customers", url: `https://api.contaazul.com/v1/sales/customers` }
+          { name: "v2_pessoas_fornecedor", url: `https://api-v2.contaazul.com/v1/pessoas?perfis=FORNECEDOR` }
         ];
 
+        let authBlocked = false;
+
         for (const ep of pessoasEndpoints) {
+          if (subRequests >= 12) {
+            apiDebug[ep.name] = "orçamento de sub-requests atingido";
+            break;
+          }
+          subRequests++;
           const { res, newAccessToken: nat, newRefreshToken: nrt } = await fetchWithAutoRefresh(
             ep.url,
             { method: "GET" },
@@ -217,48 +206,23 @@ export async function POST(req: NextRequest) {
 
           if (res.ok) {
             const data = await safeJson(res);
-            const list = extractList(data, "pessoas", "clientes", "customers");
+            const list = extractList(data, "pessoas", "clientes", "customers", "fornecedores", "suppliers");
+            const isFornecedorQuery = ep.name === "v2_pessoas_fornecedor";
             if (list.length > 0) {
               const existingIds = new Set(rawPessoas.map((p: any) => String(p.id)));
               const novos = list.filter((p: any) => !existingIds.has(String(p.id)));
+              if (isFornecedorQuery) novos.forEach((p: any) => { p._force_supplier = true; });
               rawPessoas.push(...novos);
-              apiDebug[ep.name] = `HTTP 200 → ${list.length} obtidos (${novos.length} novos)`;
+              apiDebug[ep.name] = `HTTP 200 → ${list.length} obtidos (${novos.length} novos${isFornecedorQuery ? " fornecedores" : ""})`;
               break;
             } else {
               apiDebug[ep.name] = `HTTP 200 → 0 registros (payload: ${previewPayload(data)})`;
             }
-          } else {
-            apiDebug[ep.name] = `HTTP ${res.status}`;
-          }
-        }
-
-        // 1b. Busca específica de Fornecedores via endpoints dedicados
-        const suppEndpoints = [
-          { name: "v1_suppliers", url: `https://api.contaazul.com/v1/suppliers` },
-          { name: "v1_compras_fornecedores", url: `https://api.contaazul.com/v1/compras/fornecedores` }
-        ];
-
-        for (const ep of suppEndpoints) {
-          const { res, newAccessToken: nat, newRefreshToken: nrt } = await fetchWithAutoRefresh(
-            ep.url,
-            { method: "GET" },
-            makeTokens(),
-            companyId
-          );
-          if (nat) activeToken = nat;
-          if (nrt) activeRefresh = nrt;
-
-          if (res.ok) {
-            const data = await safeJson(res);
-            const list = extractList(data, "pessoas", "fornecedores", "suppliers");
-            if (list.length > 0) {
-              const existingIds = new Set(rawPessoas.map((p: any) => String(p.id)));
-              const novos = list.filter((p: any) => !existingIds.has(String(p.id)));
-              novos.forEach((p: any) => { p._force_supplier = true; });
-              rawPessoas.push(...novos);
-              apiDebug[ep.name] = `HTTP 200 → ${list.length} obtidos (${novos.length} novos fornecedores)`;
-              break;
-            }
+          } else if (isAuthError(res.status)) {
+            // Token/sessão inválido → não adianta testar mais endpoints
+            apiDebug[ep.name] = `HTTP ${res.status} (autorização)`;
+            authBlocked = true;
+            break;
           } else {
             apiDebug[ep.name] = `HTTP ${res.status}`;
           }
@@ -266,70 +230,84 @@ export async function POST(req: NextRequest) {
 
         console.log(`[Auto-Sync][${companyId}] Total rawPessoas: ${rawPessoas.length}`);
 
-        // ─── 2. Fetch Financeiro via API v2 & v1 ───────────────────────────────
+        // ─── 2. Fetch Financeiro via API v2 (v1 = 401 p/ apps não-homologados) ──
         let entriesData: any[] = [];
-        const financeEndpoints = [
-          { name: "v2_eventos_financeiros", url: `https://api-v2.contaazul.com/v1/financeiro/eventos-financeiros` },
-          { name: "v2_eventos_pag", url: `https://api-v2.contaazul.com/v1/financeiro/eventos-financeiros?pagina=1&tamanho_pagina=100` },
-          { name: "v1_vendas", url: `https://api.contaazul.com/v1/sales` },
-          { name: "v1_compras", url: `https://api.contaazul.com/v1/purchases` },
-          { name: "v1_eventos_financeiros", url: `https://api.contaazul.com/v1/financeiro/eventos-financeiros` },
-          { name: "v1_lancamentos", url: `https://api.contaazul.com/v1/financeiro/lancamentos` }
-        ];
+        if (!authBlocked) {
+          const financeEndpoints = [
+            { name: "v2_eventos_financeiros", url: `https://api-v2.contaazul.com/v1/financeiro/eventos-financeiros` },
+            { name: "v2_eventos_pag", url: `https://api-v2.contaazul.com/v1/financeiro/eventos-financeiros?pagina=1&tamanho_pagina=100` }
+          ];
 
-        for (const ep of financeEndpoints) {
-          const { res, newAccessToken: nat, newRefreshToken: nrt } = await fetchWithAutoRefresh(
-            ep.url,
-            { method: "GET" },
-            makeTokens(),
-            companyId
-          );
-          if (nat) activeToken = nat;
-          if (nrt) activeRefresh = nrt;
+          for (const ep of financeEndpoints) {
+            if (subRequests >= 12) {
+              apiDebug[ep.name] = "orçamento de sub-requests atingido";
+              break;
+            }
+            subRequests++;
+            const { res, newAccessToken: nat, newRefreshToken: nrt } = await fetchWithAutoRefresh(
+              ep.url,
+              { method: "GET" },
+              makeTokens(),
+              companyId
+            );
+            if (nat) activeToken = nat;
+            if (nrt) activeRefresh = nrt;
 
-          if (res.ok) {
-            const data = await safeJson(res);
-            const list = extractList(data, "eventos", "lancamentos", "parcelas", "financeiro", "vendas", "compras", "sales", "purchases");
-            if (list.length > 0) {
-              entriesData = list;
-              apiDebug[ep.name] = `HTTP 200 → ${list.length} lançamentos extraídos`;
+            if (res.ok) {
+              const data = await safeJson(res);
+              const list = extractList(data, "eventos", "lancamentos", "parcelas", "financeiro", "receber", "pagar");
+              if (list.length > 0) {
+                entriesData = list;
+                apiDebug[ep.name] = `HTTP 200 → ${list.length} lançamentos extraídos`;
+                break;
+              } else {
+                apiDebug[ep.name] = `HTTP 200 → 0 registros`;
+              }
+            } else if (isAuthError(res.status)) {
+              apiDebug[ep.name] = `HTTP ${res.status} (autorização)`;
               break;
             } else {
-              apiDebug[ep.name] = `HTTP 200 → 0 registros`;
+              apiDebug[ep.name] = `HTTP ${res.status}`;
             }
-          } else {
-            apiDebug[ep.name] = `HTTP ${res.status}`;
           }
         }
 
-        // ─── 3. Fetch Categorias (Plano de Contas) ────────────────────────────
+        // ─── 3. Fetch Categorias / Plano de Contas via API v2 ──────────────────
         let categoriesData: any[] = [];
-        const categoryEndpoints = [
-          { name: "v1_categorias", url: `https://api.contaazul.com/v1/financeiro/categorias` },
-          { name: "v2_categorias", url: `https://api-v2.contaazul.com/v1/financeiro/categorias` },
-          { name: "v1_categories", url: `https://api.contaazul.com/v1/categories` }
-        ];
+        if (!authBlocked) {
+          const categoryEndpoints = [
+            { name: "v2_categorias", url: `https://api-v2.contaazul.com/v1/financeiro/categorias` }
+          ];
 
-        for (const ep of categoryEndpoints) {
-          const { res, newAccessToken: nat, newRefreshToken: nrt } = await fetchWithAutoRefresh(
-            ep.url,
-            { method: "GET" },
-            makeTokens(),
-            companyId
-          );
-          if (nat) activeToken = nat;
-          if (nrt) activeRefresh = nrt;
-
-          if (res.ok) {
-            const data = await safeJson(res);
-            const list = extractList(data, "categorias", "content", "items", "categories");
-            if (list.length > 0) {
-              categoriesData = list;
-              apiDebug[ep.name] = `HTTP 200 → ${list.length} categorias extraídas`;
+          for (const ep of categoryEndpoints) {
+            if (subRequests >= 12) {
+              apiDebug[ep.name] = "orçamento de sub-requests atingido";
               break;
             }
-          } else {
-            apiDebug[ep.name] = `HTTP ${res.status}`;
+            subRequests++;
+            const { res, newAccessToken: nat, newRefreshToken: nrt } = await fetchWithAutoRefresh(
+              ep.url,
+              { method: "GET" },
+              makeTokens(),
+              companyId
+            );
+            if (nat) activeToken = nat;
+            if (nrt) activeRefresh = nrt;
+
+            if (res.ok) {
+              const data = await safeJson(res);
+              const list = extractList(data, "categorias", "content", "items", "categories");
+              if (list.length > 0) {
+                categoriesData = list;
+                apiDebug[ep.name] = `HTTP 200 → ${list.length} categorias extraídas`;
+                break;
+              }
+            } else if (isAuthError(res.status)) {
+              apiDebug[ep.name] = `HTTP ${res.status} (autorização)`;
+              break;
+            } else {
+              apiDebug[ep.name] = `HTTP ${res.status}`;
+            }
           }
         }
 
@@ -536,16 +514,7 @@ export async function POST(req: NextRequest) {
           console.log(`[Auto-Sync][${companyId}] contaazul_categories: ${categoriesCount} gravados`);
         }
 
-        // ─── 7. Atualizar tokens e config ─────────────────────────────────────
-        if (activeToken && activeRefresh) {
-          await saveContaAzulTokens(companyId, {
-            accessToken: activeToken,
-            refreshToken: activeRefresh,
-            clientId: cfg.client_id,
-            clientSecret: cfg.client_secret
-          });
-        }
-
+        // ─── 7. Atualizar tokens e config (single update — evita sub-requests extras) ──
         const now = new Date();
         const nextSync = new Date(now.getTime() + 10 * 60 * 1000);
 
