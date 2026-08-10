@@ -219,8 +219,10 @@ export async function POST(req: NextRequest) {
               apiDebug[ep.name] = `HTTP 200 → 0 registros (payload: ${previewPayload(data)})`;
             }
           } else if (isAuthError(res.status)) {
-            // Token/sessão inválido → não adianta testar mais endpoints
-            apiDebug[ep.name] = `HTTP ${res.status} (autorização)`;
+            // Token/sessão inválido → captura body p/ diagnóstico (END_TRIAL x token)
+            const errBody = await res.text().catch(() => "");
+            const snippet = errBody.replace(/\s+/g, " ").substring(0, 180);
+            apiDebug[ep.name] = `HTTP ${res.status} (autorização): ${snippet}`;
             authBlocked = true;
             break;
           } else {
@@ -264,7 +266,9 @@ export async function POST(req: NextRequest) {
                 apiDebug[ep.name] = `HTTP 200 → 0 registros`;
               }
             } else if (isAuthError(res.status)) {
-              apiDebug[ep.name] = `HTTP ${res.status} (autorização)`;
+              const errBody = await res.text().catch(() => "");
+              const snippet = errBody.replace(/\s+/g, " ").substring(0, 180);
+              apiDebug[ep.name] = `HTTP ${res.status} (autorização): ${snippet}`;
               break;
             } else {
               apiDebug[ep.name] = `HTTP ${res.status}`;
@@ -303,7 +307,9 @@ export async function POST(req: NextRequest) {
                 break;
               }
             } else if (isAuthError(res.status)) {
-              apiDebug[ep.name] = `HTTP ${res.status} (autorização)`;
+              const errBody = await res.text().catch(() => "");
+              const snippet = errBody.replace(/\s+/g, " ").substring(0, 180);
+              apiDebug[ep.name] = `HTTP ${res.status} (autorização): ${snippet}`;
               break;
             } else {
               apiDebug[ep.name] = `HTTP ${res.status}`;
@@ -548,7 +554,7 @@ export async function POST(req: NextRequest) {
           if (hasAuthError || allFailed) {
             statusText = "error";
             errorsCount++;
-            messageText = "Atenção: Conexão com Conta Azul precisa de autorização (Token expirado ou HTTP 401/403). Acesse a aba 'Credenciais & OAuth 2.0' e clique em 'Autorizar via Navegador'.";
+            messageText = `Atenção: Conexão com Conta Azul precisa de autorização (Token expirado ou HTTP 401/403). Acesse a aba 'Credenciais & OAuth 2.0' e clique em 'Autorizar via Navegador'. Detalhes: ${debugValues.join(" | ")}`;
           } else if (debugValues.length > 0) {
             messageText = `Sync concluído. 0 novos registros encontrados no Conta Azul (status: ${debugValues.join(" | ")})`;
           }
