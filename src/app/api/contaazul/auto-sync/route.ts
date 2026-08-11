@@ -182,9 +182,8 @@ export async function POST(req: NextRequest) {
 
         // v2 é a API homologada (retorna 200). v1 antiga retorna 401 para apps não-homologados.
         const pessoasEndpoints = [
-          { name: "v2_pessoas", url: `https://api-v2.contaazul.com/v1/pessoas` },
-          { name: "v2_pessoas_pag", url: `https://api-v2.contaazul.com/v1/pessoas?pagina=1&tamanho_pagina=100` },
-          { name: "v2_pessoas_fornecedor", url: `https://api-v2.contaazul.com/v1/pessoas?perfis=FORNECEDOR` }
+          { name: "v2_pessoas", url: `https://api-v2.contaazul.com/v1/pessoas?pagina=1&tamanho_pagina=100` },
+          { name: "v2_pessoas_fornecedor", url: `https://api-v2.contaazul.com/v1/pessoas?pagina=1&tamanho_pagina=100&perfis=FORNECEDOR` }
         ];
 
         let authBlocked = false;
@@ -209,12 +208,16 @@ export async function POST(req: NextRequest) {
             const list = extractList(data, "pessoas", "clientes", "customers", "fornecedores", "suppliers");
             const isFornecedorQuery = ep.name === "v2_pessoas_fornecedor";
             if (list.length > 0) {
-              const existingIds = new Set(rawPessoas.map((p: any) => String(p.id)));
-              const novos = list.filter((p: any) => !existingIds.has(String(p.id)));
-              if (isFornecedorQuery) novos.forEach((p: any) => { p._force_supplier = true; });
-              rawPessoas.push(...novos);
-              apiDebug[ep.name] = `HTTP 200 → ${list.length} obtidos (${novos.length} novos${isFornecedorQuery ? " fornecedores" : ""})`;
-              break;
+              list.forEach((p: any) => {
+                const existing = rawPessoas.find((rp: any) => String(rp.id) === String(p.id));
+                if (existing) {
+                  if (isFornecedorQuery) existing._force_supplier = true;
+                } else {
+                  if (isFornecedorQuery) p._force_supplier = true;
+                  rawPessoas.push(p);
+                }
+              });
+              apiDebug[ep.name] = `HTTP 200 → ${list.length} obtidos`;
             } else {
               apiDebug[ep.name] = `HTTP 200 → 0 registros (payload: ${previewPayload(data)})`;
             }
