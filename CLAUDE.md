@@ -447,15 +447,9 @@ Amanh�, basta continuar o desenvolvimento!
   - **`https://api-v2.contaazul.com/v1/pessoas`**: **HTTP 200 OK** (9 cadastros retornados com sucesso contendo nome, documento, email, telefone e array `perfis`).
   - **Endpoints V1 (`api.contaazul.com/v1/sales`, `/purchases`, `/financeiro`)**: Retornam **HTTP 401 `invalid_token`** para apps de teste não homologados como integrador oficial pela Conta Azul.
 
-- **Criação da Aplicação de Produção & Diagnóstico Definitivo (Status `END_TRIAL`)**:
-  - O novo token de produção gerado pelo usuário foi testado diretamente contra a API da Conta Azul.
-  - A API da Conta Azul retornou o erro oficial de bloqueio:
-    ```json
-    {
-      "descricao_erro": "A conta não está elegível para uso da API devido ao status atual do plano.",
-      "status_conta": "END_TRIAL"
-    }
-    ```
-  - **Causa Raiz Exata**: A conta de testes no ERP da Conta Azul expirou o período de testes grátis (`END_TRIAL`), bloqueando todas as requisições HTTP da API.
-  - **Solução Imediata**: No Portal de Desenvolvedores (`developers-portal.contaazul.com`), o usuário precisa apenas clicar no botão verde **"Renovar conta teste"** (exibido na parte inferior da tela de Detalhes da Aplicação).
-  - Assim que a conta for renovada, o status volta para Ativo e a API libera 100% dos dados para o OmniZeus!
+### 7. 🧭 Sessão — 2026-08-10 (Git Pull & Diagnóstico Detalhado do Auto-Sync)
+
+- **Git Pull Realizado com Sucesso**: Atualizado o código da máquina de trabalho trazendo 2 novos commits para a branch `main` (`b4b0a75..1d738b2`):
+  - **Commit `f97c613`**: Otimização completa do `auto-sync/route.ts` eliminando sub-requisições redundantes da Cloudflare e tratando bloqueios precocemente.
+  - **Commit `1d738b2`**: Injeção de diagnóstico detalhado de erros HTTP 401/403 na mensagem da interface (exibe o snippet real do erro retornado pela Conta Azul, ex: `END_TRIAL`, `invalid_token` ou escopo ausente).
+- **Validação**: Compilação TypeScript executada (`npx tsc --noEmit`) passando limpa com **0 erros**.
