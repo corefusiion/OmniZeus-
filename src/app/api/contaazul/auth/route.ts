@@ -14,7 +14,20 @@ export async function POST(req: Request) {
       );
     }
 
-    const cleanRedirectUri = redirectUri || "https://contaazul.com";
+    let cleanRedirectUri = (redirectUri || "").trim();
+    if (cleanRedirectUri.includes("redirect_uri=")) {
+      try {
+        const u = new URL(cleanRedirectUri);
+        const extracted = u.searchParams.get("redirect_uri");
+        if (extracted) cleanRedirectUri = extracted;
+      } catch {
+        const match = cleanRedirectUri.match(/redirect_uri=([^&]+)/);
+        if (match && match[1]) cleanRedirectUri = decodeURIComponent(match[1]);
+      }
+    }
+    if (!cleanRedirectUri || cleanRedirectUri.startsWith("http://localhost")) {
+      cleanRedirectUri = "https://google.com";
+    }
 
     // Standard ContaAzul OAuth 2.0 Login Consent Screen URL (with official Cognito scope)
     const authUrl = `https://auth.contaazul.com/login?response_type=code&client_id=${encodeURIComponent(
