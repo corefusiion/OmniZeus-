@@ -447,9 +447,15 @@ Amanh�, basta continuar o desenvolvimento!
   - **`https://api-v2.contaazul.com/v1/pessoas`**: **HTTP 200 OK** (9 cadastros retornados com sucesso contendo nome, documento, email, telefone e array `perfis`).
   - **Endpoints V1 (`api.contaazul.com/v1/sales`, `/purchases`, `/financeiro`)**: Retornam **HTTP 401 `invalid_token`** para apps de teste não homologados como integrador oficial pela Conta Azul.
 
-### 7. 🧭 Sessão — 2026-08-10 (Git Pull & Diagnóstico Detalhado do Auto-Sync)
+### 7. 🧭 Sessão — 2026-08-10 (Resolução do Autenticação DevPortal & Sync de Clientes)
 
-- **Git Pull Realizado com Sucesso**: Atualizado o código da máquina de trabalho trazendo 2 novos commits para a branch `main` (`b4b0a75..1d738b2`):
-  - **Commit `f97c613`**: Otimização completa do `auto-sync/route.ts` eliminando sub-requisições redundantes da Cloudflare e tratando bloqueios precocemente.
-  - **Commit `1d738b2`**: Injeção de diagnóstico detalhado de erros HTTP 401/403 na mensagem da interface (exibe o snippet real do erro retornado pela Conta Azul, ex: `END_TRIAL`, `invalid_token` ou escopo ausente).
-- **Validação**: Compilação TypeScript executada (`npx tsc --noEmit`) passando limpa com **0 erros**.
+- **Identificação da Causa Raiz do `END_TRIAL`**:
+  - A conta antiga (`jsgleisson@gmail.com`) teve o período de teste expirado no ERP. O usuário gerou a nova conta de teste ativa pelo DevPortal (`c3eef082-2458-4672-b222-7f1b38df9da5@devportal.com` com 15 dias de teste).
+  - O erro `END_TRIAL` ocorria porque o navegador mantinha o cookie da conta antiga expirada e autorizava silenciosamente. Ao autorizar via aba anônima com os dados da conta DevPortal, a autenticação foi concluída com **HTTP 200 OK**.
+- **Resultados Concretos na Interface**:
+  - **`Clientes (6)`** ativados e sincronizados com sucesso no OmniZeus 🟢.
+  - O aviso de erro `END_TRIAL` foi totalmente removido.
+- **Melhorias de Código Enviadas (`main`)**:
+  - **Commit `2e88d46`**: Tratamento inteligente do `redirectUri` em [auth/route.ts](file:///c:/Users/gdesi/Desktop/Omnizeus/src/app/api/contaazul/auth/route.ts), prevenindo o erro `redirect_mismatch` mesmo se a URL inteira for colada no campo.
+  - **Commit `263ae59`**: Otimização no [auto-sync/route.ts](file:///c:/Users/gdesi/Desktop/Omnizeus/src/app/api/contaazul/auto-sync/route.ts) garantindo a consulta combinada de pessoas gerais e filtro específico de `FORNECEDOR`.
+- **Validação**: TypeScript build (`npx tsc --noEmit`) 100% aprovado (0 erros).
