@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
         status: res.status,
         ok: res.ok,
         isHtml,
-        bodyPreview: text.substring(0, 600),
+        bodyPreview: text.substring(0, 10000),
         keys,
         arrayLen,
         arrayPreview,
