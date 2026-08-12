@@ -952,16 +952,16 @@ function ValueField({
 }) {
   return (
     <label className="block">
-      <span className="text-[11px] font-semibold text-slate-600 block mb-1">{label}</span>
-      <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden focus-within:border-primary">
-        {prefix && <span className="pl-3 pr-1 text-xs text-slate-400 font-mono">{prefix}</span>}
+      <span className="text-[11px] font-semibold text-slate-700 block mb-1">{label}</span>
+      <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/20 shadow-2xs">
+        {prefix && <span className="pl-3 pr-1 text-xs text-slate-500 font-mono select-none">{prefix}</span>}
         <input
           type="number"
           value={value}
           onChange={(e) => onChange(Number(e.target.value) || 0)}
-          className="w-full h-10 px-3 text-sm font-bold text-slate-900 outline-none"
+          className="w-full h-10 px-3 text-sm font-bold text-slate-900 outline-none bg-transparent"
         />
-        {suffix && <span className="pr-3 text-xs text-slate-400">{suffix}</span>}
+        {suffix && <span className="pr-3 text-xs text-slate-500 select-none">{suffix}</span>}
       </div>
     </label>
   );
@@ -1007,13 +1007,13 @@ function ValueCalculator() {
   return (
     <div
       id="calculadora"
-      className="my-12 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-primary/5 overflow-hidden"
+      className="my-8 sm:my-12 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-primary/5 overflow-hidden shadow-xs"
     >
-      <div className="grid lg:grid-cols-2">
+      <div className="grid grid-cols-1 lg:grid-cols-2">
         {/* ── Inputs ── */}
-        <div className="p-6 sm:p-8 border-b lg:border-b-0 lg:border-r border-slate-200 space-y-4">
+        <div className="p-4 sm:p-6 lg:p-8 border-b lg:border-b-0 lg:border-r border-slate-200 space-y-4">
           <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-bold uppercase tracking-wider text-primary">
+            <span className="px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-bold uppercase tracking-wider text-primary">
               Calculadora de Valor
             </span>
           </div>
@@ -1022,15 +1022,15 @@ function ValueCalculator() {
             Use dados reais de volume, tempo e falhas.
           </p>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <ValueField label="Volume por semana" value={volume} onChange={setVolume} suffix="itens" />
             <ValueField label="Tempo por item" value={tempoMin} onChange={setTempoMin} suffix="min" />
             <ValueField label="Custo da hora (completo)" value={custoHora} onChange={setCustoHora} prefix="R$" />
             <ValueField label="Erros por mês" value={errosMes} onChange={setErrosMes} suffix="erros" />
             <ValueField label="Custo médio por erro" value={custoErro} onChange={setCustoErro} prefix="R$" />
-            <div>
+            <div className="col-span-1 sm:col-span-2 bg-slate-100/60 sm:bg-transparent p-3 sm:p-0 rounded-xl sm:rounded-none">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] font-semibold text-slate-600">Confiança nos dados</span>
+                <span className="text-[11px] font-semibold text-slate-700">Confiança nos dados</span>
                 <span className="text-[11px] font-mono font-bold text-primary">{confianca}%</span>
               </div>
               <input
@@ -1040,11 +1040,11 @@ function ValueCalculator() {
                 step={5}
                 value={confianca}
                 onChange={(e) => setConfianca(Number(e.target.value))}
-                className="w-full accent-primary"
+                className="w-full h-2 accent-primary cursor-pointer"
               />
-              <div className="flex justify-between text-[9px] text-slate-400">
-                <span>Conservador</span>
-                <span>Otimista</span>
+              <div className="flex justify-between text-[9px] font-medium text-slate-400 mt-1">
+                <span>Conservador (30%)</span>
+                <span>Otimista (100%)</span>
               </div>
             </div>
           </div>
@@ -1054,18 +1054,20 @@ function ValueCalculator() {
             <button
               type="button"
               onClick={() => setShowExpansao((v) => !v)}
-              className="flex items-center gap-2 text-[11px] font-bold text-slate-700 hover:text-slate-900"
+              className="w-full flex items-center justify-between sm:justify-start gap-2 text-[11px] font-bold text-slate-700 hover:text-slate-900 py-1"
             >
-              <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
-              Lente da receita — capacidade de atender mais clientes
+              <span className="flex items-center gap-2">
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                Lente da receita — capacidade de atender mais clientes
+              </span>
               {showExpansao ? (
-                <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronUp className="w-3.5 h-3.5 text-slate-400 shrink-0" />
               ) : (
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
               )}
             </button>
             {showExpansao && (
-              <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <ValueField label="Novos clientes/mês que poderia atender" value={novosClientes} onChange={setNovosClientes} />
                 <ValueField label="Ticket médio (R$)" value={ticketCliente} onChange={setTicketCliente} prefix="R$" />
               </div>
@@ -1074,47 +1076,47 @@ function ValueCalculator() {
         </div>
 
         {/* ── Resultados ── */}
-        <div className="p-6 sm:p-8 space-y-4">
+        <div className="p-4 sm:p-6 lg:p-8 space-y-4">
           <div className="flex items-center gap-2">
-            <Calculator className="w-4 h-4 text-primary" />
+            <Calculator className="w-4 h-4 text-primary shrink-0" />
             <span className="text-[11px] font-bold uppercase tracking-widest text-primary">
               Seu resultado anual estimado
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl bg-white border border-slate-200 p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="rounded-xl bg-white border border-slate-200 p-3.5 sm:p-4">
               <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold flex items-center gap-1">
-                <Clock className="w-3 h-3" /> Trabalho anual
+                <Clock className="w-3.5 h-3.5 shrink-0" /> Trabalho anual
               </span>
-              <span className="text-xl font-extrabold text-slate-900">{fmtBRL(valorTrabalhoAnual)}</span>
-              <span className="text-[10px] text-slate-400 block">{fmtInt(horasSemana)} h/semana economizadas</span>
+              <span className="text-lg sm:text-xl font-extrabold text-slate-900 block mt-1">{fmtBRL(valorTrabalhoAnual)}</span>
+              <span className="text-[10px] text-slate-500 block mt-0.5">{fmtInt(horasSemana)} h/semana economizadas</span>
             </div>
-            <div className="rounded-xl bg-white border border-slate-200 p-4">
+            <div className="rounded-xl bg-white border border-slate-200 p-3.5 sm:p-4">
               <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3" /> Erros evitados
+                <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-emerald-600" /> Erros evitados
               </span>
-              <span className="text-xl font-extrabold text-slate-900">{fmtBRL(valorErrosAnual)}</span>
-              <span className="text-[10px] text-slate-400 block">{fmtInt(errosMes)} falhas/mês</span>
+              <span className="text-lg sm:text-xl font-extrabold text-slate-900 block mt-1">{fmtBRL(valorErrosAnual)}</span>
+              <span className="text-[10px] text-slate-500 block mt-0.5">{fmtInt(errosMes)} falhas/mês</span>
             </div>
           </div>
 
-          <div className="rounded-xl bg-primary/5 border border-primary/20 p-4">
-            <div className="flex items-baseline justify-between">
+          <div className="rounded-xl bg-primary/5 border border-primary/20 p-4 sm:p-5">
+            <div className="flex items-baseline justify-between gap-2">
               <span className="text-[10px] uppercase tracking-wider text-primary font-bold">Valor anual confiável</span>
-              <span className="text-[10px] text-slate-500 font-mono">{confianca}% confiança</span>
+              <span className="text-[10px] text-slate-500 font-mono shrink-0">{confianca}% confiança</span>
             </div>
-            <span className="text-3xl font-extrabold text-slate-900">{fmtBRL(valorBase)}</span>
-            <div className="mt-2 text-[11px] text-slate-600">
+            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 block mt-1 break-words">{fmtBRL(valorBase)}</span>
+            <div className="mt-2 text-[11px] leading-snug text-slate-600">
               Faixa de investimento indicada (10–20% do valor confiável):{" "}
-              <span className="font-bold text-slate-900">
+              <span className="font-bold text-slate-900 block sm:inline mt-0.5 sm:mt-0">
                 {fmtBRL(precoRangeMin)} a {fmtBRL(precoRangeMax)}/mês
               </span>
             </div>
           </div>
 
           {showExpansao && (
-            <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-[11px] text-emerald-800">
+            <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-[11px] text-emerald-800 leading-relaxed">
               <span className="font-bold">Capacidade de receita (expansão):</span> {fmtBRL(expansaoAnual)}/ano em
               potenciais novos clientes. Mantido separado do valor-base para evitar dupla contagem — projeção, não garantia.
             </div>
@@ -1133,30 +1135,34 @@ function ValueCalculator() {
                 return (
                   <div
                     key={p.name}
-                    className={`flex items-center justify-between gap-3 rounded-xl border p-3 ${
-                      isRec ? "border-primary/40 bg-primary/5" : "border-slate-200 bg-white"
+                    className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 rounded-xl border p-3 sm:p-3.5 transition-all ${
+                      isRec ? "border-primary/40 bg-primary/5 shadow-2xs" : "border-slate-200 bg-white"
                     }`}
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-[11px] font-bold text-slate-900">{p.name}</span>
-                      <span className="text-[11px] font-mono text-slate-500">{fmtBRL(p.price)}/mês</span>
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0">
+                      <span className="text-xs font-bold text-slate-900">{p.name}</span>
+                      <span className="text-xs font-mono text-slate-500">{fmtBRL(p.price)}/mês</span>
                       {isRec && (
-                        <span className="px-1.5 py-0.5 bg-primary/10 text-primary text-[9px] font-extrabold uppercase rounded-full shrink-0">
+                        <span className="px-2 py-0.5 bg-primary/10 text-primary text-[9px] font-extrabold uppercase rounded-full shrink-0">
                           Melhor encaixe
                         </span>
                       )}
-                      <span className="text-[10px] text-slate-400 hidden sm:inline">({fmtInt(p.coins)} coins/mês)</span>
+                      <span className="text-[10px] text-slate-400 font-medium">({fmtInt(p.coins)} coins/mês)</span>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${color}`}
-                          style={{ width: `${Math.min(100, (mult / 20) * 100)}%` }}
-                        />
+
+                    <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 pt-1.5 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-semibold sm:hidden">Retorno estimado:</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-20 sm:w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${color}`}
+                            style={{ width: `${Math.min(100, (mult / 20) * 100)}%` }}
+                          />
+                        </div>
+                        <span className={`text-xs font-extrabold font-mono ${mult >= 5 ? "text-emerald-600" : "text-rose-500"}`}>
+                          {fmtInt(mult)}x
+                        </span>
                       </div>
-                      <span className={`text-[11px] font-extrabold font-mono ${mult >= 5 ? "text-emerald-600" : "text-rose-500"}`}>
-                        {fmtInt(mult)}x
-                      </span>
                     </div>
                   </div>
                 );
