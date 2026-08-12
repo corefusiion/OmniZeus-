@@ -46,26 +46,28 @@ function previewPayload(data: any): string {
   return String(data).substring(0, 80);
 }
 
-/** Upsert resiliente otimizado p/ Cloudflare (≤ 2 sub-requests).
- * PK real das tabelas Supabase é simples em id — onConflict: "id" primeiro. */
+/** Upsert resiliente otimizado p/ Cloudflare (≤ 3 sub-requests).
+ * Tenta PK composta (id, company_id) primeiro, depois PK simples id, depois sem onConflict. */
 async function resilientUpsert(
   tableName: string,
   records: any[],
-  conflictColumn = "id"
+  conflictColumn = "id,company_id"
 ): Promise<{ count: number; errors: number }> {
   if (records.length === 0) return { count: 0, errors: 0 };
 
-  // Tentativa 1: onConflict na PK real (id simples)
+  // Tentativa 1: PK composta (id, company_id)
   const { error: e1 } = await supabase.from(tableName).upsert(records, { onConflict: conflictColumn });
-
   if (!e1) return { count: records.length, errors: 0 };
 
-  // Tentativa 2: sem onConflict (deixa o PostgREST resolver)
-  const { error: e2 } = await supabase.from(tableName).upsert(records);
-
+  // Tentativa 2: PK simples (id)
+  const { error: e2 } = await supabase.from(tableName).upsert(records, { onConflict: "id" });
   if (!e2) return { count: records.length, errors: 0 };
 
-  console.error(`[Auto-Sync] ERRO FINAL em ${tableName}:`, e2.message || e1.message);
+  // Tentativa 3: sem onConflict (PostgREST resolve)
+  const { error: e3 } = await supabase.from(tableName).upsert(records);
+  if (!e3) return { count: records.length, errors: 0 };
+
+  console.error(`[Auto-Sync] ERRO FINAL em ${tableName}:`, e3.message || e2.message || e1.message);
   return { count: 0, errors: 1 };
 }
 
@@ -377,7 +379,7 @@ export async function POST(req: NextRequest) {
             item.id || `pessoa_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
           );
 
-          const itemSanitized = {
+          const customerSanitized = {
             id: itemId,
             company_id: companyId,
             nome,
@@ -400,11 +402,31 @@ export async function POST(req: NextRequest) {
             synced_at: new Date().toISOString()
           };
 
+          const supplierSanitized = {
+            id: itemId,
+            company_id: companyId,
+            nome,
+            name: nome,
+            fantasia: item.fantasia || nome,
+            email,
+            cpf_cnpj: doc,
+            document: doc,
+            telefone: tel,
+            phone: tel,
+            tipo_pessoa:
+              item.tipo_pessoa || item.person_type || (doc.length > 11 ? "Jurídica" : "Física"),
+            person_type:
+              item.tipo_pessoa || item.person_type || (doc.length > 11 ? "LEGAL_PERSON" : "NATURAL_PERSON"),
+            ativo: item.ativo ?? true,
+            status: "Ativo",
+            synced_at: new Date().toISOString()
+          };
+
           if (isSupp) {
-            scopedSuppliers.push(itemSanitized);
+            scopedSuppliers.push(supplierSanitized);
           }
           if (isCli || !isSupp) {
-            scopedCustomers.push(itemSanitized);
+            scopedCustomers.push(customerSanitized);
           }
         }
 
@@ -416,14 +438,14 @@ export async function POST(req: NextRequest) {
         if (scopedCustomers.length > 0) {
           const { count, errors } = await resilientUpsert("contaazul_clients", scopedCustomers);
           customersCount = count;
-          errorsCount += errors;
+          if (errors > 0) errorsCount += errors;
         }
 
         // Salvar fornecedores
         if (scopedSuppliers.length > 0) {
           const { count, errors } = await resilientUpsert("contaazul_suppliers", scopedSuppliers);
           suppliersCount = count;
-          errorsCount += errors;
+          if (errors > 0) errorsCount += errors;
         }
 
         // ─── 5. Salvar Lançamentos Financeiros ────────────────────────────────
