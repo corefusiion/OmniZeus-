@@ -447,15 +447,13 @@ Amanh�, basta continuar o desenvolvimento!
   - **`https://api-v2.contaazul.com/v1/pessoas`**: **HTTP 200 OK** (9 cadastros retornados com sucesso contendo nome, documento, email, telefone e array `perfis`).
   - **Endpoints V1 (`api.contaazul.com/v1/sales`, `/purchases`, `/financeiro`)**: Retornam **HTTP 401 `invalid_token`** para apps de teste não homologados como integrador oficial pela Conta Azul.
 
-### 7. 🧭 Sessão — 2026-08-10 (Resolução do Autenticação DevPortal & Sync de Clientes)
+### 7. 🧭 Sessão — 2026-08-11 (Resolução do Sync de Fornecedores & Schema Sanitization)
 
-- **Identificação da Causa Raiz do `END_TRIAL`**:
-  - A conta antiga (`jsgleisson@gmail.com`) teve o período de teste expirado no ERP. O usuário gerou a nova conta de teste ativa pelo DevPortal (`c3eef082-2458-4672-b222-7f1b38df9da5@devportal.com` com 15 dias de teste).
-  - O erro `END_TRIAL` ocorria porque o navegador mantinha o cookie da conta antiga expirada e autorizava silenciosamente. Ao autorizar via aba anônima com os dados da conta DevPortal, a autenticação foi concluída com **HTTP 200 OK**.
-- **Resultados Concretos na Interface**:
-  - **`Clientes (6)`** ativados e sincronizados com sucesso no OmniZeus 🟢.
-  - O aviso de erro `END_TRIAL` foi totalmente removido.
-- **Melhorias de Código Enviadas (`main`)**:
-  - **Commit `2e88d46`**: Tratamento inteligente do `redirectUri` em [auth/route.ts](file:///c:/Users/gdesi/Desktop/Omnizeus/src/app/api/contaazul/auth/route.ts), prevenindo o erro `redirect_mismatch` mesmo se a URL inteira for colada no campo.
-  - **Commit `263ae59`**: Otimização no [auto-sync/route.ts](file:///c:/Users/gdesi/Desktop/Omnizeus/src/app/api/contaazul/auto-sync/route.ts) garantindo a consulta combinada de pessoas gerais e filtro específico de `FORNECEDOR`.
+- **Causa Raiz da Falha no Sync de Fornecedores (`0 fornecedores`)**:
+  - A API v2 da Conta Azul (`/v1/pessoas`) retornava corretamente os 9 cadastros (`Beta teste`, `Caio santos`, `Cliente 01`, `Eronilda Santos`, `Eu sou foda`, `Gleisson`, e os 3 fornecedores `Fornecedor 01`, `Fornecedor 02`, `Fornecedor 03`).
+  - No entanto, a sanitização enviava campos como `telefone_celular`, `codigo` e `observacoes` no payload de fornecedores. Como a tabela `contaazul_suppliers` no Supabase não possui essas 3 colunas, o PostgREST rejeitava o upsert com erro de coluna inexistente.
+  - Além disso, a chave primária composta da tabela `contaazul_suppliers` é `(id, company_id)`.
+- **Solução Implementada (Commit `7a4de72`)**:
+  - Criado o objeto `supplierSanitized` em [auto-sync/route.ts](file:///c:/Users/gdesi/Desktop/Omnizeus/src/app/api/contaazul/auto-sync/route.ts) estritamente aderente ao schema de `contaazul_suppliers`.
+  - Atualizado o `resilientUpsert` para tentar primeiramente a PK composta `onConflict: "id,company_id"`, depois `id` simples, garantindo a gravação sem erros.
 - **Validação**: TypeScript build (`npx tsc --noEmit`) 100% aprovado (0 erros).
