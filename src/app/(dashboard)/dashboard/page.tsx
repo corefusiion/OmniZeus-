@@ -50,6 +50,7 @@ import {
 } from "recharts";
 import { getActiveRole, UserRole } from "@/lib/auth/roles";
 import AiUsageByUser from "@/components/dashboard/AiUsageByUser";
+import ValueProof from "@/components/dashboard/ValueProof";
 import { 
   fetchPayables, 
   fetchContracts, 
@@ -943,6 +944,9 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Prova de Valor (tempo e R$ economizados pela IA) */}
+      <ValueProof />
 
       {/* Consumo de IA por colaborador (funcionário vê o próprio uso) */}
       <AiUsageByUser />

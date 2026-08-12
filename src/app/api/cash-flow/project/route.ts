@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
     const isDespesa = (e: any) => /DESPESA|PAGAR|SAIDA|PAGAMENTO/i.test(e.tipo || e.type || "");
     const entryDate = (e: any) => e.data_pagamento || e.data_vencimento || e.created_at;
 
-    // Saldo realizado (entradas pagas âˆ’ saÃ­das pagas do Conta Azul)
+    // Saldo realizado (entradas pagas âˆ’ saídas pagas do Conta Azul)
     const realized = entries.filter((e: any) => {
       const s = (e.status || e.situacao || "").toLowerCase();
       return s.includes("pago") || s.includes("quitad") || s.includes("recebid");
@@ -73,13 +73,13 @@ export async function GET(req: NextRequest) {
       let receitas = 0;
       let despesas = 0;
 
-      // Receitas: MRR dos contratos ativos + recebÃ­veis Conta Azul a vencer
+      // Receitas: MRR dos contratos ativos + recebíveis Conta Azul a vencer
       receitas += mrr * Math.min(maxDays / 30, 2);
       entries.forEach((e: any) => {
         if (isReceita(e) && inDays(entryDate(e), now, maxDays)) receitas += num(e.valor);
       });
 
-      // Despesas: contas a pagar a vencer + saÃ­das Conta Azul a vencer
+      // Despesas: contas a pagar a vencer + saídas Conta Azul a vencer
       payables.forEach((p: any) => {
         const due = p.due_date || p.vencimento || "";
         if (inDays(due, now, maxDays)) despesas += (num(p.value_brl) || num(p.valor) || num(p.value));
@@ -97,19 +97,19 @@ export async function GET(req: NextRequest) {
     const deficit60 = p60.saldo < 0;
 
     const facts = [
-      `Saldo realizado (caixa jÃ¡ movimentado): R$ ${saldoInicial.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
-      `ProjeÃ§Ã£o 30 dias: receitas R$ ${p30.receitas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}, despesas R$ ${p30.despesas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}, saldo projetado R$ ${p30.saldo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} (${deficit30 ? "DEFICIT" : "POSITIVO"})`,
-      `ProjeÃ§Ã£o 60 dias: receitas R$ ${p60.receitas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}, despesas R$ ${p60.despesas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}, saldo projetado R$ ${p60.saldo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} (${deficit60 ? "DEFICIT" : "POSITIVO"})`,
-      `MRR contratos ativos: R$ ${mrr.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/mÃªs`,
-      `${payables.length} contas a pagar em aberto, ${entries.length} lanÃ§amentos Conta Azul`
+      `Saldo realizado (caixa já movimentado): R$ ${saldoInicial.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+      `Projeção 30 dias: receitas R$ ${p30.receitas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}, despesas R$ ${p30.despesas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}, saldo projetado R$ ${p30.saldo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} (${deficit30 ? "DEFICIT" : "POSITIVO"})`,
+      `Projeção 60 dias: receitas R$ ${p60.receitas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}, despesas R$ ${p60.despesas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}, saldo projetado R$ ${p60.saldo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} (${deficit60 ? "DEFICIT" : "POSITIVO"})`,
+      `MRR contratos ativos: R$ ${mrr.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/mês`,
+      `${payables.length} contas a pagar em aberto, ${entries.length} lançamentos Conta Azul`
     ].join("\n");
 
-    // â”€â”€ AnÃ¡lise IA (5 coins) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // â”€â”€ Análise IA (5 coins) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const systemPrompt = [
-      "VocÃª Ã© o consultor financeiro interno da plataforma OmniZeus.",
-      "Analise a projeÃ§Ã£o de fluxo de caixa abaixo e entregue: (1) leitura objetiva do cenÃ¡rio em 30 e 60 dias;",
-      "(2) principais riscos de liquidez; (3) 2 a 4 recomendaÃ§Ãµes prÃ¡ticas e acionÃ¡veis.",
-      "Responda em portuguÃªs, direto, sem saudaÃ§Ãµes, mÃ¡ximo 220 palavras.",
+      "Você é o consultor financeiro interno da plataforma OmniZeus.",
+      "Analise a projeção de fluxo de caixa abaixo e entregue: (1) leitura objetiva do cenário em 30 e 60 dias;",
+      "(2) principais riscos de liquidez; (3) 2 a 4 recomendações práticas e acionáveis.",
+      "Responda em português, direto, sem saudações, máximo 220 palavras.",
       "",
       "=== DADOS DA PROJEÃ‡ÃƒO ===",
       facts
@@ -125,7 +125,7 @@ export async function GET(req: NextRequest) {
       temperature: 0.3,
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: "Gere a anÃ¡lise do fluxo de caixa projetado." }
+        { role: "user", content: "Gere a análise do fluxo de caixa projetado." }
       ],
       persona: "cash-flow",
       featureContext: "Fluxo de Caixa Projetado",
@@ -159,9 +159,9 @@ export async function GET(req: NextRequest) {
     } else {
       analysis = [
         deficit30 || deficit60
-          ? "A projeÃ§Ã£o indica risco de saldo negativo no perÃ­odo. Recomenda-se priorizar recebimentos, renegociar vencimentos de contas a pagar e revisar despesas variÃ¡veis."
-          : "A projeÃ§Ã£o indica caixa positivo no perÃ­odo. Recomenda-se manter a disciplina de recebimentos e monitorar vencimentos das prÃ³ximas semanas.",
-        "ObservaÃ§Ã£o: anÃ¡lise automÃ¡tica gerada com base nos dados financeiros da empresa."
+          ? "A projeção indica risco de saldo negativo no período. Recomenda-se priorizar recebimentos, renegociar vencimentos de contas a pagar e revisar despesas variáveis."
+          : "A projeção indica caixa positivo no período. Recomenda-se manter a disciplina de recebimentos e monitorar vencimentos das próximas semanas.",
+        "Observação: análise automática gerada com base nos dados financeiros da empresa."
       ].join("\n");
     }
 

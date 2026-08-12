@@ -310,10 +310,10 @@ export async function fetchCustomJobRoles(): Promise<string[]> {
         return json.data.map((roleStr: string) => {
           if (typeof roleStr !== 'string') return roleStr;
           return roleStr
-            .replace(/EscritÃ³rio/g, "Escritório")
-            .replace(/SÃªnior/g, "Sênior")
-            .replace(/ContÃ¡bil/g, "Contábil")
-            .replace(/TributÃ¡rio/g, "Tributário");
+            .replace(/Escritório/g, "Escritório")
+            .replace(/Sênior/g, "Sênior")
+            .replace(/Contábil/g, "Contábil")
+            .replace(/Tributário/g, "Tributário");
         });
       }
     }

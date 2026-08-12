@@ -435,7 +435,7 @@ export default function EmpresasPage() {
                       onChange={(e) => setSelectedPlan(e.target.value as any)}
                       className="w-full h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 font-bold outline-none focus:border-slate-900 cursor-pointer"
                     >
-                      <option value="test_1_real">🧪 Plano Teste — R$ 1,00 (100 Coins/mês)</option>
+                      {/* <option value="test_1_real">🧪 Plano Teste — R$ 1,00 (100 Coins/mês)</option> OCULTO — plano temporário de teste */}
                       <option value="profissional">Plano Profissional — R$ 490/mês (5.000 Coins/mês)</option>
                       <option value="premium">Plano Premium — R$ 890/mês (15.000 Coins/mês)</option>
                       <option value="business">Plano Business — R$ 1.990/mês (50.000 Coins/mês)</option>

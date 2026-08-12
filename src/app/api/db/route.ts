@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
         .single();
         
       if (error && error.code === 'PGRST116') {
-        // Se nÃ£o existir, faz insert
+        // Se não existir, faz insert
         const { data: inserted } = await supabase.from('settings').insert({ id: 'master_config', ...settings }).select().single();
         return NextResponse.json({ success: true, settings: inserted });
       }
@@ -208,7 +208,7 @@ export async function POST(req: NextRequest) {
 
 
     if (action === "delete" && table && record?.id) {
-      if (!isWritableTable(table)) return NextResponse.json({ error: "Tabela invÃ¡lida." }, { status: 400 });
+      if (!isWritableTable(table)) return NextResponse.json({ error: "Tabela inválida." }, { status: 400 });
       if (SUPER_ADMIN_ONLY_TABLES.includes(table) && !isSuperAdmin) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
       
       const { error } = await supabase.from(table).delete().eq('id', record.id);
@@ -217,7 +217,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "insert" && table && record) {
-      if (!isWritableTable(table)) return NextResponse.json({ error: "Tabela invÃ¡lida." }, { status: 400 });
+      if (!isWritableTable(table)) return NextResponse.json({ error: "Tabela inválida." }, { status: 400 });
       if (SUPER_ADMIN_ONLY_TABLES.includes(table) && !isSuperAdmin) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
       if (table === "employees" && !canManageEmployees) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
       
@@ -232,7 +232,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "update" && table && record && record.id) {
-      if (!isWritableTable(table)) return NextResponse.json({ error: "Tabela invÃ¡lida." }, { status: 400 });
+      if (!isWritableTable(table)) return NextResponse.json({ error: "Tabela inválida." }, { status: 400 });
       if (SUPER_ADMIN_ONLY_TABLES.includes(table) && !isSuperAdmin) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
       if (table === "employees" && !canManageEmployees) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
       
@@ -261,7 +261,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
-    return NextResponse.json({ error: "AÃ§Ã£o nÃ£o reconhecida." }, { status: 400 });
+    return NextResponse.json({ error: "Ação não reconhecida." }, { status: 400 });
   } catch (error: any) {
     console.error("POST /api/db error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

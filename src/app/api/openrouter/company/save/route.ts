@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession(req);
     if (!session) {
-      return NextResponse.json({ error: "NÃ£o autenticado.", code: "UNAUTHORIZED" }, { status: 401 });
+      return NextResponse.json({ error: "Não autenticado.", code: "UNAUTHORIZED" }, { status: 401 });
     }
     if (session.role !== "super_adm") {
       return NextResponse.json({ error: "Acesso negado. Apenas o administrador da plataforma gerencia chaves de API.", code: "FORBIDDEN" }, { status: 403 });
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     const { companyId, apiKey } = await req.json();
 
     if (!companyId || !apiKey || apiKey.trim().length === 0) {
-      return NextResponse.json({ error: "Empresa e chave de API sÃ£o obrigatÃ³rias." }, { status: 400 });
+      return NextResponse.json({ error: "Empresa e chave de API são obrigatórias." }, { status: 400 });
     }
 
     const trimmedKey = apiKey.trim();
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     if (!testRes.ok) {
       const errText = await testRes.text();
       return NextResponse.json({ 
-        error: `Falha no teste de conexÃ£o com a OpenRouter: ${testRes.status} ${testRes.statusText}`
+        error: `Falha no teste de conexão com a OpenRouter: ${testRes.status} ${testRes.statusText}`
       }, { status: 400 });
     }
 
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
     const { data: company, error: findError } = await supabase.from('companies').select('id').eq('id', companyId).maybeSingle();
     if (findError || !company) {
-      return NextResponse.json({ error: "Empresa nÃ£o encontrada." }, { status: 444 });
+      return NextResponse.json({ error: "Empresa não encontrada." }, { status: 444 });
     }
 
     const now = new Date().toISOString();

@@ -102,14 +102,14 @@ export async function DELETE(req: NextRequest) {
     if (conv) {
       // Only allow delete if owner or super_adm
       if (session && session.role !== "super_adm" && conv.company_id && conv.company_id !== session.companyId) {
-        return NextResponse.json({ success: false, error: "NÃ£o autorizado a excluir." }, { status: 403 });
+        return NextResponse.json({ success: false, error: "Não autorizado a excluir." }, { status: 403 });
       }
       
       await supabase.from("conversations").update({ deleted: 1 }).eq("id", convId);
       await supabase.from("messages").delete().eq("conversation_id", convId);
     }
 
-    return NextResponse.json({ success: true, message: "Conversa excluÃ­da com sucesso." });
+    return NextResponse.json({ success: true, message: "Conversa excluída com sucesso." });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }

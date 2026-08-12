@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
       text: string;
     }[] = [];
 
-    // â”€â”€ Financeiro (solicitaÃ§Ãµes tambÃ©m sÃ£o mÃ³dulo financeiro no menu) â”€â”€â”€â”€â”€
+    // â”€â”€ Financeiro (solicitações também são módulo financeiro no menu) â”€â”€â”€â”€â”€
     if (hasModule(allowed, "financeiro")) {
       if (Array.isArray(db.payables)) {
         const payables = db.payables.filter((p: any) => (p.company_id || p.companyId) === companyId);
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
             module: "financeiro",
             title: "Contas vencidas",
             tone: "danger",
-            text: `${overdue.length} tÃ­tulo(s) vencido(s) somando R$ ${money(overdueSum)}.`
+            text: `${overdue.length} título(s) vencido(s) somando R$ ${money(overdueSum)}.`
           });
         }
         if (dueToday.length > 0) {
@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
             module: "financeiro",
             title: "Contratos expirando",
             tone: "warn",
-            text: `${expiringSoon.length} contrato(s) com vigÃªncia terminando em atÃ© 30 dias.`
+            text: `${expiringSoon.length} contrato(s) com vigência terminando em até 30 dias.`
           });
         }
       }
@@ -95,9 +95,9 @@ export async function GET(req: NextRequest) {
         if (pending.length > 0) {
           items.push({
             module: "financeiro",
-            title: "SolicitaÃ§Ãµes pendentes",
+            title: "Solicitações pendentes",
             tone: urgent.length > 0 ? "warn" : "ok",
-            text: `${pending.length} solicitaÃ§Ã£o(Ãµes) em aprovaÃ§Ã£o${urgent.length > 0 ? `, ${urgent.length} urgente(s)` : ""}.`
+            text: `${pending.length} solicitação(ões) em aprovação${urgent.length > 0 ? `, ${urgent.length} urgente(s)` : ""}.`
           });
         }
       }
@@ -109,7 +109,7 @@ export async function GET(req: NextRequest) {
         const tasks = db.tasks.filter((t: any) => (t.company_id || t.companyId) === companyId);
         const open = tasks.filter((t: any) => {
           const s = (t.status || "Pendente").toLowerCase();
-          return s !== "concluÃ­da" && s !== "concluida" && s !== "concluido";
+          return s !== "concluída" && s !== "concluida" && s !== "concluido";
         });
         const dueToday = open.filter((t: any) => (t.due_date || t.vencimento || "").slice(0, 10) === today);
         const overdue = open.filter((t: any) => {
@@ -121,7 +121,7 @@ export async function GET(req: NextRequest) {
             module: "tarefas",
             title: "Tarefas atrasadas",
             tone: "danger",
-            text: `${overdue.length} tarefa(s) atrasada(s) precisam de atenÃ§Ã£o.`
+            text: `${overdue.length} tarefa(s) atrasada(s) precisam de atenção.`
           });
         }
         if (dueToday.length > 0) {
@@ -155,7 +155,7 @@ export async function GET(req: NextRequest) {
         if (recToday.length > 0 || payToday.length > 0) {
           items.push({
             module: "contaazul",
-            title: "LanÃ§amentos Conta Azul hoje",
+            title: "Lançamentos Conta Azul hoje",
             tone: "warn",
             text: `${recToday.length} recebimento(s) (R$ ${money(recSum)}) e ${payToday.length} pagamento(s) (R$ ${money(paySum)}) para hoje.`
           });
@@ -163,13 +163,13 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Sem pendÃªncias
+    // Sem pendências
     if (items.length === 0) {
       items.push({
         module: "geral",
         title: "Dia tranquilo",
         tone: "ok",
-        text: "Nenhuma pendÃªncia para hoje. Tudo em dia!"
+        text: "Nenhuma pendência para hoje. Tudo em dia!"
       });
     }
 

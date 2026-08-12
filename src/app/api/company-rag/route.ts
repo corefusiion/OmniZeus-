@@ -7,7 +7,7 @@ import { getSession } from "@/lib/auth/session";
 
 export const runtime = "edge";
 
-// Modelo Ãºnico fixo do assistente "Pergunte sobre esta empresa" â€” sem seletor.
+// Modelo único fixo do assistente "Pergunte sobre esta empresa" â€” sem seletor.
 const RAG_MODEL = "anthropic/claude-3.7-sonnet";
 
 export async function POST(req: NextRequest) {
@@ -31,17 +31,17 @@ export async function POST(req: NextRequest) {
       ? requestedCompanyId
       : (session.companyId || "comp_zenitus");
 
-    // Contexto factual do tenant, respeitando os mÃ³dulos do funcionÃ¡rio.
+    // Contexto factual do tenant, respeitando os módulos do funcionário.
     const context = await buildTenantContext({
       companyId,
       allowedModules: session.allowedModules
     });
 
     const systemPrompt = [
-      "VocÃª Ã© o assistente interno \"Pergunte sobre esta empresa\" da plataforma OmniZeus.",
+      "Você é o assistente interno \"Pergunte sobre esta empresa\" da plataforma OmniZeus.",
       "Responda perguntas sobre a EMPRESA ATUAL usando APENAS o contexto fornecido abaixo.",
-      "Se o dado nÃ£o estiver no contexto, diga claramente que nÃ£o hÃ¡ registro â€” NUNCA invente nÃºmeros, nomes ou valores.",
-      "Seja objetivo e direto, em portuguÃªs, com frases curtas. Quando houver valores, use R$.",
+      "Se o dado não estiver no contexto, diga claramente que não há registro â€” NUNCA invente números, nomes ou valores.",
+      "Seja objetivo e direto, em português, com frases curtas. Quando houver valores, use R$.",
       "",
       "=== CONTEXTO DA EMPRESA ===",
       context
@@ -63,9 +63,9 @@ export async function POST(req: NextRequest) {
     });
 
     if (aiRes.isError) {
-      // Mensagem amigÃ¡vel: nunca expÃµe detalhes de infraestrutura/fornecedor.
+      // Mensagem amigável: nunca expõe detalhes de infraestrutura/fornecedor.
       return NextResponse.json({
-        error: "Servidor fora de operaÃ§Ã£o, aguarde um momento e tente novamente."
+        error: "Servidor fora de operação, aguarde um momento e tente novamente."
       }, { status: 502 });
     }
 

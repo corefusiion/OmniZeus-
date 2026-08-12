@@ -14,28 +14,28 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession(req);
     if (!session) {
-      return NextResponse.json({ error: "SessÃ£o invÃ¡lida ou expirada. FaÃ§a login novamente." }, { status: 401 });
+      return NextResponse.json({ error: "Sessão inválida ou expirada. Faça login novamente." }, { status: 401 });
     }
 
     const { newPassword, confirmPassword } = await req.json();
 
-    // O alvo vem SEMPRE da sessÃ£o. Aceitar userId do body permitiria a qualquer
-    // pessoa trocar a senha de outro usuÃ¡rio.
+    // O alvo vem SEMPRE da sessão. Aceitar userId do body permitiria a qualquer
+    // pessoa trocar a senha de outro usuário.
     const targetUserId = session.userId;
 
     if (!newPassword || !confirmPassword) {
-      return NextResponse.json({ error: "Nova senha e confirmaÃ§Ã£o sÃ£o obrigatÃ³rias." }, { status: 400 });
+      return NextResponse.json({ error: "Nova senha e confirmação são obrigatórias." }, { status: 400 });
     }
 
     if (newPassword !== confirmPassword) {
-      return NextResponse.json({ error: "A nova senha e a confirmaÃ§Ã£o nÃ£o coincidem." }, { status: 400 });
+      return NextResponse.json({ error: "A nova senha e a confirmação não coincidem." }, { status: 400 });
     }
 
     // Validate security rules
     const validation = validatePasswordRequirements(newPassword);
     if (!validation.isValid) {
       return NextResponse.json({
-        error: "A senha nÃ£o atende a todos os requisitos de seguranÃ§a exigidos.",
+        error: "A senha não atende a todos os requisitos de segurança exigidos.",
         checks: validation.checks
       }, { status: 400 });
     }
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       .or(`id.eq.${targetUserId},email.ilike.${session.email}`);
 
     if (fetchError || !employees || employees.length === 0) {
-      return NextResponse.json({ error: "UsuÃ¡rio nÃ£o encontrado para atualizaÃ§Ã£o de senha." }, { status: 404 });
+      return NextResponse.json({ error: "Usuário não encontrado para atualização de senha." }, { status: 404 });
     }
 
     const employee = employees[0];
@@ -71,9 +71,9 @@ export async function POST(req: NextRequest) {
     // Log audit entry
     await supabase.from("audit_logs").insert([{
       company_id: employee.company_id || employee.companyId || "global",
-      user_name: employee.name || "UsuÃ¡rio",
-      action: "Senha alterada no primeiro acesso pelo prÃ³prio usuÃ¡rio",
-      resource: "AutenticaÃ§Ã£o"
+      user_name: employee.name || "Usuário",
+      action: "Senha alterada no primeiro acesso pelo próprio usuário",
+      resource: "Autenticação"
     }]);
 
     const res = NextResponse.json({

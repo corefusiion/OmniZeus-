@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     if (session && session.role !== "super_adm") {
       const { data: conv } = await supabase.from("conversations").select("*").eq("id", conversationId).single();
       if (conv && conv.company_id && conv.company_id !== session.companyId) {
-        return NextResponse.json({ success: false, error: "Acesso nÃ£o autorizado a esta conversa." }, { status: 403 });
+        return NextResponse.json({ success: false, error: "Acesso não autorizado a esta conversa." }, { status: 403 });
       }
     }
 
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     const { conversationId, content, model, provider, accessToken, refreshToken, clientId, clientSecret, companyId } = await req.json();
 
     if (!conversationId || !content) {
-      return NextResponse.json({ success: false, error: "ID da conversa e conteÃºdo sÃ£o obrigatÃ³rios." }, { status: 400 });
+      return NextResponse.json({ success: false, error: "ID da conversa e conteúdo são obrigatórios." }, { status: 400 });
     }
 
     const activeTenantId = session
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
               clientSecret,
               name: clientName,
               document: doc,
-              personType: doc.length > 11 ? "JurÃ­dica" : "FÃ­sica"
+              personType: doc.length > 11 ? "Jurídica" : "Física"
             })
           });
 
@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
           let aiTextResponse = `Excelente! O cadastro do cliente **${clientName}** (CPF/CNPJ: ${doc}) foi transmitido e sincronizado com sucesso no ERP ContaAzul Pro!`;
 
           if (!createRes.ok) {
-            aiTextResponse = `Tentei realizar o cadastro de **${clientName}** na ContaAzul, porÃ©m a API retornou: ${createData.error || 'Verifique o token de acesso'}.`;
+            aiTextResponse = `Tentei realizar o cadastro de **${clientName}** na ContaAzul, porém a API retornou: ${createData.error || 'Verifique o token de acesso'}.`;
           }
 
           const aiMsgObj = {
@@ -146,15 +146,15 @@ export async function POST(req: NextRequest) {
     const dateStrBr = nowBr.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", year: "numeric", month: "long", day: "numeric" });
     const timeStrBr = nowBr.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
     const hourBr = parseInt(nowBr.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }), 10);
-    const periodBr = hourBr >= 12 && hourBr < 18 ? "Tarde" : (hourBr >= 18 || hourBr < 5 ? "Noite" : "ManhÃ£");
+    const periodBr = hourBr >= 12 && hourBr < 18 ? "Tarde" : (hourBr >= 18 || hourBr < 5 ? "Noite" : "Manhã");
     const greetingBr = periodBr === "Tarde" ? "Boa tarde" : (periodBr === "Noite" ? "Boa noite" : "Bom dia");
 
-    const systemPrompt = `VocÃª Ã© o Zeus BPO â€” Especialista Master em BPO Financeiro, Rotinas ContÃ¡beis e API RESTful v2 da ContaAzul Pro.
-VocÃª possui autonomia e autoridade para responder dÃºvidas contÃ¡beis, orientar conciliaÃ§Ã£o bancÃ¡ria, DRE, impostos e sugerir comandos de execuÃ§Ã£o direta de tarefas no sistema.
+    const systemPrompt = `Você é o Zeus BPO â€” Especialista Master em BPO Financeiro, Rotinas Contábeis e API RESTful v2 da ContaAzul Pro.
+Você possui autonomia e autoridade para responder dúvidas contábeis, orientar conciliação bancária, DRE, impostos e sugerir comandos de execução direta de tarefas no sistema.
 
 [CONTEXTO TEMPORAL]
-- Data: ${dateStrBr} | HorÃ¡rio de BrasÃ­lia: ${timeStrBr} | PerÃ­odo: ${periodBr}
-- Se o usuÃ¡rio cumprimentar, responda de forma cordial, profissional e direta ao ponto, apenas dando o ${greetingBr} correspondente ao horÃ¡rio. NUNCA seja sarcÃ¡stico.`;
+- Data: ${dateStrBr} | Horário de Brasília: ${timeStrBr} | Período: ${periodBr}
+- Se o usuário cumprimentar, responda de forma cordial, profissional e direta ao ponto, apenas dando o ${greetingBr} correspondente ao horário. NUNCA seja sarcástico.`;
 
     const { executeAIRequest } = await import("@/lib/ai/openRouterClient");
 
@@ -171,7 +171,7 @@ VocÃª possui autonomia e autoridade para responder dÃºvidas contÃ¡beis, or
     });
 
     if (aiRes.isError) {
-      const errText = aiRes.content || "NÃ£o foi possÃ­vel obter resposta do servidor da IA.";
+      const errText = aiRes.content || "Não foi possível obter resposta do servidor da IA.";
       const aiErrObj = {
         id: `msg_${Date.now()}_ai_err`,
         conversation_id: conversationId,

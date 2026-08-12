@@ -39,7 +39,8 @@ import {
   ArrowUpRight,
   HelpCircle,
   Sliders,
-  Play
+  Play,
+  Calculator
 } from "lucide-react";
 
 /* ─────────────────────────────────────────
@@ -168,15 +169,15 @@ function AppPreview() {
               <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
                 <div className="flex items-center gap-2">
                   <Bot className="w-4 h-4 text-primary" />
-                  <span className="text-xs font-bold text-slate-900">Hub de Inteligência Artificial — 15 Modelos Nativos</span>
+                  <span className="text-xs font-bold text-slate-900">Hub de Inteligência Artificial — Contexto da sua empresa</span>
                 </div>
                 <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 font-bold text-[10px] rounded border border-emerald-200">
-                  Engine Proprietária OmniAI
+                  Motor Contextual OmniAI
                 </span>
               </div>
               
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                {["GPT-5.5", "Claude Code", "Claude 3.7", "Gemini 3.6 Pro"].map((m, idx) => (
+                {["Agente Fiscal", "Agente BPO", "Agente Tarefas", "Agente Conta Azul"].map((m, idx) => (
                   <div key={m} className={`p-2 rounded-lg border text-center font-bold ${idx === 0 ? 'bg-primary text-white border-primary shadow-2xs' : 'bg-white text-slate-700 border-slate-200'}`}>
                     {m}
                   </div>
@@ -431,11 +432,11 @@ function Hero() {
             </div>
 
             <h1 className="text-3xl sm:text-5xl lg:text-[54px] font-bold text-slate-900 leading-[1.1] tracking-tight">
-              Gestão, automação e IA em um único ambiente.
+              Sua equipe operando com o impacto de uma muito maior.
             </h1>
 
             <p className="text-sm sm:text-lg text-slate-600 leading-relaxed max-w-xl mx-auto lg:mx-0">
-              Unifique a operação do seu escritório contábil ou prestação de BPO Financeiro. Conecte dados do Conta Azul, automatize tarefas e utilize agentes de IA contextualizados com a sua empresa.
+              Escritórios contábeis e prestadores de BPO usam o OmniZeus para resolver os problemas reais do dia: atender clientes sem demora, eliminar consultas manuais e fechar DRE e tributos com precisão — com agentes de IA que conhecem o contexto da sua empresa.
             </p>
 
             <div className="flex items-center justify-center lg:justify-start gap-3.5 pt-2">
@@ -484,11 +485,11 @@ function TrustBar() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
           <div className="p-3">
             <span className="text-2xl lg:text-3xl font-bold text-slate-900 block">100%</span>
-            <span className="text-xs text-slate-600 font-semibold">Multi-tenant Isolado</span>
+            <span className="text-xs text-slate-600 font-semibold">Contexto de cada empresa</span>
           </div>
           <div className="p-3">
-            <span className="text-2xl lg:text-3xl font-bold text-slate-900 block">15</span>
-            <span className="text-xs text-slate-600 font-semibold">Modelos LLM Nativos</span>
+            <span className="text-2xl lg:text-3xl font-bold text-slate-900 block">24/7</span>
+            <span className="text-xs text-slate-600 font-semibold">Consultas fiscais sem espera</span>
           </div>
           <div className="p-3">
             <span className="text-2xl lg:text-3xl font-bold text-slate-900 block">API</span>
@@ -522,7 +523,7 @@ function FeaturesModules() {
     {
       icon: Bot,
       title: "Omni IA Hub",
-      desc: "15 modelos de inteligência artificial de ponta (GPT-5.5, Claude Code, Claude 3.7 Sonnet, Gemini 3.6 Pro, DeepSeek V4) nativamente calibrados com o contexto da sua empresa."
+      desc: "Agentes de IA treinados com o contexto real da sua operação para resolver consultas fiscais, redigir pareceres e automatizar sua rotina — sem depender de planilhas ou checklists manuais."
     },
     {
       icon: CheckSquare,
@@ -601,8 +602,8 @@ function AIDifferential() {
               <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs flex items-start gap-3">
                 <Bot className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                 <div>
-                  <strong className="text-slate-900 block font-bold mb-0.5">Omni IA Hub (15 LLMs Nativos)</strong>
-                  <span className="text-slate-500">Modelos de última geração como GPT-5.5, Claude Code e Gemini 3.6 Pro prontos para pareceres fiscais, societários e de BPO.</span>
+                  <strong className="text-slate-900 block font-bold mb-0.5">Omni IA Hub — consultas que viraram resultados</strong>
+                  <span className="text-slate-500">Pareceres fiscais, societários e de BPO prontos em minutos, com o contexto da sua empresa injetado em cada resposta. O modelo é meio: o que importa é o problema resolvido.</span>
                 </div>
               </div>
 
@@ -632,8 +633,8 @@ function AIDifferential() {
 
             <div className="space-y-3">
               <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1">
-                <span className="font-bold text-slate-800 uppercase text-[10px] tracking-wider block">1. Injeção de Contexto da Empresa</span>
-                <p className="text-slate-600">Regras tributárias da empresa contratante + segmento + notas internas ativas.</p>
+                <span className="font-bold text-slate-800 uppercase text-[10px] tracking-wider block">1. Contexto antes da consulta</span>
+                <p className="text-slate-600">Regras tributárias da empresa contratante + segmento + notas internas ativas definem o resultado desejado antes de qualquer resposta.</p>
               </div>
 
               <div className="flex justify-center">
@@ -641,8 +642,8 @@ function AIDifferential() {
               </div>
 
               <div className="p-3.5 bg-primary/10 border border-primary/30 rounded-xl text-xs space-y-1">
-                <span className="font-bold text-primary uppercase text-[10px] tracking-wider block">2. Seleção Inteligente de Modelo</span>
-                <p className="text-slate-700">Motor NATIVO OmniZeus seleciona o modelo de IA ideal com menor tempo de resposta e máxima precisão.</p>
+                <span className="font-bold text-primary uppercase text-[10px] tracking-wider block">2. Construção dirigida ao problema</span>
+                <p className="text-slate-700">A IA executa com base na intenção definida pelo especialista — e a verificação permanece humana, com histórico gravado no banco para auditoria.</p>
               </div>
 
               <div className="flex justify-center">
@@ -650,8 +651,8 @@ function AIDifferential() {
               </div>
 
               <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs space-y-1">
-                <span className="font-bold text-emerald-800 uppercase text-[10px] tracking-wider block">3. Resposta Técnica sem Alucinações</span>
-                <p className="text-emerald-900 font-medium">Saída formatada com precisão operacional e histórico gravado no banco SQL.</p>
+                <span className="font-bold text-emerald-800 uppercase text-[10px] tracking-wider block">3. Resultado sob supervisão</span>
+                <p className="text-emerald-900 font-medium">Saída formatada com precisão operacional e validada pelo profissional — a tecnologia acelera, o humano responde pelo resultado.</p>
               </div>
             </div>
           </div>
@@ -927,6 +928,251 @@ function HorizontalFaqSection() {
 /* ─────────────────────────────────────────
    Planos & Preços (Conversão Principal)
 ───────────────────────────────────────── */
+/* ─────────────────────────────────────────
+   Calculadora de Valor (ROI — precificação por valor)
+
+   Baseada na metodologia de precificação por valor:
+   - Lente do tempo: trabalho manual economizado por ano;
+   - Lente da receita: cenário de expansão (receita possibilitada);
+   - Faixa de 10% a 20% do valor anual confiável;
+   - Verificação de múltiplo (valor anual ÷ assinatura anual).
+───────────────────────────────────────── */
+function ValueField({
+  label,
+  value,
+  onChange,
+  prefix,
+  suffix
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  prefix?: string;
+  suffix?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="text-[11px] font-semibold text-slate-600 block mb-1">{label}</span>
+      <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden focus-within:border-primary">
+        {prefix && <span className="pl-3 pr-1 text-xs text-slate-400 font-mono">{prefix}</span>}
+        <input
+          type="number"
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value) || 0)}
+          className="w-full h-10 px-3 text-sm font-bold text-slate-900 outline-none"
+        />
+        {suffix && <span className="pr-3 text-xs text-slate-400">{suffix}</span>}
+      </div>
+    </label>
+  );
+}
+
+function ValueCalculator() {
+  const [volume, setVolume] = useState(20);
+  const [tempoMin, setTempoMin] = useState(30);
+  const [custoHora, setCustoHora] = useState(60);
+  const [errosMes, setErrosMes] = useState(3);
+  const [custoErro, setCustoErro] = useState(150);
+  const [confianca, setConfianca] = useState(80);
+  const [showExpansao, setShowExpansao] = useState(false);
+  const [novosClientes, setNovosClientes] = useState(2);
+  const [ticketCliente, setTicketCliente] = useState(1500);
+
+  const fmtBRL = (n: number) =>
+    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(n);
+  const fmtInt = (n: number) => new Intl.NumberFormat("pt-BR").format(Math.round(n));
+
+  const horasSemana = (volume * tempoMin) / 60;
+  const valorTrabalhoAnual = horasSemana * custoHora * 52;
+  const valorErrosAnual = errosMes * custoErro * 12;
+  const valorBase = (valorTrabalhoAnual + valorErrosAnual) * (confianca / 100);
+  const precoRangeMin = valorBase * 0.1;
+  const precoRangeMax = valorBase * 0.2;
+
+  const expansaoAnual = showExpansao ? novosClientes * ticketCliente * 12 : 0;
+
+  const plans = [
+    { name: "Professional", price: 490, coins: 5000 },
+    { name: "Premium", price: 890, coins: 15000 },
+    { name: "Business", price: 1990, coins: 50000 }
+  ];
+
+  const rangeMid = (precoRangeMin + precoRangeMax) / 2;
+  const recomendado = valorBase > 0
+    ? plans.reduce((a, b) =>
+        Math.abs(b.price * 12 - rangeMid) < Math.abs(a.price * 12 - rangeMid) ? b : a
+      )
+    : plans[1];
+
+  return (
+    <div
+      id="calculadora"
+      className="my-12 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-primary/5 overflow-hidden"
+    >
+      <div className="grid lg:grid-cols-2">
+        {/* ── Inputs ── */}
+        <div className="p-6 sm:p-8 border-b lg:border-b-0 lg:border-r border-slate-200 space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-bold uppercase tracking-wider text-primary">
+              Calculadora de Valor
+            </span>
+          </div>
+          <p className="text-xs leading-relaxed text-slate-600">
+            Descubra quanto esse trabalho manual custa para o seu escritório hoje — antes de escolher o plano.
+            Use dados reais de volume, tempo e falhas.
+          </p>
+
+          <div className="grid grid-cols-2 gap-3">
+            <ValueField label="Volume por semana" value={volume} onChange={setVolume} suffix="itens" />
+            <ValueField label="Tempo por item" value={tempoMin} onChange={setTempoMin} suffix="min" />
+            <ValueField label="Custo da hora (completo)" value={custoHora} onChange={setCustoHora} prefix="R$" />
+            <ValueField label="Erros por mês" value={errosMes} onChange={setErrosMes} suffix="erros" />
+            <ValueField label="Custo médio por erro" value={custoErro} onChange={setCustoErro} prefix="R$" />
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] font-semibold text-slate-600">Confiança nos dados</span>
+                <span className="text-[11px] font-mono font-bold text-primary">{confianca}%</span>
+              </div>
+              <input
+                type="range"
+                min={30}
+                max={100}
+                step={5}
+                value={confianca}
+                onChange={(e) => setConfianca(Number(e.target.value))}
+                className="w-full accent-primary"
+              />
+              <div className="flex justify-between text-[9px] text-slate-400">
+                <span>Conservador</span>
+                <span>Otimista</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Lente da receita (cenário de expansão) */}
+          <div className="border-t border-slate-200 pt-4">
+            <button
+              type="button"
+              onClick={() => setShowExpansao((v) => !v)}
+              className="flex items-center gap-2 text-[11px] font-bold text-slate-700 hover:text-slate-900"
+            >
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+              Lente da receita — capacidade de atender mais clientes
+              {showExpansao ? (
+                <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              )}
+            </button>
+            {showExpansao && (
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <ValueField label="Novos clientes/mês que poderia atender" value={novosClientes} onChange={setNovosClientes} />
+                <ValueField label="Ticket médio (R$)" value={ticketCliente} onChange={setTicketCliente} prefix="R$" />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Resultados ── */}
+        <div className="p-6 sm:p-8 space-y-4">
+          <div className="flex items-center gap-2">
+            <Calculator className="w-4 h-4 text-primary" />
+            <span className="text-[11px] font-bold uppercase tracking-widest text-primary">
+              Seu resultado anual estimado
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl bg-white border border-slate-200 p-4">
+              <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold flex items-center gap-1">
+                <Clock className="w-3 h-3" /> Trabalho anual
+              </span>
+              <span className="text-xl font-extrabold text-slate-900">{fmtBRL(valorTrabalhoAnual)}</span>
+              <span className="text-[10px] text-slate-400 block">{fmtInt(horasSemana)} h/semana economizadas</span>
+            </div>
+            <div className="rounded-xl bg-white border border-slate-200 p-4">
+              <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3" /> Erros evitados
+              </span>
+              <span className="text-xl font-extrabold text-slate-900">{fmtBRL(valorErrosAnual)}</span>
+              <span className="text-[10px] text-slate-400 block">{fmtInt(errosMes)} falhas/mês</span>
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-primary/5 border border-primary/20 p-4">
+            <div className="flex items-baseline justify-between">
+              <span className="text-[10px] uppercase tracking-wider text-primary font-bold">Valor anual confiável</span>
+              <span className="text-[10px] text-slate-500 font-mono">{confianca}% confiança</span>
+            </div>
+            <span className="text-3xl font-extrabold text-slate-900">{fmtBRL(valorBase)}</span>
+            <div className="mt-2 text-[11px] text-slate-600">
+              Faixa de investimento indicada (10–20% do valor confiável):{" "}
+              <span className="font-bold text-slate-900">
+                {fmtBRL(precoRangeMin)} a {fmtBRL(precoRangeMax)}/mês
+              </span>
+            </div>
+          </div>
+
+          {showExpansao && (
+            <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-[11px] text-emerald-800">
+              <span className="font-bold">Capacidade de receita (expansão):</span> {fmtBRL(expansaoAnual)}/ano em
+              potenciais novos clientes. Mantido separado do valor-base para evitar dupla contagem — projeção, não garantia.
+            </div>
+          )}
+
+          <div>
+            <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold block mb-2">
+              Retorno de cada plano (valor anual ÷ assinatura anual)
+            </span>
+            <div className="space-y-2">
+              {plans.map((p) => {
+                const mult = p.price > 0 && valorBase > 0 ? valorBase / (p.price * 12) : 0;
+                const isRec = recomendado?.name === p.name;
+                const color =
+                  mult >= 10 ? "bg-emerald-500" : mult >= 5 ? "bg-primary" : "bg-rose-400";
+                return (
+                  <div
+                    key={p.name}
+                    className={`flex items-center justify-between gap-3 rounded-xl border p-3 ${
+                      isRec ? "border-primary/40 bg-primary/5" : "border-slate-200 bg-white"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-[11px] font-bold text-slate-900">{p.name}</span>
+                      <span className="text-[11px] font-mono text-slate-500">{fmtBRL(p.price)}/mês</span>
+                      {isRec && (
+                        <span className="px-1.5 py-0.5 bg-primary/10 text-primary text-[9px] font-extrabold uppercase rounded-full shrink-0">
+                          Melhor encaixe
+                        </span>
+                      )}
+                      <span className="text-[10px] text-slate-400 hidden sm:inline">({fmtInt(p.coins)} coins/mês)</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${color}`}
+                          style={{ width: `${Math.min(100, (mult / 20) * 100)}%` }}
+                        />
+                      </div>
+                      <span className={`text-[11px] font-extrabold font-mono ${mult >= 5 ? "text-emerald-600" : "text-rose-500"}`}>
+                        {fmtInt(mult)}x
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-[10px] leading-relaxed text-slate-400">
+              Retorno acima de 10x é facilmente explicável; entre 5x e 10x ainda é um bom projeto; abaixo de 5x,
+              reveja escopo. Estimativa projetada — não garantia.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PricingSection({
   onSelectPlan
 }: {
@@ -948,7 +1194,7 @@ function PricingSection({
         "5.000 OmniCoins / mês de IA",
         "Gestão Financeira & Contas a Pagar",
         "Integração com Conta Azul",
-        "Omni IA Hub (15 modelos LLM)",
+        "Omni IA Hub (agentes com contexto da empresa)",
         "Gestão de Tarefas & SOPs",
         "Gerador de Documentos A4",
         "Suporte por e-mail"
@@ -1035,18 +1281,12 @@ function PricingSection({
               </button>
             </div>
 
-            <button
-              onClick={() => onSelectPlan && onSelectPlan("test_1_real")}
-              className="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-all cursor-pointer"
-            >
-              <span className="px-1.5 py-0.5 bg-amber-600 text-white rounded text-[9px] font-extrabold uppercase">
-                Teste R$ 1,00
-              </span>
-              <span>🧪 Testar Checkout Real com R$ 1,00</span>
-              <ArrowRight className="w-3.5 h-3.5 text-amber-700" />
-            </button>
+            {/* Plano de teste R$ 1,00 OCULTO (usado apenas para validar integração) — reativar via onSelectPlan("test_1_real") se necessário */}
           </div>
         </div>
+
+        {/* Calculadora de Valor (ROI) */}
+        <ValueCalculator />
 
         {/* Pricing Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
@@ -1060,7 +1300,7 @@ function PricingSection({
               }`}
             >
               {p.badge && (
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-emerald-600 text-white text-[10px] font-extrabold uppercase px-3.5 py-1 rounded-full tracking-wider shadow-sm">
+                <div className="relative self-center text-center mb-3 md:mb-0 md:absolute md:-top-3.5 md:left-1/2 md:-translate-x-1/2 md:whitespace-nowrap bg-emerald-600 text-white text-[10px] font-extrabold uppercase px-3.5 py-1 rounded-lg md:rounded-full tracking-wider shadow-sm">
                   {p.badge}
                 </div>
               )}
@@ -1164,7 +1404,7 @@ function PricingSection({
                   <td className="p-4 text-center">✓</td>
                 </tr>
                 <tr>
-                  <td className="p-4">Omni IA Hub (15 Modelos LLM Nativos)</td>
+                  <td className="p-4">Omni IA Hub com Agentes Contextuais</td>
                   <td className="p-4 text-center">✓</td>
                   <td className="p-4 text-center bg-emerald-50/60 text-emerald-800 font-bold">✓</td>
                   <td className="p-4 text-center">✓</td>
@@ -1302,7 +1542,7 @@ function WhyChooseSection() {
   const pillars = [
     { title: "Gestão + IA Nativas", desc: "Não são ferramentas coladas. A IA funciona nativamente dentro da rotina de tarefas e finanças." },
     { title: "Integração Conta Azul", desc: "Consulte o ERP do cliente sem precisar trocar de abas ou reescrever dados manuais." },
-    { title: "Agentes Especializados", desc: "15 modelos nativos direcionados para pareceres tributários, DRE e automação de solicitações." },
+    { title: "Agentes Especializados", desc: "Agentes treinados com a sua operação para pareceres tributários, DRE e automação de solicitações — o diferencial está no contexto, não no modelo." },
     { title: "Controle Auditável", desc: "Cada ação, troca de status e consumo de IA fica devidamente gravado nos logs do banco SQL." },
     { title: "Operação Centralizada", desc: "Menos senhas, menos custos com assinaturas espalhadas e maior controle gerencial." },
     { title: "Arquitetura Multi-Tenant", desc: "Segurança de nível enterprise com isolamento total dos dados de cada empresa contratante." }
@@ -1405,7 +1645,7 @@ function FAQSection() {
     },
     {
       q: "A inteligência artificial já está incluída no valor do plano?",
-      a: "Sim! Todos os planos acompanham sua respectiva franquia de OmniCoins incluída, garantindo acesso direto aos 15 modelos de IA do Omni IA Hub."
+      a: "Sim! Todos os planos acompanham sua respectiva franquia de OmniCoins incluída, garantindo acesso direto aos agentes de IA do Omni IA Hub."
     },
     {
       q: "Posso cadastrar múltiplos colaboradores no meu escritório?",
@@ -1689,10 +1929,10 @@ function ContractModal({
             </span>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
-                { id: "test_1_real", label: "Teste R$ 1,00", price: "R$ 1,00" },
                 { id: "profissional", label: "Profissional", price: "R$ 490/m" },
                 { id: "premium", label: "Premium", price: "R$ 890/m" },
                 { id: "business", label: "Business", price: "R$ 1.990/m" }
+                // { id: "test_1_real", label: "Teste R$ 1,00", price: "R$ 1,00" } // OCULTO — plano temporário de teste
               ].map((p) => (
                 <button
                   key={p.id}

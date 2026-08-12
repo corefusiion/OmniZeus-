@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     const { order_id } = body;
 
     if (!order_id) {
-      return NextResponse.json({ error: "ID do pedido nÃ£o informado." }, { status: 400 });
+      return NextResponse.json({ error: "ID do pedido não informado." }, { status: 400 });
     }
 
     const { data: order, error: findError } = await supabase.from('pedidos_saas')
@@ -28,13 +28,13 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (findError || !order) {
-      return NextResponse.json({ error: "Pedido de compra nÃ£o encontrado." }, { status: 404 });
+      return NextResponse.json({ error: "Pedido de compra não encontrado." }, { status: 404 });
     }
 
     if (order.status === "PROVISIONADO" || order.provisioned_company_id) {
       return NextResponse.json(
         {
-          error: "NÃ£o Ã© possÃ­vel excluir um pedido jÃ¡ provisionado. Ele possui empresa e gestor vinculados."
+          error: "Não é possível excluir um pedido já provisionado. Ele possui empresa e gestor vinculados."
         },
         { status: 400 }
       );
@@ -54,13 +54,13 @@ export async function POST(req: NextRequest) {
       user_name: session?.name || "Super Admin",
       action: "EXCLUSAO_PEDIDO_COMPRA",
       resource: "pedidos_saas",
-      details: `Pedido ${order.order_number || order.id} (${order.empresa_nome || ""}) excluÃ­do antes do provisionamento. Origem: ${order.origin_source || "landing_page"}.`,
+      details: `Pedido ${order.order_number || order.id} (${order.empresa_nome || ""}) excluído antes do provisionamento. Origem: ${order.origin_source || "landing_page"}.`,
       created_at: new Date().toISOString()
     }]);
 
     return NextResponse.json({
       success: true,
-      message: `Pedido "${order.order_number || order.id}" excluÃ­do com sucesso.`
+      message: `Pedido "${order.order_number || order.id}" excluído com sucesso.`
     });
   } catch (err: any) {
     console.error("Error deleting purchase order:", err);

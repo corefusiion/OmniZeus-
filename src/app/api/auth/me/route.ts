@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     const session = await getSession(req);
     if (!session) {
       return NextResponse.json(
-        { success: false, error: "SessÃ£o invÃ¡lida ou expirada." },
+        { success: false, error: "Sessão inválida ou expirada." },
         { status: 401 }
       );
     }
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     return response;
   } catch {
     return NextResponse.json(
-      { success: false, error: "Falha ao verificar sessÃ£o." },
+      { success: false, error: "Falha ao verificar sessão." },
       { status: 500 }
     );
   }

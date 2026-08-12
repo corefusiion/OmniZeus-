@@ -50,13 +50,13 @@ export async function POST(req: NextRequest) {
 
     if (!prompt || typeof prompt !== "string") {
       return NextResponse.json(
-        { success: false, error: "Prompt Ã© obrigatÃ³rio." },
+        { success: false, error: "Prompt é obrigatório." },
         { status: 400 }
       );
     }
 
     // Escopo multi-tenant: a chave OpenRouter da empresa (se configurada) tem
-    // prioridade; caso contrÃ¡rio, cai no fallback da chave master.
+    // prioridade; caso contrário, cai no fallback da chave master.
     const session = await getSession(req);
     const activeCompanyId =
       req.headers.get("x-company-id") ||
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
           const { data: entries } = await supabase.from('contaazul_entries').select('*').eq('company_id', activeCompanyId);
           const { data: categories } = await supabase.from('contaazul_categories').select('*');
 
-          // Recuperar histÃ³rico da conversa para manter contexto (ex: "sim")
+          // Recuperar histórico da conversa para manter contexto (ex: "sim")
           const { data: messagesRows } = await supabase
             .from('contaazul_ia_messages')
             .select('*')
@@ -105,36 +105,36 @@ export async function POST(req: NextRequest) {
               return { role: "user", content: m.text };
             });
 
-          const systemPrompt = `VocÃª Ã© o Omni Conta Azul IA, assistente operacional nativo do ERP ContaAzul no OmniZeus. Seu objetivo primÃ¡rio Ã© comportar-se como um consultor humano experiente, conduzindo a conversa naturalmente.
+          const systemPrompt = `Você é o Omni Conta Azul IA, assistente operacional nativo do ERP ContaAzul no OmniZeus. Seu objetivo primário é comportar-se como um consultor humano experiente, conduzindo a conversa naturalmente.
 
 COMPORTAMENTO CONVERSACIONAL (OBRIGATÃ“RIO):
-1. Diferencie perguntas de comandos. Se o usuÃ¡rio diz "pode cadastrar cliente?", isso Ã© uma PERGUNTA, nÃ£o um comando. Responda naturalmente ("Claro, posso cadastrar. Me informe Nome, CNPJ e Email.") e NÃƒO tente executar a aÃ§Ã£o.
-2. NUNCA assuma ou invente dados. NÃ£o preencha nome, email, telefone ou CNPJ com base em suposiÃ§Ãµes (como usar "pode cadastrar um cliente?" como o Nome da pessoa).
-3. Somente crie registros / widgets (array actions) QUANDO possuir todas as informaÃ§Ãµes obrigatÃ³rias (ex: para cliente precisa de Nome, Nome Fantasia, Documento (CPF/CNPJ), Email, Tipo de Pessoa, Papel (Cliente/Fornecedor) e se Ã© Optante pelo Simples). Se faltar algo, apenas PERGUNTE ao usuÃ¡rio o que falta e NÃƒO gere a action.
-4. Antes de tomar uma decisÃ£o de gerar a action, valide internamente:
-   - A intenÃ§Ã£o estÃ¡ clara? Ã‰ um pedido de cadastro real?
+1. Diferencie perguntas de comandos. Se o usuário diz "pode cadastrar cliente?", isso é uma PERGUNTA, não um comando. Responda naturalmente ("Claro, posso cadastrar. Me informe Nome, CNPJ e Email.") e NÃƒO tente executar a ação.
+2. NUNCA assuma ou invente dados. Não preencha nome, email, telefone ou CNPJ com base em suposições (como usar "pode cadastrar um cliente?" como o Nome da pessoa).
+3. Somente crie registros / widgets (array actions) QUANDO possuir todas as informações obrigatórias (ex: para cliente precisa de Nome, Nome Fantasia, Documento (CPF/CNPJ), Email, Tipo de Pessoa, Papel (Cliente/Fornecedor) e se é Optante pelo Simples). Se faltar algo, apenas PERGUNTE ao usuário o que falta e NÃƒO gere a action.
+4. Antes de tomar uma decisão de gerar a action, valide internamente:
+   - A intenção está clara? Ã‰ um pedido de cadastro real?
    - Tenho todos os dados?
-   - Se "nÃ£o", pergunte o que falta.
+   - Se "não", pergunte o que falta.
 
-IMPORTANTE: VOCÃŠ TEM ACESSO VERDADEIRO E COMPLETO AOS DADOS REAIS ABAIXO. NUNCA DIGA AO USUÃRIO QUE NÃƒO TEM ACESSO AO BANCO DE DADOS DA CONTAAZUL!
+IMPORTANTE: VOCÃŠ TEM ACESSO VERDADEIRO E COMPLETO AOS DADOS REAIS ABAIXO. NUNCA DIGA AO USUÁRIO QUE NÃƒO TEM ACESSO AO BANCO DE DADOS DA CONTAAZUL!
 
 DADOS REAIS SINCRONIZADOS DA CONTAAZUL:
 - Clientes (${(clients || []).length} cadastrados): ${JSON.stringify((clients || []).slice(0, 10))}
 - Fornecedores (${(suppliers || []).length}): ${JSON.stringify((suppliers || []).slice(0, 10))}
-- LanÃ§amentos (${(entries || []).length}): ${JSON.stringify((entries || []).slice(0, 10))}
+- Lançamentos (${(entries || []).length}): ${JSON.stringify((entries || []).slice(0, 10))}
 - Categorias (${(categories || []).length}): ${JSON.stringify((categories || []).slice(0, 10))}
 
 DIRETRIZES DE RESPOSTA (OBRIGATÃ“RIO):
-1. NÃƒO imprima blocos de cÃ³digo JSON brutos como \`\`\`json na mensagem. Responda em JSON puro na raiz do corpo HTTP.
+1. NÃƒO imprima blocos de código JSON brutos como \`\`\`json na mensagem. Responda em JSON puro na raiz do corpo HTTP.
 2. NÃƒO use negrito com asteriscos duplos (**texto**) no meio de frases.
 3. PROIBIDO GERAÃ‡ÃƒO DE LINKS DE IMAGEM MARRKDOWN DO TIPO ![...](sandbox://...) OU ![...](file://...). NUNCA INVENTE CAMINHOS DE SANDBOX!
-4. QUANDO O USUÃRIO SOLICITAR UM GRÃFICO (linha, barras, evoluÃ§Ã£o, despesas, vencimentos), RETORNE O OBJETO JSON "chart" PREENCHIDO com o tipo "line" ou "bar", totais e itens (cada item contendo "label" e "value").
-5. Apenas retorne objetos de criaÃ§Ã£o dentro da array "actions" se a intenÃ§Ã£o for clara E vocÃª tiver os dados.
+4. QUANDO O USUÁRIO SOLICITAR UM GRÁFICO (linha, barras, evolução, despesas, vencimentos), RETORNE O OBJETO JSON "chart" PREENCHIDO com o tipo "line" ou "bar", totais e itens (cada item contendo "label" e "value").
+5. Apenas retorne objetos de criação dentro da array "actions" se a intenção for clara E você tiver os dados.
 6. Estrutura do JSON base de resposta:
 {
-  "message": "Sua resposta conversacional em texto limpo e legÃ­vel.",
+  "message": "Sua resposta conversacional em texto limpo e legível.",
   "chart": {
-    "title": "GrÃ¡fico de Linhas â€” EvoluÃ§Ã£o de LanÃ§amentos",
+    "title": "Gráfico de Linhas â€” Evolução de Lançamentos",
     "chartType": "line",
     "totalPayable": 11500,
     "totalReceivable": 15400,
@@ -200,42 +200,42 @@ DIRETRIZES DE RESPOSTA (OBRIGATÃ“RIO):
               if (promptLower.includes("cliente")) {
                 parsedResponse.table = {
                   columns: [
-                    { key: "name", label: "Nome / RazÃ£o Social" },
+                    { key: "name", label: "Nome / Razão Social" },
                     { key: "document", label: "Documento (CNPJ/CPF)" },
                     { key: "email", label: "E-mail de Contato" }
                   ],
                   rows: safeClients.map((c: any) => ({
                     id: c.id,
                     name: c.name || c.nome || c.company_name || c.razao_social || "Cliente CA",
-                    document: c.document || c.cnpj || c.cpf || c.documento || "NÃ£o informado",
+                    document: c.document || c.cnpj || c.cpf || c.documento || "Não informado",
                     email: c.email || "Sem e-mail"
                   }))
                 };
               } else if (promptLower.includes("fornecedor")) {
                 parsedResponse.table = {
                   columns: [
-                    { key: "name", label: "RazÃ£o Social / Fornecedor" },
+                    { key: "name", label: "Razão Social / Fornecedor" },
                     { key: "document", label: "CNPJ / Documento" },
                     { key: "email", label: "E-mail de Contato" }
                   ],
                   rows: safeSuppliers.map((s: any) => ({
                     id: s.id,
                     name: s.name || s.nome || "Fornecedor ERP",
-                    document: s.document || s.cnpj || s.documento || "NÃ£o informado",
+                    document: s.document || s.cnpj || s.documento || "Não informado",
                     email: s.email || "Sem e-mail"
                   }))
                 };
-              } else if (promptLower.includes("lanÃ§amento") || promptLower.includes("despesa") || promptLower.includes("conta")) {
+              } else if (promptLower.includes("lançamento") || promptLower.includes("despesa") || promptLower.includes("conta")) {
                 parsedResponse.table = {
                   columns: [
-                    { key: "description", label: "DescriÃ§Ã£o do TÃ­tulo" },
+                    { key: "description", label: "Descrição do Título" },
                     { key: "nome_pessoa", label: "Favorecido" },
                     { key: "valor", label: "Valor (R$)", type: "currency" },
-                    { key: "situacao", label: "SituaÃ§Ã£o", type: "status" }
+                    { key: "situacao", label: "Situação", type: "status" }
                   ],
                   rows: safeEntries.map((e: any) => ({
                     id: e.id || e.id_evento,
-                    description: e.description || e.desc || "LanÃ§amento Financeiro",
+                    description: e.description || e.desc || "Lançamento Financeiro",
                     nome_pessoa: e.nome_pessoa || e.cliente || e.fornecedor || "-",
                     valor: Number(e.valor || 0),
                     situacao: e.situacao || e.status || "PENDENTE"
@@ -252,13 +252,13 @@ DIRETRIZES DE RESPOSTA (OBRIGATÃ“RIO):
 
     if (!parsedResponse) {
       parsedResponse = {
-        message: "NÃ£o consegui processar a resposta no momento. Tente novamente.",
+        message: "Não consegui processar a resposta no momento. Tente novamente.",
         table: null,
         actions: []
       };
     }
 
-    // Persistir mensagem limpa e sem marcaÃ§Ãµes JSON no banco
+    // Persistir mensagem limpa e sem marcações JSON no banco
     const msgId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     const aiMsgId = `msg_${Date.now() + 1}_${Math.random().toString(36).substr(2, 5)}`;
     const now = new Date().toISOString();

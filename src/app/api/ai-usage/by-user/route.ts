@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
       ? requestedCompanyId
       : (session.companyId || "comp_zenitus");
 
-    // Gestor/super_adm enxergam todos; funcionÃ¡rio vÃª apenas o prÃ³prio consumo.
+    // Gestor/super_adm enxergam todos; funcionário vê apenas o próprio consumo.
     const isGestor = session.role === "gestor" || session.role === "super_adm";
     const ownUserId = session.userId;
 
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
       ? db.ai_usage_logs.filter((l: any) => (l.company_id || l.companyId) === companyId)
       : [];
 
-    // Nome dos colaboradores para exibiÃ§Ã£o
+    // Nome dos colaboradores para exibição
     const emps = Array.isArray(db.employees) ? db.employees : [];
     const userNames = new Map<string, string>();
     emps.forEach((e: any) => {
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
       const key = `${uid}::${day}`;
       const cur = byKey.get(key) || {
         usuario_id: uid,
-        usuario_nome: userNames.get(uid) || (uid === ownUserId && !isGestor ? "VocÃª" : uid),
+        usuario_nome: userNames.get(uid) || (uid === ownUserId && !isGestor ? "Você" : uid),
         dia: day,
         interacoes: 0,
         coins: 0,
