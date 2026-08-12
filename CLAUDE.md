@@ -447,13 +447,12 @@ Amanh�, basta continuar o desenvolvimento!
   - **`https://api-v2.contaazul.com/v1/pessoas`**: **HTTP 200 OK** (9 cadastros retornados com sucesso contendo nome, documento, email, telefone e array `perfis`).
   - **Endpoints V1 (`api.contaazul.com/v1/sales`, `/purchases`, `/financeiro`)**: Retornam **HTTP 401 `invalid_token`** para apps de teste não homologados como integrador oficial pela Conta Azul.
 
-### 7. 🧭 Sessão — 2026-08-11 (Separação Estrita de Clientes/Fornecedores & Mapeamento de Produtos/Serviços)
+### 7. 🧭 Sessão — 2026-08-11 (Separação Estrita, Exclusão Manual & Abas de Produtos/Serviços)
 
-- **Causa da Mistura de Clientes na Aba de Fornecedores**:
-  - A requisição `v2_pessoas_fornecedor` forçava `_force_supplier = true` em todos os registros retornados pela busca geral da Conta Azul v2 (`/v1/pessoas`).
-- **Solução Implementada (Commit `bae6381`)**:
-  - Removido o flag coercitivo `_force_supplier`. A classificação agora inspeciona estritamente o array `perfis` oficial de cada pessoa (`["Cliente"]` vs `["Fornecedor"]`).
-  - **Resultado**: Clientes (6) e Fornecedores (3) ficam 100% isolados nas suas respectivas abas.
-- **Mapeamento dos Demais Módulos**:
-  - **Produtos & Serviços**: Script DDL preparado (`contaazul_products` e `contaazul_services`) e rotas integradas no [auto-sync/route.ts](file:///c:/Users/gdesi/Desktop/Omnizeus/src/app/api/contaazul/auto-sync/route.ts).
-- **Validação**: TypeScript build (`npx tsc --noEmit`) 100% aprovado (0 erros).
+- **Filtro de Exclusão de Clientes na Guia de Fornecedores**:
+  - `filteredSuppliers` em [contaazul/page.tsx](file:///c:/Users/gdesi/Desktop/Omnizeus/src/app/(dashboard)/contaazul/page.tsx) agora filtra automaticamente qualquer registro de cliente sem o perfil explícito de fornecedor.
+- **Botão Excluir Manual**:
+  - Adicionado botão vermelho **Excluir** na coluna de ações das tabelas de **Clientes** e **Fornecedores**, permitindo remover qualquer registro salvo no Supabase e na interface com 1 clique (`handleDeleteClient` / `handleDeleteSupplier`).
+- **Novas Guias Visuais no Menu**:
+  - Adicionadas abas visuais dedicadas para **Produtos** (`Database`), **Serviços** (`Zap`), **Contas a Receber/Pagar** (`DollarSign`) e **Plano de Contas** (`Layers`) no topo da página `/contaazul`.
+- **Validação**: TypeScript build (`npx tsc --noEmit`) 100% aprovado (0 erros). Commit `e835dc8` enviado para o GitHub.
