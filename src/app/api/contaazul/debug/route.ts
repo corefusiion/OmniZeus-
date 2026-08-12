@@ -146,36 +146,28 @@ export async function GET(req: NextRequest) {
       `https://api.contaazul.com/v1/vendas/clientes?pagina=1&tamanho_pagina=50`
     ),
     probe(
-      "eventos_financeiros",
-      `https://api.contaazul.com/v1/financeiro/eventos-financeiros?pagina=1&tamanho_pagina=50`
+      "v2_eventos_financeiros",
+      `https://api-v2.contaazul.com/v1/financeiro/eventos-financeiros`
     ),
     probe(
-      "lancamentos_financeiros",
-      `https://api.contaazul.com/v1/financeiro/lancamentos?pagina=1&tamanho_pagina=50`
+      "v2_produtos",
+      `https://api-v2.contaazul.com/v1/produtos`
+    ),
+    probe(
+      "v2_servicos",
+      `https://api-v2.contaazul.com/v1/servicos`
+    ),
+    probe(
+      "v2_categorias_raiz",
+      `https://api-v2.contaazul.com/v1/categorias`
+    ),
+    probe(
+      "eventos_financeiros_v1",
+      `https://api.contaazul.com/v1/financeiro/eventos-financeiros?pagina=1&tamanho_pagina=50`
     ),
     probe(
       "categorias_v1",
       `https://api.contaazul.com/v1/financeiro/categorias`
-    ),
-    probe(
-      "categorias_v2",
-      `https://api-v2.contaazul.com/v1/financeiro/categorias`
-    ),
-    probe(
-      "receitas_v1",
-      `https://api.contaazul.com/v1/receitas?pagina=1&tamanho_pagina=50`
-    ),
-    probe(
-      "despesas_v1",
-      `https://api.contaazul.com/v1/despesas?pagina=1&tamanho_pagina=50`
-    ),
-    probe(
-      "v1_sales",
-      `https://api.contaazul.com/v1/sales`
-    ),
-    probe(
-      "v1_purchases",
-      `https://api.contaazul.com/v1/purchases`
     ),
     probe(
       "v1_services",
