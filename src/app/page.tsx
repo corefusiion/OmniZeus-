@@ -415,42 +415,41 @@ function Navbar() {
 ───────────────────────────────────────── */
 function Hero() {
   return (
-    <section className="pt-32 pb-20 lg:pt-36 lg:pb-28 bg-gradient-to-b from-slate-50/80 via-white to-white border-b border-slate-100">
-      <div className="max-w-[1400px] mx-auto px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
-          <div className="lg:col-span-6 space-y-6 text-left min-w-0">
-            <div className="inline-flex items-center px-3.5 py-1 bg-primary/10 border border-primary/20 rounded-full text-primary text-[11px] font-bold tracking-wide uppercase">
+    <section className="pt-24 pb-16 sm:pt-28 lg:pt-36 lg:pb-28 bg-gradient-to-b from-slate-50/80 via-white to-white border-b border-slate-100">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col lg:grid lg:grid-cols-12 gap-8 lg:gap-8 items-center">
+          
+          {/* Mockup do Site / AppPreview — PRIMEIRO NO MOBILE */}
+          <div className="w-full lg:col-span-6 min-w-0 order-1 lg:order-2" id="produto">
+            <AppPreview />
+          </div>
+
+          {/* Textos, Descrições e Botões — SEGUNDO NO MOBILE */}
+          <div className="w-full lg:col-span-6 space-y-6 text-center lg:text-left min-w-0 order-2 lg:order-1">
+            <div className="inline-flex items-center px-3.5 py-1 bg-primary/10 border border-primary/20 rounded-full text-primary text-[11px] font-bold tracking-wide uppercase mx-auto lg:mx-0">
               <span>Plataforma Integrada de Operação & IA</span>
             </div>
 
-            <h1 className="text-4xl sm:text-5xl lg:text-[54px] font-bold text-slate-900 leading-[1.08] tracking-tight">
+            <h1 className="text-3xl sm:text-5xl lg:text-[54px] font-bold text-slate-900 leading-[1.1] tracking-tight">
               Gestão, automação e IA em um único ambiente.
             </h1>
 
-            <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-xl">
+            <p className="text-sm sm:text-lg text-slate-600 leading-relaxed max-w-xl mx-auto lg:mx-0">
               Unifique a operação do seu escritório contábil ou prestação de BPO Financeiro. Conecte dados do Conta Azul, automatize tarefas e utilize agentes de IA contextualizados com a sua empresa.
             </p>
 
-            <div className="flex flex-wrap items-center gap-3.5 pt-2">
-              <a
-                href="#planos"
-                className="inline-flex items-center gap-2 bg-primary hover:opacity-90 text-white text-sm font-bold px-7 py-3.5 rounded-xl transition-all shadow-md hover:shadow-lg"
-              >
-                <span>Começar agora</span>
-                <ArrowRight className="w-4 h-4" />
-              </a>
-
+            <div className="flex items-center justify-center lg:justify-start gap-3.5 pt-2">
               <a
                 href="#produto"
-                className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 text-sm font-bold px-6 py-3.5 rounded-xl border border-slate-200 hover:border-slate-300 transition-all"
+                className="inline-flex items-center justify-center gap-2 bg-primary hover:opacity-90 text-white text-sm font-bold px-7 py-3.5 rounded-xl transition-all shadow-md hover:shadow-lg"
               >
-                <Play className="w-4 h-4 text-primary fill-primary/20" />
+                <Play className="w-4 h-4 text-white fill-white/20" />
                 <span>Conhecer a plataforma</span>
               </a>
             </div>
 
             {/* Trust Badges */}
-            <div className="pt-6 border-t border-slate-200/70 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-500 font-semibold">
+            <div className="pt-6 border-t border-slate-200/70 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-500 font-semibold justify-items-center lg:justify-items-start">
               <span className="flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 Sem implantação complexa
@@ -466,9 +465,6 @@ function Hero() {
             </div>
           </div>
 
-          <div className="lg:col-span-6 min-w-0" id="produto">
-            <AppPreview />
-          </div>
         </div>
       </div>
     </section>
