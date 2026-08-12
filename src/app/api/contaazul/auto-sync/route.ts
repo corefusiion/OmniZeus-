@@ -182,10 +182,8 @@ export async function POST(req: NextRequest) {
 
         const isAuthError = (status: number) => status === 401 || status === 403;
 
-        // v2 é a API homologada (retorna 200). v1 antiga retorna 401 para apps não-homologados.
         const pessoasEndpoints = [
-          { name: "v2_pessoas", url: `https://api-v2.contaazul.com/v1/pessoas?pagina=1&tamanho_pagina=100` },
-          { name: "v2_pessoas_fornecedor", url: `https://api-v2.contaazul.com/v1/pessoas?pagina=1&tamanho_pagina=100&perfis=FORNECEDOR` }
+          { name: "v2_pessoas", url: `https://api-v2.contaazul.com/v1/pessoas?pagina=1&tamanho_pagina=100` }
         ];
 
         let authBlocked = false;
@@ -208,18 +206,9 @@ export async function POST(req: NextRequest) {
           if (res.ok) {
             const data = await safeJson(res);
             const list = extractList(data, "pessoas", "clientes", "customers", "fornecedores", "suppliers");
-            const isFornecedorQuery = ep.name === "v2_pessoas_fornecedor";
             if (list.length > 0) {
-              list.forEach((p: any) => {
-                const existing = rawPessoas.find((rp: any) => String(rp.id) === String(p.id));
-                if (existing) {
-                  if (isFornecedorQuery) existing._force_supplier = true;
-                } else {
-                  if (isFornecedorQuery) p._force_supplier = true;
-                  rawPessoas.push(p);
-                }
-              });
-              apiDebug[ep.name] = `HTTP 200 → ${list.length} obtidos`;
+              rawPessoas = list;
+              apiDebug[ep.name] = `HTTP 200 → ${list.length} pessoas obtidas`;
             } else {
               apiDebug[ep.name] = `HTTP 200 → 0 registros (payload: ${previewPayload(data)})`;
             }
@@ -334,46 +323,17 @@ export async function POST(req: NextRequest) {
           const email = item.email || item.email_principal || "";
           const tel = item.telefone_celular || item.telefone || item.phone || item.celular || "";
 
-          // Classificação de fornecedor — múltiplas formas da API Conta Azul
-          // _force_supplier = marcado na busca com filtro perfis=FORNECEDOR
-          const perfisRaw =
-            item.perfis || item.profiles || item.perfil || item.roles || item.tipos_perfil || [];
-          const perfisArr = Array.isArray(perfisRaw) ? perfisRaw : [perfisRaw];
+          // Classificação estrita pelo array perfis[] retornado oficialmente pela Conta Azul
+          const perfisRaw = item.perfis || item.profiles || item.perfil || item.roles || item.tipos_perfil || [];
+          const perfisArr = (Array.isArray(perfisRaw) ? perfisRaw : [perfisRaw]).map((p: any) =>
+            (typeof p === "string" ? p : p?.tipo_perfil || p?.tipo || p?.name || p?.nome || p?.type || "").toUpperCase()
+          );
 
-          let isSupp =
-            item._force_supplier === true ||
-            item.is_supplier === true ||
-            item.tipo_perfil === "Fornecedor" ||
-            item.tipo_perfil === "FORNECEDOR" ||
-            item.perfil === "FORNECEDOR" ||
-            perfisArr.some((p: any) => {
-              const str = (
-                typeof p === "string"
-                  ? p
-                  : p?.tipo_perfil || p?.tipo || p?.name || p?.nome || p?.type || ""
-              ).toUpperCase();
-              return str.includes("FORNECEDOR") || str.includes("SUPPLIER");
-            });
+          const hasSupplierProfile = perfisArr.some(str => str.includes("FORNECEDOR") || str.includes("SUPPLIER"));
+          const hasCustomerProfile = perfisArr.some(str => str.includes("CLIENTE") || str.includes("CUSTOMER"));
 
-          let isCli =
-            item.is_customer === true ||
-            item.tipo_perfil === "Cliente" ||
-            item.tipo_perfil === "CLIENTE" ||
-            item.perfil === "CLIENTE" ||
-            perfisArr.some((p: any) => {
-              const str = (
-                typeof p === "string"
-                  ? p
-                  : p?.tipo_perfil || p?.tipo || p?.name || p?.nome || p?.type || ""
-              ).toUpperCase();
-              return str.includes("CLIENTE") || str.includes("CUSTOMER");
-            });
-
-          // Fallback por nome (heurística)
-          const nameUpper = String(nome).toUpperCase();
-          if (nameUpper.includes("FORNECEDOR") || nameUpper.includes("SUPPLIER")) {
-            isSupp = true;
-          }
+          const isSupp = hasSupplierProfile;
+          const isCli = hasCustomerProfile || (!hasSupplierProfile);
 
           const itemId = String(
             item.id || `pessoa_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
