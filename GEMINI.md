@@ -494,3 +494,22 @@ Amanh�, basta continuar o desenvolvimento!
 - **Validar em produção**: após deploy na Cloudflare, executar auto-sync e verificar nos logs se os endpoints de fornecedores/financeiro/categorias retornam dados ou erros HTTP (403/404).
 - **Se 403 nos endpoints financeiros**: o token OAuth pode não ter os scopes necessários (`financeiro:read`). Nesse caso, reconectar o OAuth na aba Credenciais & OAuth 2.0 e verificar quais scopes o app Conta Azul tem configurado.
 - **Verificar no Supabase**: tabelas `contaazul_suppliers`, `contaazul_entries`, `contaazul_categories` devem ter registros após sync.
+
+---
+
+## 🧭 Sessão — 2026-08-12 (Resolução do Limite 'Too many subrequests', Componente ValueProof e Deploy Cloudflare)
+
+### 1. Resolução do Erro 'Too many subrequests' no Auto-Sync
+- **Curto-circuito de Endpoints**: `src/app/api/contaazul/auto-sync/route.ts` interrompe a busca na API do Conta Azul assim que o primeiro endpoint válido responde HTTP 200 (evita chamar 14 URLs sequenciais).
+- **Upsert Otimizado no Supabase**: `resilientUpsert` simplificado para upsert direto em lote com `{ onConflict: 'id' }` (sem 3 retries de fetch por tabela).
+- **Consumo de Sub-requisições**: Reduzido de 45+ subrequests para **< 12 chamadas**, eliminando o erro de cota no Cloudflare Workers.
+
+### 2. Novo Módulo & Componente "Prova de Valor (ROI)"
+- **`src/components/dashboard/ValueProof.tsx`**: Painel visual de ROI financeiro, horas economizadas e impacto acumulado do uso da IA.
+- **`src/app/api/value-proof/route.ts`**: API dedicada para agregar métricas de valor por tenant.
+- **Integração no Dashboard**: Adicionado no topo do Dashboard Executivo (`/dashboard`).
+
+### 3. Compilação & Deploy
+- `npx tsc --noEmit` → **exit 0** (0 erros de tipo).
+- `npm run build` → **30/30 páginas estáticas + 51 APIs Edge `ƒ` compiladas com sucesso**.
+- Commit `ea8666b` comitado e **push concluído para `origin/main`**, acionando o deploy automático no Cloudflare Pages.
