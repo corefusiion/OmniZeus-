@@ -67,7 +67,7 @@ function ContaAzulContent() {
   const errorFromUrl = searchParams?.get("error");
 
   const [role, setRole] = useState<UserRole>("gestor");
-  const [activeTab, setActiveTab] = useState<'conexao' | 'clientes' | 'fornecedores' | 'financeiro' | 'categorias'>('clientes');
+  const [activeTab, setActiveTab] = useState<'conexao' | 'clientes' | 'fornecedores' | 'financeiro' | 'categorias' | 'produtos' | 'servicos'>('clientes');
   
   // Config State
   const [clientId, setClientId] = useState("1mbtg7ok5lp46p0j9oir48fda0");
@@ -109,6 +109,8 @@ function ContaAzulContent() {
   const [syncedClients, setSyncedClients] = useState<any[]>([]);
   const [syncedSuppliers, setSyncedSuppliers] = useState<any[]>([]);
   const [syncedEntries, setSyncedEntries] = useState<any[]>([]);
+  const [syncedProducts, setSyncedProducts] = useState<any[]>([]);
+  const [syncedServices, setSyncedServices] = useState<any[]>([]);
   const [categories, setCategories] = useState<ContaAzulCategory[]>([]);
 
   // Category Modal State
@@ -1309,6 +1311,40 @@ function ContaAzulContent() {
     setTimeout(() => setNoticeMessage(null), 3000);
   };
 
+  const handleDeleteClient = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir este cliente do OmniZeus?")) return;
+    try {
+      const updated = syncedClients.filter(c => String(c.id) !== String(id));
+      setSyncedClients(updated);
+      await saveContaAzulClients(updated);
+      await fetch("/api/db", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", table: "contaazul_clients", record: { id } })
+      }).catch(() => {});
+      setNoticeMessage({ type: 'success', text: 'Cliente excluído com sucesso!' });
+    } catch {
+      setNoticeMessage({ type: 'error', text: 'Falha ao excluir cliente.' });
+    }
+  };
+
+  const handleDeleteSupplier = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir este fornecedor do OmniZeus?")) return;
+    try {
+      const updated = syncedSuppliers.filter(s => String(s.id) !== String(id));
+      setSyncedSuppliers(updated);
+      await saveContaAzulSuppliers(updated);
+      await fetch("/api/db", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", table: "contaazul_suppliers", record: { id } })
+      }).catch(() => {});
+      setNoticeMessage({ type: 'success', text: 'Fornecedor excluído com sucesso!' });
+    } catch {
+      setNoticeMessage({ type: 'error', text: 'Falha ao excluir fornecedor.' });
+    }
+  };
+
   // Voice recording toggle simulation
   const toggleVoiceRecording = () => {
     setIsRecordingAudio(!isRecordingAudio);
@@ -1379,8 +1415,18 @@ function ContaAzulContent() {
   });
 
   const filteredSuppliers = syncedSuppliers.filter(c => {
+    const nameUpper = String(c.name || c.nome || c.company_name || c.razao_social || '').toUpperCase();
+    const perfisRaw = c.perfis || [];
+    const perfisArr = (Array.isArray(perfisRaw) ? perfisRaw : [perfisRaw]).map((p: any) => String(p).toUpperCase());
+
+    // Se for um cliente e não possuir o perfil explícito de fornecedor, esconde da guia de Fornecedores
+    const isPureClient = syncedClients.some(cli => String(cli.id) === String(c.id) || (cli.nome && String(cli.nome).toUpperCase() === nameUpper));
+    if (isPureClient && !perfisArr.some(p => p.includes("FORNECEDOR"))) {
+      return false;
+    }
+
     const q = searchQuery.toLowerCase();
-    const name = (c.name || c.nome || c.company_name || c.razao_social || '').toLowerCase();
+    const name = nameUpper.toLowerCase();
     const doc = (c.document || c.cnpj || c.cpf || c.cpf_cnpj || c.documento || '').toLowerCase();
     return name.includes(q) || doc.includes(q);
   });
@@ -2216,9 +2262,11 @@ function ContaAzulContent() {
         <div className="flex items-center gap-1 overflow-x-auto max-w-full pb-0.5 shrink-0">
           {[
             { id: 'clientes', label: `Clientes (${syncedClients.length})`, icon: Users },
-            { id: 'fornecedores', label: `Fornecedores (${syncedSuppliers.length})`, icon: Building },
+            { id: 'fornecedores', label: `Fornecedores (${filteredSuppliers.length})`, icon: Building },
             { id: 'financeiro', label: `Contas a Receber/Pagar (${syncedEntries.length})`, icon: DollarSign },
             { id: 'categorias', label: `Plano de Contas (${categories.length})`, icon: Layers },
+            { id: 'produtos', label: `Produtos (${syncedProducts.length})`, icon: Database },
+            { id: 'servicos', label: `Serviços (${syncedServices.length})`, icon: Zap },
             { id: 'conexao', label: 'Credenciais & OAuth 2.0', icon: Key },
           ].map(t => {
             const Icon = t.icon;
@@ -2357,6 +2405,13 @@ function ContaAzulContent() {
                             <Edit className="w-3 h-3 text-gray-500" />
                             <span>Editar</span>
                           </button>
+                          <button
+                            onClick={() => handleDeleteClient(c.id)}
+                            className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded-md text-[11px] font-medium inline-flex items-center gap-1 border border-red-200 ml-1.5 transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3 text-red-500" />
+                            <span>Excluir</span>
+                          </button>
                         </td>
                       </tr>
                     );
@@ -2437,6 +2492,13 @@ function ContaAzulContent() {
                           >
                             <Edit className="w-3 h-3 text-gray-500" />
                             <span>Editar</span>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteSupplier(c.id)}
+                            className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded-md text-[11px] font-medium inline-flex items-center gap-1 border border-red-200 ml-1.5 transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3 text-red-500" />
+                            <span>Excluir</span>
                           </button>
                         </td>
                       </tr>
@@ -2594,6 +2656,120 @@ function ContaAzulContent() {
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tab: Produtos */}
+      {activeTab === 'produtos' && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+            <div>
+              <h3 className="text-base font-bold text-gray-900">Produtos Integrados da ContaAzul Pro</h3>
+              <p className="text-xs text-gray-500">Catálogo de produtos físicos e estoques sincronizados</p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-gray-50 text-gray-500 font-bold uppercase tracking-wider">
+                <tr>
+                  <th className="py-3 px-4 rounded-tl-lg">Produto</th>
+                  <th className="py-3 px-4">SKU / Código</th>
+                  <th className="py-3 px-4">Formato</th>
+                  <th className="py-3 px-4">Valor (R$)</th>
+                  <th className="py-3 px-4">Estoque</th>
+                  <th className="py-3 px-4 rounded-tr-lg text-right">Situação</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {syncedProducts.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center">
+                      <Database className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                      <p className="text-gray-500 font-medium">Nenhum Produto Cadastrado</p>
+                      <p className="text-gray-400 mt-1">Os produtos do catálogo da ContaAzul aparecerão aqui após a sincronização.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  syncedProducts.map((p, i) => (
+                    <tr key={i} className="hover:bg-gray-50 transition-colors">
+                      <td className="py-3.5 px-4 font-semibold text-gray-900">{p.nome || p.name || '—'}</td>
+                      <td className="py-3.5 px-4 font-mono text-gray-600">{p.sku || p.codigo || '—'}</td>
+                      <td className="py-3.5 px-4 text-gray-600">{p.formato || p.format || 'Simples'}</td>
+                      <td className="py-3.5 px-4 font-semibold text-gray-900">
+                        {p.valor ? `R$ ${Number(p.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'}
+                      </td>
+                      <td className="py-3.5 px-4 font-mono text-gray-600">{p.estoque ?? '0'}</td>
+                      <td className="py-3.5 px-4 text-right">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200">
+                          <CheckCircle2 className="w-3 h-3" />
+                          {p.status || "Ativo"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tab: Serviços */}
+      {activeTab === 'servicos' && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+            <div>
+              <h3 className="text-base font-bold text-gray-900">Serviços Integrados da ContaAzul Pro</h3>
+              <p className="text-xs text-gray-500">Catálogo de serviços prestados e tomados sincronizados</p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-gray-50 text-gray-500 font-bold uppercase tracking-wider">
+                <tr>
+                  <th className="py-3 px-4 rounded-tl-lg">Nome do Serviço</th>
+                  <th className="py-3 px-4">Código</th>
+                  <th className="py-3 px-4">Tipo</th>
+                  <th className="py-3 px-4">Valor Custo (R$)</th>
+                  <th className="py-3 px-4">Valor Venda (R$)</th>
+                  <th className="py-3 px-4 rounded-tr-lg text-right">Situação</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {syncedServices.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center">
+                      <Zap className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                      <p className="text-gray-500 font-medium">Nenhum Serviço Cadastrado</p>
+                      <p className="text-gray-400 mt-1">Os serviços cadastrados no ERP ContaAzul aparecerão aqui após a sincronização.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  syncedServices.map((s, i) => (
+                    <tr key={i} className="hover:bg-gray-50 transition-colors">
+                      <td className="py-3.5 px-4 font-semibold text-gray-900">{s.nome || s.name || '—'}</td>
+                      <td className="py-3.5 px-4 font-mono text-gray-600">{s.codigo || s.code || '—'}</td>
+                      <td className="py-3.5 px-4 text-gray-600">{s.tipo || s.type || 'Prestado'}</td>
+                      <td className="py-3.5 px-4 font-mono text-gray-600">
+                        {s.valor_custo ? `R$ ${Number(s.valor_custo).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ 0,00'}
+                      </td>
+                      <td className="py-3.5 px-4 font-semibold text-gray-900">
+                        {s.valor_venda ? `R$ ${Number(s.valor_venda).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ 0,00'}
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200">
+                          <CheckCircle2 className="w-3 h-3" />
+                          {s.status || "Ativo"}
+                        </span>
                       </td>
                     </tr>
                   ))
