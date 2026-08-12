@@ -447,12 +447,12 @@ Amanh�, basta continuar o desenvolvimento!
   - **`https://api-v2.contaazul.com/v1/pessoas`**: **HTTP 200 OK** (9 cadastros retornados com sucesso contendo nome, documento, email, telefone e array `perfis`).
   - **Endpoints V1 (`api.contaazul.com/v1/sales`, `/purchases`, `/financeiro`)**: Retornam **HTTP 401 `invalid_token`** para apps de teste não homologados como integrador oficial pela Conta Azul.
 
-### 7. 🧭 Sessão — 2026-08-11 (Separação Estrita, Exclusão Manual & Abas de Produtos/Serviços)
+### 7. 🧭 Sessão — 2026-08-11 (Separação Estrita, Exclusão Manual, Abas & Reordenação Mobile da Landing Page)
 
-- **Filtro de Exclusão de Clientes na Guia de Fornecedores**:
-  - `filteredSuppliers` em [contaazul/page.tsx](file:///c:/Users/gdesi/Desktop/Omnizeus/src/app/(dashboard)/contaazul/page.tsx) agora filtra automaticamente qualquer registro de cliente sem o perfil explícito de fornecedor.
-- **Botão Excluir Manual**:
-  - Adicionado botão vermelho **Excluir** na coluna de ações das tabelas de **Clientes** e **Fornecedores**, permitindo remover qualquer registro salvo no Supabase e na interface com 1 clique (`handleDeleteClient` / `handleDeleteSupplier`).
-- **Novas Guias Visuais no Menu**:
-  - Adicionadas abas visuais dedicadas para **Produtos** (`Database`), **Serviços** (`Zap`), **Contas a Receber/Pagar** (`DollarSign`) e **Plano de Contas** (`Layers`) no topo da página `/contaazul`.
-- **Validação**: TypeScript build (`npx tsc --noEmit`) 100% aprovado (0 erros). Commit `e835dc8` enviado para o GitHub.
+- **Reordenação Mobile da Landing Page (`/`)**:
+  - Em dispositivos móveis (`< lg`), o container de preview interativo da plataforma (`<AppPreview />` com ID `#produto`) é renderizado **EM PRIMEIRO LUGAR** no topo da página Hero (`order-1 lg:order-2`).
+  - O bloco de títulos, descrições e selos de confiança fica posicionado **ABAIXO do container de preview** no mobile (`order-2 lg:order-1`).
+- **Remoção do Botão "Começar Agora" & Centralização**:
+  - Removido o botão verde redundante `"Começar agora"` para evitar navegação confusa ou quebras no mobile.
+  - O botão primário CTA `"Conhecer a plataforma"` foi estilizado com a cor primária e alinhamento centralizado no mobile (`justify-center lg:justify-start`).
+- **Validação**: TypeScript build (`npx tsc --noEmit`) 100% aprovado (0 erros). Commits `e835dc8` e `034fa65` enviados para o GitHub.
