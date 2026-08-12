@@ -447,13 +447,13 @@ Amanh�, basta continuar o desenvolvimento!
   - **`https://api-v2.contaazul.com/v1/pessoas`**: **HTTP 200 OK** (9 cadastros retornados com sucesso contendo nome, documento, email, telefone e array `perfis`).
   - **Endpoints V1 (`api.contaazul.com/v1/sales`, `/purchases`, `/financeiro`)**: Retornam **HTTP 401 `invalid_token`** para apps de teste não homologados como integrador oficial pela Conta Azul.
 
-### 7. 🧭 Sessão — 2026-08-11 (Resolução do Sync de Fornecedores & Schema Sanitization)
+### 7. 🧭 Sessão — 2026-08-11 (Separação Estrita de Clientes/Fornecedores & Mapeamento de Produtos/Serviços)
 
-- **Causa Raiz da Falha no Sync de Fornecedores (`0 fornecedores`)**:
-  - A API v2 da Conta Azul (`/v1/pessoas`) retornava corretamente os 9 cadastros (`Beta teste`, `Caio santos`, `Cliente 01`, `Eronilda Santos`, `Eu sou foda`, `Gleisson`, e os 3 fornecedores `Fornecedor 01`, `Fornecedor 02`, `Fornecedor 03`).
-  - No entanto, a sanitização enviava campos como `telefone_celular`, `codigo` e `observacoes` no payload de fornecedores. Como a tabela `contaazul_suppliers` no Supabase não possui essas 3 colunas, o PostgREST rejeitava o upsert com erro de coluna inexistente.
-  - Além disso, a chave primária composta da tabela `contaazul_suppliers` é `(id, company_id)`.
-- **Solução Implementada (Commit `7a4de72`)**:
-  - Criado o objeto `supplierSanitized` em [auto-sync/route.ts](file:///c:/Users/gdesi/Desktop/Omnizeus/src/app/api/contaazul/auto-sync/route.ts) estritamente aderente ao schema de `contaazul_suppliers`.
-  - Atualizado o `resilientUpsert` para tentar primeiramente a PK composta `onConflict: "id,company_id"`, depois `id` simples, garantindo a gravação sem erros.
+- **Causa da Mistura de Clientes na Aba de Fornecedores**:
+  - A requisição `v2_pessoas_fornecedor` forçava `_force_supplier = true` em todos os registros retornados pela busca geral da Conta Azul v2 (`/v1/pessoas`).
+- **Solução Implementada (Commit `bae6381`)**:
+  - Removido o flag coercitivo `_force_supplier`. A classificação agora inspeciona estritamente o array `perfis` oficial de cada pessoa (`["Cliente"]` vs `["Fornecedor"]`).
+  - **Resultado**: Clientes (6) e Fornecedores (3) ficam 100% isolados nas suas respectivas abas.
+- **Mapeamento dos Demais Módulos**:
+  - **Produtos & Serviços**: Script DDL preparado (`contaazul_products` e `contaazul_services`) e rotas integradas no [auto-sync/route.ts](file:///c:/Users/gdesi/Desktop/Omnizeus/src/app/api/contaazul/auto-sync/route.ts).
 - **Validação**: TypeScript build (`npx tsc --noEmit`) 100% aprovado (0 erros).
