@@ -1,0 +1,208 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 520" width="1100" height="520">
+  <defs>
+    <!-- Background & Gradients -->
+    <linearGradient id="archBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#070D18"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+
+    <linearGradient id="blueBoxGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+
+    <linearGradient id="accentBlue" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1E6FD9"/>
+      <stop offset="100%" stop-color="#38BDF8"/>
+    </linearGradient>
+
+    <filter id="boxShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+
+    <pattern id="archGrid" width="30" height="30" patternUnits="userSpaceOnUse">
+      <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#334155" stroke-width="0.5" stroke-opacity="0.3"/>
+    </pattern>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="1100" height="520" fill="url(#archBg)"/>
+  <rect width="1100" height="520" fill="url(#archGrid)"/>
+
+  <!-- Title & Legend -->
+  <g transform="translate(60, 40)">
+    <text x="0" y="0" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-size="20" font-weight="800" fill="#FFFFFF">
+      OMNIZEUS — Arquitetura de Alto Nível &amp; Isolamento Multi-Tenant
+    </text>
+    <text x="0" y="22" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-size="12" font-weight="400" fill="#94A3B8">
+      Fluxo de requisição com Edge Runtime, barreiras estritas de tenant, gateway de IA e sincronização ERP.
+    </text>
+  </g>
+
+  <!-- 1. CLIENT LAYER -->
+  <g transform="translate(60, 100)" filter="url(#boxShadow)">
+    <rect width="210" height="360" rx="12" fill="url(#blueBoxGrad)" stroke="#334155" stroke-width="1.2"/>
+    <rect width="210" height="36" rx="12" fill="#1E293B"/>
+    <rect y="24" width="210" height="12" fill="#1E293B"/>
+    <text x="16" y="24" font-family="monospace" font-size="11" font-weight="700" fill="#38BDF8">01. CAMADA CLIENTE</text>
+
+    <!-- Sub items -->
+    <g transform="translate(14, 52)">
+      <!-- Item 1 -->
+      <rect width="182" height="64" rx="8" fill="#0F172A" stroke="#334155" stroke-width="0.8"/>
+      <text x="12" y="20" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">Web SPA (Next.js 14)</text>
+      <text x="12" y="36" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9.5" fill="#94A3B8">App Router &amp; Edge Components</text>
+      <text x="12" y="52" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" font-weight="600" fill="#10B981">Tailwind + Lucide + SWR</text>
+    </g>
+
+    <g transform="translate(14, 126)">
+      <!-- Item 2 -->
+      <rect width="182" height="64" rx="8" fill="#0F172A" stroke="#334155" stroke-width="0.8"/>
+      <text x="12" y="20" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">Mobile Responsive</text>
+      <text x="12" y="36" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9.5" fill="#94A3B8">Calculadora ROI &amp; Painéis</text>
+      <text x="12" y="52" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" font-weight="600" fill="#38BDF8">Viewports 320px – 4K</text>
+    </g>
+
+    <g transform="translate(14, 200)">
+      <!-- Item 3 -->
+      <rect width="182" height="64" rx="8" fill="#0F172A" stroke="#334155" stroke-width="0.8"/>
+      <text x="12" y="20" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">Tenant Context</text>
+      <text x="12" y="36" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9.5" fill="#94A3B8">useTenant() &amp; Company Switcher</text>
+      <text x="12" y="52" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" font-weight="600" fill="#F59E0B">SaaS Master vs Tenant</text>
+    </g>
+
+    <g transform="translate(14, 274)">
+      <!-- Item 4 -->
+      <rect width="182" height="64" rx="8" fill="#0F172A" stroke="#334155" stroke-width="0.8"/>
+      <text x="12" y="20" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">Evolution WhatsApp</text>
+      <text x="12" y="36" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9.5" fill="#94A3B8">Chatbot &amp; Avisos Financeiros</text>
+      <text x="12" y="52" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" font-weight="600" fill="#10B981">Webhooks 2-Way</text>
+    </g>
+  </g>
+
+  <!-- Connect Arrow 1 -> 2 -->
+  <g transform="translate(275, 275)">
+    <line x1="0" y1="0" x2="45" y2="0" stroke="#38BDF8" stroke-width="2" stroke-dasharray="4,4"/>
+    <polygon points="45,-5 55,0 45,5" fill="#38BDF8"/>
+  </g>
+
+  <!-- 2. EDGE GATEWAY & SECURITY LAYER -->
+  <g transform="translate(335, 100)" filter="url(#boxShadow)">
+    <rect width="210" height="360" rx="12" fill="url(#blueBoxGrad)" stroke="#1E6FD9" stroke-width="1.5"/>
+    <rect width="210" height="36" rx="12" fill="#1E6FD9" fill-opacity="0.25"/>
+    <rect y="24" width="210" height="12" fill="#1E6FD9" fill-opacity="0.25"/>
+    <text x="16" y="24" font-family="monospace" font-size="11" font-weight="700" fill="#38BDF8">02. EDGE &amp; SEGURANÇA</text>
+
+    <g transform="translate(14, 52)">
+      <rect width="182" height="64" rx="8" fill="#0F172A" stroke="#334155" stroke-width="0.8"/>
+      <text x="12" y="20" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">Cloudflare Workers</text>
+      <text x="12" y="36" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9.5" fill="#94A3B8">Zero Cold Start &lt; 15ms</text>
+      <text x="12" y="52" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" font-weight="600" fill="#10B981">Cloudflare Pages Build</text>
+    </g>
+
+    <g transform="translate(14, 126)">
+      <rect width="182" height="64" rx="8" fill="#0F172A" stroke="#334155" stroke-width="0.8"/>
+      <text x="12" y="20" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">JWT HttpOnly Cookie</text>
+      <text x="12" y="36" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9.5" fill="#94A3B8">PBKDF2 Web Crypto Session</text>
+      <text x="12" y="52" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" font-weight="600" fill="#38BDF8">Anti-Tamper Signature</text>
+    </g>
+
+    <g transform="translate(14, 200)">
+      <rect width="182" height="64" rx="8" fill="#0F172A" stroke="#EF4444" stroke-width="0.8"/>
+      <text x="12" y="20" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" font-weight="700" fill="#F87171">Barreira Cross-Tenant</text>
+      <text x="12" y="36" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9.5" fill="#94A3B8">Header x-company-id Guard</text>
+      <text x="12" y="52" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" font-weight="600" fill="#EF4444">403 Forbidden se violado</text>
+    </g>
+
+    <g transform="translate(14, 274)">
+      <rect width="182" height="64" rx="8" fill="#0F172A" stroke="#334155" stroke-width="0.8"/>
+      <text x="12" y="20" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">Permissão por Módulo</text>
+      <text x="12" y="36" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9.5" fill="#94A3B8">allowedModules Filtering</text>
+      <text x="12" y="52" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" font-weight="600" fill="#F59E0B">Super ADM | Gestor | Colab</text>
+    </g>
+  </g>
+
+  <!-- Connect Arrow 2 -> 3 -->
+  <g transform="translate(550, 275)">
+    <line x1="0" y1="0" x2="45" y2="0" stroke="#38BDF8" stroke-width="2" stroke-dasharray="4,4"/>
+    <polygon points="45,-5 55,0 45,5" fill="#38BDF8"/>
+  </g>
+
+  <!-- 3. APPLICATION & AI CORE -->
+  <g transform="translate(610, 100)" filter="url(#boxShadow)">
+    <rect width="210" height="360" rx="12" fill="url(#blueBoxGrad)" stroke="#334155" stroke-width="1.2"/>
+    <rect width="210" height="36" rx="12" fill="#1E293B"/>
+    <rect y="24" width="210" height="12" fill="#1E293B"/>
+    <text x="16" y="24" font-family="monospace" font-size="11" font-weight="700" fill="#38BDF8">03. NÚCLEO &amp; IA ENGINE</text>
+
+    <g transform="translate(14, 52)">
+      <rect width="182" height="64" rx="8" fill="#0F172A" stroke="#334155" stroke-width="0.8"/>
+      <text x="12" y="20" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">Multi-LLM Router</text>
+      <text x="12" y="36" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9.5" fill="#94A3B8">GPT-4o, Claude 3.7, Gemini 2.5</text>
+      <text x="12" y="52" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" font-weight="600" fill="#10B981">Model Map + Provider Resolver</text>
+    </g>
+
+    <g transform="translate(14, 126)">
+      <rect width="182" height="64" rx="8" fill="#0F172A" stroke="#334155" stroke-width="0.8"/>
+      <text x="12" y="20" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">Economia OmniCoins</text>
+      <text x="12" y="36" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9.5" fill="#94A3B8">1 Coin = R$ 0,10 (FinOps)</text>
+      <text x="12" y="52" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" font-weight="600" fill="#38BDF8">Dedução atômica por tenant</text>
+    </g>
+
+    <g transform="translate(14, 200)">
+      <rect width="182" height="64" rx="8" fill="#0F172A" stroke="#334155" stroke-width="0.8"/>
+      <text x="12" y="20" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">Motor Sync Conta Azul</text>
+      <text x="12" y="36" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9.5" fill="#94A3B8">Auto-Sync Otimizado Edge</text>
+      <text x="12" y="52" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" font-weight="600" fill="#10B981">&lt; 12 subrequests per call</text>
+    </g>
+
+    <g transform="translate(14, 274)">
+      <rect width="182" height="64" rx="8" fill="#0F172A" stroke="#334155" stroke-width="0.8"/>
+      <text x="12" y="20" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">IA BPO &amp; Docs Engine</text>
+      <text x="12" y="36" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9.5" fill="#94A3B8">Conciliação, PDF A4, .pptx</text>
+      <text x="12" y="52" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" font-weight="600" fill="#F59E0B">Vision OCR de Faturas</text>
+    </g>
+  </g>
+
+  <!-- Connect Arrow 3 -> 4 -->
+  <g transform="translate(825, 275)">
+    <line x1="0" y1="0" x2="45" y2="0" stroke="#38BDF8" stroke-width="2" stroke-dasharray="4,4"/>
+    <polygon points="45,-5 55,0 45,5" fill="#38BDF8"/>
+  </g>
+
+  <!-- 4. EXTERNAL INTEGRATIONS & DB -->
+  <g transform="translate(885, 100)" filter="url(#boxShadow)">
+    <rect width="170" height="360" rx="12" fill="url(#blueBoxGrad)" stroke="#334155" stroke-width="1.2"/>
+    <rect width="170" height="36" rx="12" fill="#1E293B"/>
+    <rect y="24" width="170" height="12" fill="#1E293B"/>
+    <text x="14" y="24" font-family="monospace" font-size="10.5" font-weight="700" fill="#38BDF8">04. ECOSSISTEMA &amp; DB</text>
+
+    <g transform="translate(12, 52)">
+      <rect width="146" height="64" rx="8" fill="#0F172A" stroke="#334155" stroke-width="0.8"/>
+      <text x="10" y="20" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">OpenRouter API</text>
+      <text x="10" y="36" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" fill="#94A3B8">Unified LLM Gateway</text>
+      <text x="10" y="52" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="8.5" font-weight="600" fill="#38BDF8">Chave Master / Tenant</text>
+    </g>
+
+    <g transform="translate(12, 126)">
+      <rect width="146" height="64" rx="8" fill="#0F172A" stroke="#334155" stroke-width="0.8"/>
+      <text x="10" y="20" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">Conta Azul ERP</text>
+      <text x="10" y="36" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" fill="#94A3B8">OAuth 2.0 API v2</text>
+      <text x="10" y="52" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="8.5" font-weight="600" fill="#10B981">Clientes / DRE / Extratos</text>
+    </g>
+
+    <g transform="translate(12, 200)">
+      <rect width="146" height="64" rx="8" fill="#0F172A" stroke="#334155" stroke-width="0.8"/>
+      <text x="10" y="20" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">Stripe Subscriptions</text>
+      <text x="10" y="36" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" fill="#94A3B8">Billing &amp; Portal</text>
+      <text x="10" y="52" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="8.5" font-weight="600" fill="#F59E0B">HMAC Webhook Check</text>
+    </g>
+
+    <g transform="translate(12, 274)">
+      <rect width="146" height="64" rx="8" fill="#0F172A" stroke="#1E6FD9" stroke-width="1"/>
+      <text x="10" y="20" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">Supabase DB</text>
+      <text x="10" y="36" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" fill="#94A3B8">PostgreSQL + RLS</text>
+      <text x="10" y="52" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="8.5" font-weight="700" fill="#10B981">AES-256 GCM Rest</text>
+    </g>
+  </g>
+</svg>

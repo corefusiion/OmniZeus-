@@ -1,0 +1,241 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 500" width="1200" height="500">
+  <defs>
+    <!-- Background Gradients -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#070D18"/>
+      <stop offset="50%" stop-color="#0B132B"/>
+      <stop offset="100%" stop-color="#0A1124"/>
+    </linearGradient>
+
+    <radialGradient id="glowBlue" cx="20%" cy="30%" r="50%">
+      <stop offset="0%" stop-color="#1E6FD9" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#1E6FD9" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="glowCyan" cx="80%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#0EA5E9" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#0EA5E9" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Card Gradients -->
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#0F172A" stop-opacity="0.95"/>
+    </linearGradient>
+
+    <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1E6FD9"/>
+      <stop offset="100%" stop-color="#38BDF8"/>
+    </linearGradient>
+
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E2E8F0"/>
+    </linearGradient>
+
+    <linearGradient id="chartGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1E6FD9" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#1E6FD9" stop-opacity="0.0"/>
+    </linearGradient>
+
+    <!-- Shadow Filter -->
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+    <filter id="pillShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+
+    <!-- Pattern -->
+    <pattern id="gridPattern" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#334155" stroke-width="0.75" stroke-opacity="0.25"/>
+    </pattern>
+  </defs>
+
+  <!-- Base Canvas -->
+  <rect width="1200" height="500" fill="url(#bgGrad)"/>
+  <rect width="1200" height="500" fill="url(#gridPattern)"/>
+  <rect width="1200" height="500" fill="url(#glowBlue)"/>
+  <rect width="1200" height="500" fill="url(#glowCyan)"/>
+
+  <!-- Subtle Ambient Glow Rings -->
+  <circle cx="950" cy="250" r="300" fill="none" stroke="#1E6FD9" stroke-width="1" stroke-opacity="0.15" stroke-dasharray="6,8"/>
+  <circle cx="950" cy="250" r="220" fill="none" stroke="#38BDF8" stroke-width="1" stroke-opacity="0.2"/>
+
+  <!-- Left Side: Brand & Value Proposition -->
+  <g transform="translate(80, 75)">
+    <!-- Top Pill: Status -->
+    <g filter="url(#pillShadow)">
+      <rect x="0" y="0" width="270" height="32" rx="16" fill="#1E293B" fill-opacity="0.8" stroke="#334155" stroke-width="1"/>
+      <circle cx="16" cy="16" r="4" fill="#10B981"/>
+      <circle cx="16" cy="16" r="8" fill="none" stroke="#10B981" stroke-width="1" stroke-opacity="0.4"/>
+      <text x="30" y="20" font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif" font-size="11.5" font-weight="600" fill="#94A3B8" letter-spacing="0.5">
+        SaaS MULTI-TENANT ENTERPRISE 3.0
+      </text>
+    </g>
+
+    <!-- Brand Header with Logo Mark -->
+    <g transform="translate(0, 52)">
+      <!-- Zeus Lightning Hexagon Icon -->
+      <polygon points="26,0 52,15 52,45 26,60 0,45 0,15" fill="url(#primaryGrad)"/>
+      <path d="M 28,12 L 18,32 L 26,32 L 22,48 L 34,26 L 27,26 Z" fill="#FFFFFF"/>
+      
+      <!-- Brand Name -->
+      <text x="70" y="44" font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif" font-size="44" font-weight="900" fill="url(#textGrad)" letter-spacing="-1">
+        OMNI<tspan fill="#38BDF8">ZEUS</tspan>
+      </text>
+    </g>
+
+    <!-- Subtitle / Tagline -->
+    <text x="0" y="148" font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif" font-size="20" font-weight="700" fill="#F8FAFC">
+      The Enterprise Multi-Tenant AI Operating System
+    </text>
+
+    <!-- Description -->
+    <text x="0" y="178" font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif" font-size="14" font-weight="400" fill="#94A3B8" width="460">
+      <tspan x="0" dy="0">Automação de BPO Financeiro com sincronização 24/7 Conta Azul ERP,</tspan>
+      <tspan x="0" dy="22">orquestrador Multi-LLM (GPT-4o, Claude 3.7, Gemini 2.5), governança</tspan>
+      <tspan x="0" dy="22">multi-tenant isolada, economia OmniCoins e billing Stripe integrado.</tspan>
+    </text>
+
+    <!-- Technology & Architecture Badges -->
+    <g transform="translate(0, 260)">
+      <!-- Badge 1: Next.js Edge -->
+      <g>
+        <rect x="0" y="0" width="142" height="30" rx="8" fill="#0F172A" stroke="#1E6FD9" stroke-width="1.2" stroke-opacity="0.8"/>
+        <text x="12" y="19" font-family="monospace" font-size="11.5" font-weight="700" fill="#38BDF8">⚡ Next.js 14 Edge</text>
+      </g>
+      <!-- Badge 2: Multi-LLM -->
+      <g transform="translate(152, 0)">
+        <rect x="0" y="0" width="138" height="30" rx="8" fill="#0F172A" stroke="#334155" stroke-width="1"/>
+        <text x="12" y="19" font-family="monospace" font-size="11.5" font-weight="600" fill="#E2E8F0">🤖 Multi-LLM Hub</text>
+      </g>
+      <!-- Badge 3: Conta Azul -->
+      <g transform="translate(300, 0)">
+        <rect x="0" y="0" width="148" height="30" rx="8" fill="#0F172A" stroke="#334155" stroke-width="1"/>
+        <text x="12" y="19" font-family="monospace" font-size="11.5" font-weight="600" fill="#E2E8F0">🔄 Conta Azul 24/7</text>
+      </g>
+    </g>
+
+    <!-- Second Line of Badges -->
+    <g transform="translate(0, 300)">
+      <!-- Badge 4: Zero Cross Tenant -->
+      <g>
+        <rect x="0" y="0" width="158" height="30" rx="8" fill="#0F172A" stroke="#334155" stroke-width="1"/>
+        <text x="12" y="19" font-family="monospace" font-size="11.5" font-weight="600" fill="#E2E8F0">🛡️ Zero Cross-Tenant</text>
+      </g>
+      <!-- Badge 5: OmniCoins -->
+      <g transform="translate(168, 0)">
+        <rect x="0" y="0" width="132" height="30" rx="8" fill="#0F172A" stroke="#334155" stroke-width="1"/>
+        <text x="12" y="19" font-family="monospace" font-size="11.5" font-weight="600" fill="#E2E8F0">🪙 OmniCoins FinOps</text>
+      </g>
+      <!-- Badge 6: Stripe -->
+      <g transform="translate(310, 0)">
+        <rect x="0" y="0" width="138" height="30" rx="8" fill="#0F172A" stroke="#334155" stroke-width="1"/>
+        <text x="12" y="19" font-family="monospace" font-size="11.5" font-weight="600" fill="#E2E8F0">💳 Stripe Subscriptions</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Right Side: High-Fidelity UI Mockup Card -->
+  <g transform="translate(620, 60)" filter="url(#shadow)">
+    <!-- Window Frame -->
+    <rect x="0" y="0" width="500" height="380" rx="14" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.2"/>
+
+    <!-- Window Top Header Bar -->
+    <rect x="0" y="0" width="500" height="38" rx="14" fill="#0F172A"/>
+    <!-- Overwrite bottom rounded corners of top bar -->
+    <rect x="0" y="24" width="500" height="14" fill="#0F172A"/>
+    <line x1="0" y1="38" x2="500" y2="38" stroke="#334155" stroke-width="0.8"/>
+
+    <!-- Window Buttons -->
+    <circle cx="18" cy="19" r="5" fill="#EF4444"/>
+    <circle cx="34" cy="19" r="5" fill="#F59E0B"/>
+    <circle cx="50" cy="19" r="5" fill="#10B981"/>
+
+    <!-- URL Bar inside Window -->
+    <rect x="74" y="9" width="280" height="20" rx="5" fill="#1E293B" stroke="#334155" stroke-width="0.8"/>
+    <path d="M 86,18 L 86,16 A 4,4 0 0,1 94,16 L 94,18 M 84,18 L 96,18 L 96,24 L 84,24 Z" fill="none" stroke="#10B981" stroke-width="1.2"/>
+    <text x="104" y="23" font-family="monospace" font-size="9.5" fill="#94A3B8">app.omnizeus.com.br/dashboard</text>
+
+    <!-- Company Badge inside Header -->
+    <rect x="368" y="9" width="120" height="20" rx="5" fill="#1E6FD9" fill-opacity="0.2" stroke="#1E6FD9" stroke-width="0.8"/>
+    <text x="376" y="23" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9.5" font-weight="700" fill="#38BDF8">🏢 Zenitus Tech</text>
+
+    <!-- Mockup Body Content -->
+    <!-- KPI Row -->
+    <g transform="translate(18, 52)">
+      <!-- KPI 1 -->
+      <rect x="0" y="0" width="108" height="64" rx="8" fill="#1E293B" stroke="#334155" stroke-width="0.8"/>
+      <text x="10" y="18" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="8.5" font-weight="700" fill="#64748B" letter-spacing="0.5">FATURAMENTO</text>
+      <text x="10" y="38" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="800" fill="#FFFFFF">R$ 54.800</text>
+      <text x="10" y="52" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="8" font-weight="700" fill="#10B981">↑ +14.2% mês</text>
+
+      <!-- KPI 2 -->
+      <rect x="118" y="0" width="108" height="64" rx="8" fill="#1E293B" stroke="#334155" stroke-width="0.8"/>
+      <text x="128" y="18" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="8.5" font-weight="700" fill="#64748B" letter-spacing="0.5">CLIENTES ERP</text>
+      <text x="128" y="38" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="800" fill="#FFFFFF">162 Ativos</text>
+      <text x="128" y="52" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="8" font-weight="700" fill="#38BDF8">Conta Azul Sync</text>
+
+      <!-- KPI 3 -->
+      <rect x="236" y="0" width="108" height="64" rx="8" fill="#1E293B" stroke="#334155" stroke-width="0.8"/>
+      <text x="246" y="18" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="8.5" font-weight="700" fill="#64748B" letter-spacing="0.5">OMNICOINS</text>
+      <text x="246" y="38" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="800" fill="#38BDF8">15.000</text>
+      <text x="246" y="52" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="8" font-weight="600" fill="#94A3B8">Saldo da Franquia</text>
+
+      <!-- KPI 4 -->
+      <rect x="354" y="0" width="110" height="64" rx="8" fill="#1E293B" stroke="#334155" stroke-width="0.8"/>
+      <text x="364" y="18" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="8.5" font-weight="700" fill="#64748B" letter-spacing="0.5">STATUS IA BPO</text>
+      <text x="364" y="38" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="800" fill="#10B981">● Operando</text>
+      <text x="364" y="52" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="8" font-weight="600" fill="#64748B">4 Modelos Ativos</text>
+    </g>
+
+    <!-- Chart Block inside Mockup -->
+    <g transform="translate(18, 128)">
+      <rect x="0" y="0" width="464" height="135" rx="8" fill="#1E293B" fill-opacity="0.7" stroke="#334155" stroke-width="0.8"/>
+      <text x="14" y="20" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="10" font-weight="700" fill="#E2E8F0">
+        Fluxo Financeiro Projetado vs. Realizado (Conta Azul ERP)
+      </text>
+      <text x="380" y="20" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="8.5" font-weight="600" fill="#10B981">
+        ● Tempo Real
+      </text>
+
+      <!-- Sparkline Area + Curve -->
+      <path d="M 20,105 Q 80,75 140,88 T 260,50 T 360,65 T 444,30 L 444,120 L 20,120 Z" fill="url(#chartGrad)"/>
+      <path d="M 20,105 Q 80,75 140,88 T 260,50 T 360,65 T 444,30" fill="none" stroke="#38BDF8" stroke-width="2.5" stroke-linecap="round"/>
+      
+      <!-- Chart Dots -->
+      <circle cx="140" cy="88" r="3.5" fill="#38BDF8" stroke="#0F172A" stroke-width="1.5"/>
+      <circle cx="260" cy="50" r="3.5" fill="#38BDF8" stroke="#0F172A" stroke-width="1.5"/>
+      <circle cx="444" cy="30" r="4.5" fill="#10B981" stroke="#FFFFFF" stroke-width="1.5"/>
+    </g>
+
+    <!-- Bottom Actions / Mini Table inside Mockup -->
+    <g transform="translate(18, 275)">
+      <rect x="0" y="0" width="464" height="85" rx="8" fill="#1E293B" stroke="#334155" stroke-width="0.8"/>
+      <text x="14" y="18" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9.5" font-weight="700" fill="#94A3B8">ÚLTIMAS ATIVIDADES AUTOMATIZADAS POR IA</text>
+
+      <!-- Item 1 -->
+      <g transform="translate(14, 28)">
+        <circle cx="6" cy="7" r="3.5" fill="#38BDF8"/>
+        <text x="18" y="10" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" font-weight="600" fill="#F8FAFC">Conciliação Bancária Extrato Bradesco #4910</text>
+        <text x="320" y="10" font-family="monospace" font-size="8.5" fill="#10B981">Sincronizado</text>
+        <text x="400" y="10" font-family="monospace" font-size="8" fill="#64748B">há 2 min</text>
+      </g>
+      <!-- Item 2 -->
+      <g transform="translate(14, 46)">
+        <circle cx="6" cy="7" r="3.5" fill="#A855F7"/>
+        <text x="18" y="10" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" font-weight="600" fill="#F8FAFC">OCR Boleto Fiscal &amp; Classificação DRE</text>
+        <text x="320" y="10" font-family="monospace" font-size="8.5" fill="#38BDF8">5 Coins</text>
+        <text x="400" y="10" font-family="monospace" font-size="8" fill="#64748B">há 8 min</text>
+      </g>
+      <!-- Item 3 -->
+      <g transform="translate(14, 64)">
+        <circle cx="6" cy="7" r="3.5" fill="#10B981"/>
+        <text x="18" y="10" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" font-weight="600" fill="#F8FAFC">Relatório Executivo PDF A4 Gerado (Honorários)</text>
+        <text x="320" y="10" font-family="monospace" font-size="8.5" fill="#10B981">Concluído</text>
+        <text x="400" y="10" font-family="monospace" font-size="8" fill="#64748B">há 14 min</text>
+      </g>
+    </g>
+  </g>
+</svg>
