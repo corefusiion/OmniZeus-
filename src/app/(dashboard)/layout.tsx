@@ -59,7 +59,7 @@ function DashboardShell({
   // gestor/super_adm nunca bloqueados; sessão não reidratada nunca bloqueia.
   useEffect(() => {
     if (!currentUser.id) return; // sessão ainda reidratando — não bloquear com default
-    const isSuperAdmin = currentUser.role === "super_adm" || currentUser.email === "jsgleisson@gmail.com";
+    const isSuperAdmin = currentUser.role === "super_adm" || currentUser.email === "admin@omnizeus.local" || currentUser.email === "jsgleisson@gmail.com";
     if (!isSuperAdmin && isRouteMatch(pathname, SAAS_ROUTES)) {
       router.replace("/dashboard");
       return;
@@ -122,7 +122,7 @@ function DashboardShell({
     }
   };
 
-  const isSuperAdmin = currentUser.role === "super_adm" || currentUser.email === "jsgleisson@gmail.com";
+  const isSuperAdmin = currentUser.role === "super_adm" || currentUser.email === "admin@omnizeus.local" || currentUser.email === "jsgleisson@gmail.com";
   const isCompanySuspended = activeCompany && activeCompany.status === "Suspenso" && !isSuperAdmin;
   const isPastDueGrace = activeCompany && activeCompany.subscription_status === "past_due" && !isCompanySuspended;
 

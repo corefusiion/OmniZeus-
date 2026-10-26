@@ -314,11 +314,11 @@ Para navegar e validar todos os papéis e isolamentos da plataforma, utilize as 
 
 | Papel | E-mail | Senha | Escopo de Visibilidade |
 | :--- | :--- | :---: | :--- |
-| 👑 **Super Admin Master** | `jsgleisson@gmail.com` | `Design20` | Painel Master SaaS (`/dashboard-master`), Centro Multi-Finance e alternância para qualquer empresa |
-| 🛡️ **Gestor Alpha** | `gestor_alpha@teste-alpha.local` | `Design20` | Visão completa da **Empresa Alpha** (Financeiro, Conta Azul, Usuários, Equipe) |
-| 👤 **Funcionário Alpha** | `funcionario02@teste-alpha.local` | `Design20` | Acesso operacional restrito aos módulos liberados em sua permissão |
-| 🛡️ **Gestor Beta** | `gestor_beta@teste-beta.local` | `Design20` | Acesso estritamente isolado à **Empresa Beta** (Zero vazamento para Alpha) |
-| 🛡️ **Gestor Gamma** | `gestor_gamma@teste-gamma.local` | `Design20` | Acesso estritamente isolado à **Empresa Gamma** |
+| 👑 **Super Admin Master** | `admin@omnizeus.local` | `Admin@123` | Painel Master SaaS (`/dashboard-master`), Centro Multi-Finance e alternância para qualquer empresa |
+| 🛡️ **Gestor Alpha** | `gestor_alpha@teste-alpha.local` | `Gestor@123` | Visão completa da **Empresa Alpha** (Financeiro, Conta Azul, Usuários, Equipe) |
+| 👤 **Funcionário Alpha** | `funcionario02@teste-alpha.local` | `Colab@123` | Acesso operacional restrito aos módulos liberados em sua permissão |
+| 🛡️ **Gestor Beta** | `gestor_beta@teste-beta.local` | `Gestor@123` | Acesso estritamente isolado à **Empresa Beta** (Zero vazamento para Alpha) |
+| 🛡️ **Gestor Gamma** | `gestor_gamma@teste-gamma.local` | `Gestor@123` | Acesso estritamente isolado à **Empresa Gamma** |
 
 ---
 

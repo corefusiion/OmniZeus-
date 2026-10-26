@@ -89,7 +89,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   }, [router]);
 
   const user = getCurrentUser();
-  const isSuperAdmin = role === "super_adm" || user.email === "jsgleisson@gmail.com";
+  const isSuperAdmin = role === "super_adm" || user.email === "admin@omnizeus.local" || user.email === "jsgleisson@gmail.com";
 
   const companies = getCompanies();
   const activeCompany = tenantId ? (companies.find(c => c.id === tenantId) || null) : null;

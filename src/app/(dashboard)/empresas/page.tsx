@@ -175,7 +175,7 @@ export default function EmpresasPage() {
     }
   }, [activeTab, selectedTenant]);
 
-  const isMasterAdmin = user.role === "super_adm" || user.email === "jsgleisson@gmail.com";
+  const isMasterAdmin = user.role === "super_adm" || user.email === "admin@omnizeus.local" || user.email === "jsgleisson@gmail.com";
 
   // Filtered companies list
   const filteredCompanies = useMemo(() => {

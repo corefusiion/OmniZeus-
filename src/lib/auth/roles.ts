@@ -14,7 +14,15 @@ export interface UserProfile {
 export const PRODUCTION_USERS: UserProfile[] = [
   {
     id: 'usr_super',
-    name: 'Gleisson (Master Admin)',
+    name: 'Master Admin',
+    email: 'admin@omnizeus.local',
+    role: 'super_adm',
+    companyId: 'global',
+    companyName: 'Visão Global SaaS Master'
+  },
+  {
+    id: 'usr_super_root',
+    name: 'Master Admin (Root)',
     email: 'jsgleisson@gmail.com',
     role: 'super_adm',
     companyId: 'global',

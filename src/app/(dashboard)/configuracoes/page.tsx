@@ -78,7 +78,7 @@ export default function ConfiguracoesPage() {
     };
   }, []);
 
-  const isMasterAdmin = user.role === "super_adm" || user.email === "jsgleisson@gmail.com";
+  const isMasterAdmin = user.role === "super_adm" || user.email === "admin@omnizeus.local" || user.email === "jsgleisson@gmail.com";
 
   const handleSaveSettings = () => {
     if (isMasterAdmin && activeComp) {
